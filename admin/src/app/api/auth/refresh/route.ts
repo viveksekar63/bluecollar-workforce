@@ -1,60 +1,78 @@
-import { NextResponse } from "next/server";
+import {
+  NextRequest,
+  NextResponse,
+} from "next/server";
 
 const BACKEND_URL =
   process.env.BACKEND_API_URL ||
   process.env.NEXT_PUBLIC_API_URL ||
   "http://localhost:3001/api/v1";
 
-export async function POST(request: Request) {
-  try {
-    const body = await request.json();
+export async function POST(
+  request: NextRequest,
+) {
+  const refreshToken =
+    request.cookies.get(
+      "worktrust_refresh_token",
+    )?.value;
 
+  if (!refreshToken) {
+    return NextResponse.json(
+      {
+        message: "Refresh token missing",
+      },
+      {
+        status: 401,
+      },
+    );
+  }
+
+  try {
     const response = await fetch(
-      `${BACKEND_URL}/auth/admin/login`,
+      `${BACKEND_URL}/auth/admin/refresh`,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          refreshToken,
+        }),
         cache: "no-store",
       },
     );
 
-    const data = await response.json().catch(() => ({}));
+    const data = await response
+      .json()
+      .catch(() => ({}));
 
     if (!response.ok) {
-      return NextResponse.json(
+      const result = NextResponse.json(
         {
           message:
             data.message ||
-            "Invalid email or password",
+            "Refresh token expired",
         },
         {
           status: response.status,
         },
       );
-    }
 
-    if (!data.accessToken || !data.refreshToken) {
-      return NextResponse.json(
-        {
-          message:
-            "Login succeeded but authentication tokens were not returned",
-        },
-        {
-          status: 502,
-        },
+      result.cookies.delete(
+        "worktrust_access_token",
       );
+
+      result.cookies.delete(
+        "worktrust_refresh_token",
+      );
+
+      return result;
     }
 
     const result = NextResponse.json({
       user: data.user ?? null,
     });
 
-    /*
-     * Access token
-     */
     result.cookies.set(
       "worktrust_access_token",
       data.accessToken,
@@ -68,7 +86,8 @@ export async function POST(request: Request) {
     );
 
     /*
-     * Refresh token
+     * IMPORTANT:
+     * Backend rotated the refresh token.
      */
     result.cookies.set(
       "worktrust_refresh_token",
@@ -83,13 +102,11 @@ export async function POST(request: Request) {
     );
 
     return result;
-  } catch (error) {
-    console.error("Admin login error:", error);
-
+  } catch {
     return NextResponse.json(
       {
         message:
-          "Unable to connect to the authentication service",
+          "Unable to refresh authentication",
       },
       {
         status: 503,

@@ -1,30 +1,55 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/api/auth/login", "/api/auth/logout"] as const;
+const PUBLIC_PATHS = [
+  "/login",
+  "/api/auth/login",
+  "/api/auth/logout",
+  "/api/auth/refresh",
+] as const;
 
 function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.some(
-    (path) => pathname === path || pathname.startsWith(`${path}/`)
+    (path) => pathname === path || pathname.startsWith(`${path}/`),
   );
 }
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Public routes are allowed without authentication.
+  /*
+   * Public routes
+   */
   if (isPublicPath(pathname)) {
-    if (pathname === "/login" && request.cookies.has("worktrust_access_token")) {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
+    /*
+     * If user is already logged in and opens /login,
+     * redirect to dashboard.
+     */
+    if (
+      pathname === "/login" &&
+      request.cookies.has("worktrust_access_token")
+    ) {
+      return NextResponse.redirect(
+        new URL("/dashboard", request.url),
+      );
     }
+
     return NextResponse.next();
   }
 
-  // All application pages are protected.
-  const token = request.cookies.get("worktrust_access_token")?.value;
+  /*
+   * Protected application routes
+   */
+  const accessToken =
+    request.cookies.get("worktrust_access_token")?.value;
 
-  if (!token) {
+  if (!accessToken) {
     const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("returnUrl", pathname);
+
+    loginUrl.searchParams.set(
+      "returnUrl",
+      pathname,
+    );
+
     return NextResponse.redirect(loginUrl);
   }
 
@@ -45,5 +70,6 @@ export const config = {
     "/messages/:path*",
     "/settings/:path*",
     "/login",
+    "/api/auth/:path*",
   ],
 };

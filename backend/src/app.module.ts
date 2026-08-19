@@ -17,9 +17,32 @@ import { RatingsModule } from './ratings/ratings.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ComplaintsModule } from './complaints/complaints.module';
 import { AuditModule } from './audit/audit.module';
+import { PrismaModule } from './prisma/prisma.module';
+import { ConfigModule } from '@nestjs/config';
 
 @Module({
-  imports: [AuthModule, UsersModule, WorkersModule, EmployersModule, EmploymentModule, DocumentsModule, VerificationModule, SkillsModule, JobsModule, ApplicationsModule, AttendanceModule, PaymentsModule, RatingsModule, NotificationsModule, ComplaintsModule, AuditModule],
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+    }),
+    AuthModule,
+    UsersModule,
+    WorkersModule,
+    EmployersModule,
+    EmploymentModule,
+    DocumentsModule,
+    VerificationModule,
+    SkillsModule,
+    JobsModule,
+    ApplicationsModule,
+    AttendanceModule,
+    PaymentsModule,
+    RatingsModule,
+    NotificationsModule,
+    ComplaintsModule,
+    AuditModule,
+    PrismaModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })
