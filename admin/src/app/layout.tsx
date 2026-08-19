@@ -1,7 +1,6 @@
 import "./globals.css";
 import type { Metadata } from "next";
-import { Providers } from "./providers";
-
+import { QueryProvider } from "@/providers/query-provider";
 export const metadata: Metadata = {
   title: "WorkTrust Admin",
   description: "Verified blue-collar workforce administration",
@@ -10,7 +9,11 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body><Providers>{children}</Providers></body>
+      <body>
+        <QueryProvider>
+          {children}
+        </QueryProvider>
+      </body>
     </html>
   );
 }
