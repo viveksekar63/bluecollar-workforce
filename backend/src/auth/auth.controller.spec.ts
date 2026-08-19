@@ -1,18 +1,37 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { AuthController } from './auth.controller';
+import { Test, TestingModule } from "@nestjs/testing";
+import { AuthController } from "./auth.controller";
+import { AuthService } from "./auth.service";
 
-describe('AuthController', () => {
+describe("AuthController", () => {
   let controller: AuthController;
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      controllers: [AuthController],
-    }).compile();
+  const authServiceMock = {
+    adminLogin: jest.fn(),
+    refreshToken: jest.fn(),
+    logout: jest.fn(),
+    getAdminMe: jest.fn(),
+    getAdminPermissions: jest.fn(),
+  };
 
-    controller = module.get<AuthController>(AuthController);
+  beforeEach(async () => {
+    const module: TestingModule =
+      await Test.createTestingModule({
+        controllers: [AuthController],
+        providers: [
+          {
+            provide: AuthService,
+            useValue: authServiceMock,
+          },
+        ],
+      }).compile();
+
+    controller =
+      module.get<AuthController>(
+        AuthController,
+      );
   });
 
-  it('should be defined', () => {
+  it("should be defined", () => {
     expect(controller).toBeDefined();
   });
 });
