@@ -10,6 +10,7 @@ import { AuthModule } from "./auth/auth.module";
 import { DashboardModule } from "./dashboard/dashboard.module";
 
 import { UsersModule } from "./users/users.module";
+import { RolesModule } from "./roles/roles.module";
 import { WorkersModule } from "./workers/workers.module";
 import { EmployersModule } from "./employers/employers.module";
 import { EmploymentModule } from "./employment/employment.module";
@@ -42,6 +43,7 @@ import { AuditModule } from "./audit/audit.module";
 
     // Admin / Workforce Modules
     UsersModule,
+    RolesModule,
     WorkersModule,
     EmployersModule,
     EmploymentModule,
