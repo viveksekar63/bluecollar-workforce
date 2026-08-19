@@ -10,7 +10,9 @@ import {
   PERMISSIONS_KEY,
 } from "./permission.decorator";
 
-import { PermissionService } from "./permission.service";
+import {
+  PermissionService,
+} from "./permission.service";
 
 @Injectable()
 export class PermissionGuard
@@ -33,10 +35,11 @@ export class PermissionGuard
         ],
       );
 
-    /*
-     * No permission requirement.
-     */
-    if (!permissions || permissions.length === 0) {
+    // No permission requirement
+    if (
+      !permissions ||
+      permissions.length === 0
+    ) {
       return true;
     }
 
@@ -45,7 +48,7 @@ export class PermissionGuard
 
     const user = request.user;
 
-    if (!user?.sub) {
+    if (!user?.userId) {
       throw new ForbiddenException(
         "User authentication required",
       );
@@ -53,7 +56,7 @@ export class PermissionGuard
 
     const hasPermission =
       await this.permissionService.hasAnyPermission(
-        user.sub,
+        user.userId,
         permissions,
       );
 

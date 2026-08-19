@@ -1,11 +1,13 @@
-import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { JwtModule } from '@nestjs/jwt';
-import { PassportModule } from '@nestjs/passport';
+import { Module } from "@nestjs/common";
+import { JwtModule } from "@nestjs/jwt";
+import { ConfigModule, ConfigService } from "@nestjs/config";
 
-import { AuthController } from './auth.controller';
-import { AuthService } from './auth.service';
-import { JwtStrategy } from './strategies/jwt.strategy';
+import { AuthController } from "./auth.controller";
+import { AuthService } from "./auth.service";
+
+import { JwtStrategy } from "./strategies/jwt.strategy";
+import { JwtAuthGuard } from "./guards/jwt-auth.guard";
+
 import { PermissionService } from "./permissions/permission.service";
 import { PermissionGuard } from "./permissions/permission.guard";
 
@@ -13,37 +15,43 @@ import { PermissionGuard } from "./permissions/permission.guard";
   imports: [
     ConfigModule,
 
-    PassportModule,
-
     JwtModule.registerAsync({
       imports: [ConfigModule],
 
       inject: [ConfigService],
 
-      useFactory: (configService: ConfigService) => ({
-        secret: configService.getOrThrow<string>(
-          'JWT_ACCESS_SECRET',
-        ),
+      useFactory: (
+        configService: ConfigService,
+      ) => ({
+        secret:
+          configService.get<string>(
+            "JWT_ACCESS_SECRET",
+          ),
 
         signOptions: {
-          expiresIn: '15m',
+          expiresIn:
+            configService.get<
+              "1d" | "7d" | "30d"
+            >("JWT_ACCESS_EXPIRES_IN") || "1d",
         },
       }),
     }),
   ],
 
-  controllers: [AuthController],
+  controllers: [
+    AuthController,
+  ],
 
   providers: [
     AuthService,
     JwtStrategy,
+    JwtAuthGuard,
+
     PermissionService,
     PermissionGuard,
   ],
 
   exports: [
-    AuthService,
-    JwtModule,
     PermissionService,
     PermissionGuard,
   ],

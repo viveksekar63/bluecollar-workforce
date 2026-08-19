@@ -11,6 +11,7 @@ import {
   generateRefreshToken,
   hashRefreshToken,
 } from './utils/token.utils';
+import { PermissionService } from './permissions/permission.service';
 
 @Injectable()
 export class AuthService {
@@ -18,6 +19,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly permissionService: PermissionService,
   ) {}
 
   async adminLogin(
@@ -86,6 +88,12 @@ export class AuthService {
       roles,
     );
   }
+
+  async getAdminPermissions(userId: string) {
+    return this.permissionService.getUserPermissions(
+        userId,
+    );
+ }
 
   private async generateAuthTokens(
     userId: string,
