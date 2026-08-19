@@ -1,0 +1,86 @@
+services:
+
+  postgres:
+    image: postgres:16
+    container_name: bluecollar-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: bluecollar
+      POSTGRES_USER: bluecollar
+      POSTGRES_PASSWORD: bluecollar_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - bluecollar
+
+  redis:
+    image: redis:7-alpine
+    container_name: bluecollar-redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - bluecollar
+
+  minio:
+    image: minio/minio:latest
+    container_name: bluecollar-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: bluecollar
+      MINIO_ROOT_PASSWORD: bluecollar_minio_password
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - bluecollar
+
+  opensearch:
+    image: opensearchproject/opensearch:2.19.0
+    container_name: bluecollar-opensearch
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      DISABLE_SECURITY_PLUGIN: "true"
+      OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+      - "9600:9600"
+    volumes:
+      - opensearch_data:/usr/share/opensearch/data
+    networks:
+      - bluecollar
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: bluecollar-backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    ports:
+      - "3001:3000"
+    depends_on:
+      - postgres
+      - redis
+      - minio
+      - opensearch
+    networks:
+      - bluecollar
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  opensearch_data:
+
+networks:
+  bluecollar:
+    driver: bridge
