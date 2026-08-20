@@ -21,6 +21,7 @@ import {
 import { AdminShell } from "@/components/layout/admin-shell";
 import { CreateUserDialog } from "@/components/users/create-user-dialog";
 import { useUsers } from "@/hooks/use-users";
+import Link from "next/link";
 
 import type {
   CreateUserPayload,
@@ -112,18 +113,16 @@ function StatusBadge({
 
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-        active
+      className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${active
           ? "bg-emerald-50 text-emerald-700"
           : "bg-slate-100 text-slate-600"
-      }`}
+        }`}
     >
       <span
-        className={`mr-1.5 h-1.5 w-1.5 rounded-full ${
-          active
+        className={`mr-1.5 h-1.5 w-1.5 rounded-full ${active
             ? "bg-emerald-500"
             : "bg-slate-400"
-        }`}
+          }`}
       />
 
       {active
@@ -274,7 +273,7 @@ export default function UsersPage() {
         if (!response.ok) {
           const message =
             typeof data?.message ===
-            "string"
+              "string"
               ? data.message
               : "Unable to load roles";
 
@@ -286,8 +285,8 @@ export default function UsersPage() {
             Array.isArray(data)
               ? data
               : Array.isArray(
-                    data?.data,
-                  )
+                data?.data,
+              )
                 ? data.data
                 : [],
           );
@@ -401,8 +400,8 @@ export default function UsersPage() {
     () =>
       Boolean(
         search ||
-          status ||
-          roleId,
+        status ||
+        roleId,
       ),
     [
       search,
@@ -415,17 +414,17 @@ export default function UsersPage() {
     meta.total === 0
       ? 0
       : (meta.page - 1) *
-          meta.limit +
-        1;
+      meta.limit +
+      1;
 
   const showingTo =
     meta.total === 0
       ? 0
       : Math.min(
-          meta.page *
-            meta.limit,
-          meta.total,
-        );
+        meta.page *
+        meta.limit,
+        meta.total,
+      );
 
   return (
     <AdminShell>
@@ -833,8 +832,8 @@ export default function UsersPage() {
                                 <td className="px-5 py-4">
                                   <div className="flex max-w-[260px] flex-wrap gap-1.5">
                                     {user.roles &&
-                                    user.roles
-                                      .length >
+                                      user.roles
+                                        .length >
                                       0 ? (
                                       user.roles.map(
                                         (
@@ -876,12 +875,13 @@ export default function UsersPage() {
 
                                 {/* Actions */}
                                 <td className="px-5 py-4 text-right">
-                                  <button
-                                    type="button"
+                                  <Link
+                                    href={`/users/${user.id}`}
+                                    prefetch={false}
                                     className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
                                   >
                                     View
-                                  </button>
+                                  </Link>
                                 </td>
                               </tr>
                             ),
@@ -916,7 +916,7 @@ export default function UsersPage() {
                           }
                           disabled={
                             meta.page <=
-                              1 ||
+                            1 ||
                             loading
                           }
                           className="inline-flex h-9 items-center gap-1 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
@@ -943,7 +943,7 @@ export default function UsersPage() {
                           }
                           disabled={
                             meta.page >=
-                              meta.totalPages ||
+                            meta.totalPages ||
                             loading
                           }
                           className="inline-flex h-9 items-center gap-1 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
