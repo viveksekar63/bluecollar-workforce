@@ -14,6 +14,7 @@ import {
   RefreshCw,
   Search,
   ShieldCheck,
+  Trash2,
   UserRound,
   X,
 } from "lucide-react";
@@ -114,14 +115,14 @@ function StatusBadge({
   return (
     <span
       className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${active
-          ? "bg-emerald-50 text-emerald-700"
-          : "bg-slate-100 text-slate-600"
+        ? "bg-emerald-50 text-emerald-700"
+        : "bg-slate-100 text-slate-600"
         }`}
     >
       <span
         className={`mr-1.5 h-1.5 w-1.5 rounded-full ${active
-            ? "bg-emerald-500"
-            : "bg-slate-400"
+          ? "bg-emerald-500"
+          : "bg-slate-400"
           }`}
       />
 
@@ -221,6 +222,17 @@ export default function UsersPage() {
 
   const [createUserOpen, setCreateUserOpen] =
     useState(false);
+  const [deleteUserOpen, setDeleteUserOpen] =
+    useState(false);
+
+  const [selectedUser, setSelectedUser] =
+    useState<User | null>(null);
+
+  const [deleteLoading, setDeleteLoading] =
+    useState(false);
+
+  const [deleteError, setDeleteError] =
+    useState<string | null>(null);
 
   const {
     users,
@@ -229,6 +241,7 @@ export default function UsersPage() {
     error,
     fetchUsers,
     createUser,
+    deleteUser,
   } = useUsers({
     page,
     limit: PAGE_SIZE,
@@ -394,6 +407,55 @@ export default function UsersPage() {
       roleId:
         roleId || undefined,
     });
+  }
+
+  async function handleDeleteUser() {
+    if (!selectedUser) {
+      return;
+    }
+
+    setDeleteLoading(true);
+    setDeleteError(null);
+
+    try {
+      await deleteUser(selectedUser.id);
+
+      setDeleteUserOpen(false);
+      setSelectedUser(null);
+
+      /*
+      * If the last user on the current page
+      * was deleted, move back one page.
+      */
+      const remainingUsersOnPage =
+        users.length - 1;
+
+      if (
+        remainingUsersOnPage === 0 &&
+        meta.page > 1
+      ) {
+        setPage(meta.page - 1);
+      } else {
+        await fetchUsers({
+          page,
+          limit: PAGE_SIZE,
+          search:
+            search || undefined,
+          status:
+            status || undefined,
+          roleId:
+            roleId || undefined,
+        });
+      }
+    } catch (err) {
+      setDeleteError(
+        err instanceof Error
+          ? err.message
+          : "Unable to delete user",
+      );
+    } finally {
+      setDeleteLoading(false);
+    }
   }
 
   const hasFilters = useMemo(
@@ -875,13 +937,28 @@ export default function UsersPage() {
 
                                 {/* Actions */}
                                 <td className="px-5 py-4 text-right">
-                                  <Link
-                                    href={`/users/${user.id}`}
-                                    prefetch={false}
-                                    className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
-                                  >
-                                    View
-                                  </Link>
+                                  <div className="flex items-center justify-end gap-2">
+                                    <Link
+                                      href={`/users/${user.id}`}
+                                      prefetch={false}
+                                      className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
+                                    >
+                                      View
+                                    </Link>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setSelectedUser(user);
+                                        setDeleteError(null);
+                                        setDeleteUserOpen(true);
+                                      }}
+                                      className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-50"
+                                    >
+                                      <Trash2 size={13} />
+                                      Delete
+                                    </button>
+                                  </div>
                                 </td>
                               </tr>
                             ),
@@ -977,6 +1054,76 @@ export default function UsersPage() {
           handleCreateUser
         }
       />
+      {deleteUserOpen && selectedUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
+          <div className="w-full max-w-md rounded-xl bg-white shadow-xl">
+            <div className="border-b border-slate-200 px-6 py-5">
+              <h2 className="text-lg font-bold text-slate-900">
+                Delete User
+              </h2>
+
+              <p className="mt-1 text-sm text-slate-500">
+                This action cannot be undone.
+              </p>
+            </div>
+
+            <div className="px-6 py-5">
+              <p className="text-sm text-slate-700">
+                Are you sure you want to delete
+                {" "}
+                <span className="font-semibold text-slate-900">
+                  {getFullName(selectedUser)}
+                </span>
+                ?
+              </p>
+
+              {deleteError && (
+                <div className="mt-4 flex items-start gap-2 rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-xs text-red-700">
+                  <AlertCircle
+                    size={15}
+                    className="mt-0.5 shrink-0"
+                  />
+
+                  <span>{deleteError}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 border-t border-slate-200 px-6 py-4">
+              <button
+                type="button"
+                disabled={deleteLoading}
+                onClick={() => {
+                  setDeleteUserOpen(false);
+                  setSelectedUser(null);
+                  setDeleteError(null);
+                }}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                disabled={deleteLoading}
+                onClick={() => void handleDeleteUser()}
+                className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {deleteLoading && (
+                  <RefreshCw
+                    size={15}
+                    className="animate-spin"
+                  />
+                )}
+
+                {deleteLoading
+                  ? "Deleting..."
+                  : "Delete User"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AdminShell>
   );
 }
