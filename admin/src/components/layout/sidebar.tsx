@@ -9,14 +9,15 @@ import {
   BarChart3,
   BriefcaseBusiness,
   Building2,
+  CalendarCheck2,
   ClipboardCheck,
   CreditCard,
   Home,
+  KeyRound,
   MessageSquare,
   Settings,
   Users,
   UserRoundCheck,
-  CalendarCheck2,
 } from "lucide-react";
 
 type SidebarItem = [
@@ -30,6 +31,7 @@ const items: SidebarItem[] = [
 
   // User Management
   ["Users", "/users", UserRoundCheck],
+  ["Roles & Permissions", "/roles", KeyRound],
 
   ["Workers", "/workers", Users],
   ["Employers", "/employers", Building2],
@@ -64,12 +66,11 @@ export function Sidebar() {
         </div>
       </div>
 
-      <nav className="flex-1 space-y-1 px-3 pt-4">
+      <nav className="flex-1 space-y-1 overflow-y-auto px-3 pt-4">
         {items.map(([label, href, Icon]) => {
           const active =
             pathname === href ||
-            (href !== "/dashboard" &&
-              pathname.startsWith(href));
+            (href !== "/dashboard" && pathname.startsWith(href));
 
           return (
             <Link
