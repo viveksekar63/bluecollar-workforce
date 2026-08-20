@@ -10,7 +10,6 @@ import {
   AlertCircle,
   ChevronLeft,
   ChevronRight,
-  Filter,
   Plus,
   RefreshCw,
   Search,
@@ -18,11 +17,14 @@ import {
   UserRound,
   X,
 } from "lucide-react";
+
 import { AdminShell } from "@/components/layout/admin-shell";
+import { CreateUserDialog } from "@/components/users/create-user-dialog";
 import { useUsers } from "@/hooks/use-users";
+
 import type {
+  CreateUserPayload,
   User,
-  UserStatus,
 } from "@/types/users";
 
 interface RoleOption {
@@ -48,14 +50,22 @@ const STATUS_OPTIONS = [
 ];
 
 function getInitials(user: User) {
-  const first = user.firstName?.charAt(0) ?? "";
-  const last = user.lastName?.charAt(0) ?? "";
+  const first =
+    user.firstName?.charAt(0) ?? "";
 
-  return `${first}${last}`.toUpperCase() || "U";
+  const last =
+    user.lastName?.charAt(0) ?? "";
+
+  return (
+    `${first}${last}`.toUpperCase() || "U"
+  );
 }
 
 function getFullName(user: User) {
-  return [user.firstName, user.lastName]
+  return [
+    user.firstName,
+    user.lastName,
+  ]
     .filter(Boolean)
     .join(" ");
 }
@@ -71,19 +81,24 @@ function formatDate(value: string) {
     return "-";
   }
 
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(date);
+  return new Intl.DateTimeFormat(
+    "en-IN",
+    {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    },
+  ).format(date);
 }
 
 function getRoleLabel(name: string) {
   return name
     .replaceAll("_", " ")
     .toLowerCase()
-    .replace(/\b\w/g, (letter) =>
-      letter.toUpperCase(),
+    .replace(
+      /\b\w/g,
+      (letter) =>
+        letter.toUpperCase(),
     );
 }
 
@@ -110,7 +125,10 @@ function StatusBadge({
             : "bg-slate-400"
         }`}
       />
-      {active ? "Active" : "Inactive"}
+
+      {active
+        ? "Active"
+        : "Inactive"}
     </span>
   );
 }
@@ -166,6 +184,17 @@ function EmptyState({
   );
 }
 
+function UsersIcon() {
+  return (
+    <div className="relative flex items-center justify-center">
+      <UserRound
+        size={19}
+        className="text-blue-600"
+      />
+    </div>
+  );
+}
+
 export default function UsersPage() {
   const [searchInput, setSearchInput] =
     useState("");
@@ -191,24 +220,33 @@ export default function UsersPage() {
   const [rolesError, setRolesError] =
     useState<string | null>(null);
 
+  const [createUserOpen, setCreateUserOpen] =
+    useState(false);
+
   const {
     users,
     meta,
     loading,
     error,
     fetchUsers,
+    createUser,
   } = useUsers({
     page,
     limit: PAGE_SIZE,
-    search: search || undefined,
-    status: status || undefined,
-    roleId: roleId || undefined,
+    search:
+      search || undefined,
+    status:
+      status || undefined,
+    roleId:
+      roleId || undefined,
   });
 
   /*
-   * Load roles for the Role filter.
+   * Load roles for the Role filter
+   * and Create User dialog.
    *
-   * The role IDs come from the backend and are never hard-coded.
+   * Role IDs come from the backend
+   * and are never hard-coded.
    */
   useEffect(() => {
     let cancelled = false;
@@ -218,19 +256,20 @@ export default function UsersPage() {
       setRolesError(null);
 
       try {
-        const response = await fetch(
-          "/api/roles",
-          {
-            method: "GET",
-            credentials: "include",
-            cache: "no-store",
-          },
-        );
+        const response =
+          await fetch(
+            "/api/roles",
+            {
+              method: "GET",
+              credentials: "include",
+              cache: "no-store",
+            },
+          );
 
         const data =
-          await response.json().catch(
-            () => [],
-          );
+          await response
+            .json()
+            .catch(() => []);
 
         if (!response.ok) {
           const message =
@@ -246,7 +285,9 @@ export default function UsersPage() {
           setRoles(
             Array.isArray(data)
               ? data
-              : Array.isArray(data?.data)
+              : Array.isArray(
+                    data?.data,
+                  )
                 ? data.data
                 : [],
           );
@@ -274,11 +315,12 @@ export default function UsersPage() {
   }, []);
 
   /*
-   * Search is applied when the user presses Enter
-   * or clicks the search button.
+   * Search is applied when the user
+   * presses Enter or clicks Search.
    */
   function applySearch() {
     setPage(1);
+
     setSearch(
       searchInput.trim(),
     );
@@ -314,7 +356,8 @@ export default function UsersPage() {
 
   function handleNextPage() {
     if (
-      meta.page < meta.totalPages
+      meta.page <
+      meta.totalPages
     ) {
       setPage(meta.page + 1);
     }
@@ -324,9 +367,33 @@ export default function UsersPage() {
     await fetchUsers({
       page,
       limit: PAGE_SIZE,
-      search: search || undefined,
-      status: status || undefined,
-      roleId: roleId || undefined,
+      search:
+        search || undefined,
+      status:
+        status || undefined,
+      roleId:
+        roleId || undefined,
+    });
+  }
+
+  async function handleCreateUser(
+    payload: CreateUserPayload,
+  ) {
+    await createUser(payload);
+
+    setCreateUserOpen(false);
+
+    setPage(1);
+
+    await fetchUsers({
+      page: 1,
+      limit: PAGE_SIZE,
+      search:
+        search || undefined,
+      status:
+        status || undefined,
+      roleId:
+        roleId || undefined,
     });
   }
 
@@ -337,7 +404,11 @@ export default function UsersPage() {
           status ||
           roleId,
       ),
-    [search, status, roleId],
+    [
+      search,
+      status,
+      roleId,
+    ],
   );
 
   const showingFrom =
@@ -351,588 +422,561 @@ export default function UsersPage() {
     meta.total === 0
       ? 0
       : Math.min(
-          meta.page * meta.limit,
+          meta.page *
+            meta.limit,
           meta.total,
         );
 
   return (
     <AdminShell>
-    <div className="min-h-screen bg-slate-50">
-      <main className="ml-[238px] min-h-screen">
-        {/* Header */}
-        <div className="border-b border-slate-200 bg-white">
-          <div className="flex items-center justify-between px-8 py-6">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-                Users
-              </h1>
+      <div className="min-h-screen bg-slate-50">
+        <main className="ml-[238px] min-h-screen">
+          {/* Header */}
+          <div className="border-b border-slate-200 bg-white">
+            <div className="flex items-center justify-between px-8 py-6">
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+                  Users
+                </h1>
 
-              <p className="mt-1 text-sm text-slate-500">
-                Manage platform users and
-                their access.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              className="inline-flex items-center gap-2 rounded-lg bg-[#0864ec] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
-              disabled
-              title="User creation will be enabled in Pass 2"
-            >
-              <Plus size={17} />
-              Add User
-            </button>
-          </div>
-        </div>
-
-        <div className="px-8 py-6">
-          {/* Summary */}
-          <div className="mb-5 grid gap-4 md:grid-cols-3">
-            <div className="rounded-xl border border-slate-200 bg-white p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-slate-500">
-                    Total Users
-                  </p>
-
-                  <p className="mt-1 text-2xl font-bold text-slate-900">
-                    {meta.total.toLocaleString()}
-                  </p>
-                </div>
-
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50">
-                  <UsersIcon />
-                </div>
+                <p className="mt-1 text-sm text-slate-500">
+                  Manage platform users
+                  and their access.
+                </p>
               </div>
-            </div>
 
-            <div className="rounded-xl border border-slate-200 bg-white p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-slate-500">
-                    Current Page
-                  </p>
-
-                  <p className="mt-1 text-2xl font-bold text-slate-900">
-                    {meta.page}
-                  </p>
-                </div>
-
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50">
-                  <ShieldCheck
-                    size={19}
-                    className="text-emerald-600"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-slate-200 bg-white p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-slate-500">
-                    Available Roles
-                  </p>
-
-                  <p className="mt-1 text-2xl font-bold text-slate-900">
-                    {roles.length}
-                  </p>
-                </div>
-
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-50">
-                  <ShieldCheck
-                    size={19}
-                    className="text-purple-600"
-                  />
-                </div>
-              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  setCreateUserOpen(
+                    true,
+                  )
+                }
+                className="inline-flex items-center gap-2 rounded-lg bg-[#0864ec] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+              >
+                <Plus size={17} />
+                Add User
+              </button>
             </div>
           </div>
 
-          {/* Filters */}
-          <div className="rounded-xl border border-slate-200 bg-white">
-            <div className="border-b border-slate-200 px-5 py-4">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-                {/* Search */}
-                <div className="relative flex-1">
-                  <Search
-                    size={17}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                  />
+          <div className="px-8 py-6">
+            {/* Summary */}
+            <div className="mb-5 grid gap-4 md:grid-cols-3">
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-slate-500">
+                      Total Users
+                    </p>
 
-                  <input
-                    type="text"
-                    value={searchInput}
-                    onChange={(event) =>
-                      setSearchInput(
-                        event.target.value,
-                      )
-                    }
-                    onKeyDown={(event) => {
-                      if (
-                        event.key ===
-                        "Enter"
-                      ) {
-                        applySearch();
+                    <p className="mt-1 text-2xl font-bold text-slate-900">
+                      {meta.total.toLocaleString()}
+                    </p>
+                  </div>
+
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50">
+                    <UsersIcon />
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-slate-500">
+                      Current Page
+                    </p>
+
+                    <p className="mt-1 text-2xl font-bold text-slate-900">
+                      {meta.page}
+                    </p>
+                  </div>
+
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50">
+                    <ShieldCheck
+                      size={19}
+                      className="text-emerald-600"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-slate-500">
+                      Available Roles
+                    </p>
+
+                    <p className="mt-1 text-2xl font-bold text-slate-900">
+                      {roles.length}
+                    </p>
+                  </div>
+
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-50">
+                    <ShieldCheck
+                      size={19}
+                      className="text-purple-600"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Filters */}
+            <div className="rounded-xl border border-slate-200 bg-white">
+              <div className="border-b border-slate-200 px-5 py-4">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+                  {/* Search */}
+                  <div className="relative flex-1">
+                    <Search
+                      size={17}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                    />
+
+                    <input
+                      type="text"
+                      value={
+                        searchInput
                       }
-                    }}
-                    placeholder="Search by name, phone or email..."
-                    className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                  />
-                </div>
-
-                <button
-                  type="button"
-                  onClick={applySearch}
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-800"
-                >
-                  <Search size={15} />
-                  Search
-                </button>
-
-                {/* Status */}
-                <select
-                  value={status}
-                  onChange={(event) =>
-                    handleStatusChange(
-                      event.target.value,
-                    )
-                  }
-                  className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                >
-                  {STATUS_OPTIONS.map(
-                    (option) => (
-                      <option
-                        key={option.value}
-                        value={
-                          option.value
+                      onChange={(
+                        event,
+                      ) =>
+                        setSearchInput(
+                          event.target
+                            .value,
+                        )
+                      }
+                      onKeyDown={(
+                        event,
+                      ) => {
+                        if (
+                          event.key ===
+                          "Enter"
+                        ) {
+                          applySearch();
                         }
-                      >
-                        {option.label}
-                      </option>
-                    ),
-                  )}
-                </select>
+                      }}
+                      placeholder="Search by name, phone or email..."
+                      className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    />
+                  </div>
 
-                {/* Role */}
-                <select
-                  value={roleId}
-                  onChange={(event) =>
-                    handleRoleChange(
-                      event.target.value,
-                    )
-                  }
-                  disabled={
-                    rolesLoading
-                  }
-                  className="h-10 min-w-[180px] rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-50"
-                >
-                  <option value="">
-                    {rolesLoading
-                      ? "Loading roles..."
-                      : "All Roles"}
-                  </option>
-
-                  {roles.map((role) => (
-                    <option
-                      key={role.id}
-                      value={role.id}
-                    >
-                      {getRoleLabel(
-                        role.name,
-                      )}
-                    </option>
-                  ))}
-                </select>
-
-                {/* Refresh */}
-                <button
-                  type="button"
-                  onClick={() =>
-                    void refreshUsers()
-                  }
-                  disabled={loading}
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                  title="Refresh"
-                >
-                  <RefreshCw
-                    size={16}
-                    className={
-                      loading
-                        ? "animate-spin"
-                        : ""
-                    }
-                  />
-                </button>
-
-                {/* Clear */}
-                {hasFilters && (
                   <button
                     type="button"
                     onClick={
-                      clearFilters
+                      applySearch
                     }
-                    className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-800"
                   >
-                    <X size={14} />
-                    Clear
+                    <Search size={15} />
+                    Search
                   </button>
+
+                  {/* Status */}
+                  <select
+                    value={status}
+                    onChange={(
+                      event,
+                    ) =>
+                      handleStatusChange(
+                        event.target
+                          .value,
+                      )
+                    }
+                    className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  >
+                    {STATUS_OPTIONS.map(
+                      (option) => (
+                        <option
+                          key={
+                            option.value
+                          }
+                          value={
+                            option.value
+                          }
+                        >
+                          {
+                            option.label
+                          }
+                        </option>
+                      ),
+                    )}
+                  </select>
+
+                  {/* Role */}
+                  <select
+                    value={roleId}
+                    onChange={(
+                      event,
+                    ) =>
+                      handleRoleChange(
+                        event.target
+                          .value,
+                      )
+                    }
+                    disabled={
+                      rolesLoading
+                    }
+                    className="h-10 min-w-[180px] rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-50"
+                  >
+                    <option value="">
+                      {rolesLoading
+                        ? "Loading roles..."
+                        : "All Roles"}
+                    </option>
+
+                    {roles.map(
+                      (role) => (
+                        <option
+                          key={role.id}
+                          value={role.id}
+                        >
+                          {getRoleLabel(
+                            role.name,
+                          )}
+                        </option>
+                      ),
+                    )}
+                  </select>
+
+                  {/* Refresh */}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void refreshUsers()
+                    }
+                    disabled={loading}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    title="Refresh"
+                  >
+                    <RefreshCw
+                      size={16}
+                      className={
+                        loading
+                          ? "animate-spin"
+                          : ""
+                      }
+                    />
+                  </button>
+
+                  {/* Clear */}
+                  {hasFilters && (
+                    <button
+                      type="button"
+                      onClick={
+                        clearFilters
+                      }
+                      className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
+                    >
+                      <X size={14} />
+                      Clear
+                    </button>
+                  )}
+                </div>
+
+                {rolesError && (
+                  <div className="mt-3 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                    <AlertCircle
+                      size={14}
+                    />
+
+                    {rolesError}
+                  </div>
                 )}
               </div>
 
-              {rolesError && (
-                <div className="mt-3 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+              {/* Error */}
+              {error && (
+                <div className="m-5 flex items-start gap-2 rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-xs text-red-700">
                   <AlertCircle
-                    size={14}
+                    size={15}
+                    className="mt-0.5 shrink-0"
                   />
-                  {rolesError}
+
+                  <div>
+                    <p className="font-semibold">
+                      Unable to load
+                      users
+                    </p>
+
+                    <p className="mt-0.5">
+                      {error}
+                    </p>
+                  </div>
                 </div>
               )}
-            </div>
 
-            {/* Table */}
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px]">
-                <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50/70">
-                    <th className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-wide text-slate-500">
-                      User
-                    </th>
+              {/* Loading */}
+              {loading && (
+                <div className="flex min-h-[320px] items-center justify-center">
+                  <div className="flex items-center gap-2 text-sm text-slate-500">
+                    <RefreshCw
+                      size={17}
+                      className="animate-spin"
+                    />
 
-                    <th className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-wide text-slate-500">
-                      Contact
-                    </th>
+                    Loading users...
+                  </div>
+                </div>
+              )}
 
-                    <th className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-wide text-slate-500">
-                      Role
-                    </th>
+              {/* Empty */}
+              {!loading &&
+                !error &&
+                users.length === 0 && (
+                  <EmptyState
+                    hasFilters={
+                      hasFilters
+                    }
+                    onClear={
+                      clearFilters
+                    }
+                  />
+                )}
 
-                    <th className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-wide text-slate-500">
-                      Status
-                    </th>
+              {/* Table */}
+              {!loading &&
+                users.length > 0 && (
+                  <>
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[900px]">
+                        <thead>
+                          <tr className="border-b border-slate-200 bg-slate-50/70">
+                            <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                              User
+                            </th>
 
-                    <th className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-wide text-slate-500">
-                      Created
-                    </th>
-                  </tr>
-                </thead>
+                            <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                              Contact
+                            </th>
 
-                <tbody>
-                  {loading ? (
-                    <>
-                      {Array.from({
-                        length: 7,
-                      }).map(
-                        (_, index) => (
-                          <tr
-                            key={index}
-                            className="border-b border-slate-100"
-                          >
-                            <td className="px-5 py-4">
-                              <div className="flex items-center gap-3">
-                                <div className="h-9 w-9 animate-pulse rounded-full bg-slate-200" />
+                            <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                              Roles
+                            </th>
 
-                                <div className="space-y-2">
-                                  <div className="h-3 w-28 animate-pulse rounded bg-slate-200" />
+                            <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                              Status
+                            </th>
 
-                                  <div className="h-2.5 w-20 animate-pulse rounded bg-slate-100" />
-                                </div>
-                              </div>
-                            </td>
+                            <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                              Created
+                            </th>
 
-                            <td className="px-5 py-4">
-                              <div className="space-y-2">
-                                <div className="h-3 w-28 animate-pulse rounded bg-slate-200" />
-                                <div className="h-2.5 w-36 animate-pulse rounded bg-slate-100" />
-                              </div>
-                            </td>
-
-                            <td className="px-5 py-4">
-                              <div className="h-6 w-20 animate-pulse rounded bg-slate-200" />
-                            </td>
-
-                            <td className="px-5 py-4">
-                              <div className="h-6 w-16 animate-pulse rounded-full bg-slate-200" />
-                            </td>
-
-                            <td className="px-5 py-4">
-                              <div className="h-3 w-20 animate-pulse rounded bg-slate-200" />
-                            </td>
+                            <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                              Actions
+                            </th>
                           </tr>
-                        ),
-                      )}
-                    </>
-                  ) : error ? (
-                    <tr>
-                      <td
-                        colSpan={5}
-                        className="px-5 py-16"
-                      >
-                        <div className="flex flex-col items-center justify-center text-center">
-                          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-red-50">
-                            <AlertCircle
-                              size={22}
-                              className="text-red-500"
-                            />
-                          </div>
+                        </thead>
 
-                          <h3 className="text-sm font-semibold text-slate-900">
-                            Unable to load users
-                          </h3>
-
-                          <p className="mt-1 text-xs text-slate-500">
-                            {error}
-                          </p>
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              void refreshUsers()
-                            }
-                            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white"
-                          >
-                            <RefreshCw
-                              size={14}
-                            />
-                            Try again
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : users.length ===
-                    0 ? (
-                    <tr>
-                      <td
-                        colSpan={5}
-                      >
-                        <EmptyState
-                          hasFilters={
-                            hasFilters
-                          }
-                          onClear={
-                            clearFilters
-                          }
-                        />
-                      </td>
-                    </tr>
-                  ) : (
-                    users.map((user) => (
-                      <tr
-                        key={user.id}
-                        className="border-b border-slate-100 transition hover:bg-slate-50/60"
-                      >
-                        {/* User */}
-                        <td className="px-5 py-4">
-                          <div className="flex items-center gap-3">
-                            {user.profilePhotoUrl ? (
-                              <img
-                                src={
-                                  user.profilePhotoUrl
+                        <tbody>
+                          {users.map(
+                            (user) => (
+                              <tr
+                                key={
+                                  user.id
                                 }
-                                alt={getFullName(
-                                  user,
-                                )}
-                                className="h-9 w-9 rounded-full object-cover"
-                              />
-                            ) : (
-                              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 text-xs font-bold text-blue-700">
-                                {getInitials(
-                                  user,
-                                )}
-                              </div>
-                            )}
+                                className="border-b border-slate-100 transition hover:bg-slate-50/70"
+                              >
+                                {/* User */}
+                                <td className="px-5 py-4">
+                                  <div className="flex items-center gap-3">
+                                    {user.profilePhotoUrl ? (
+                                      <img
+                                        src={
+                                          user.profilePhotoUrl
+                                        }
+                                        alt={getFullName(
+                                          user,
+                                        )}
+                                        className="h-9 w-9 rounded-full object-cover"
+                                      />
+                                    ) : (
+                                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 text-xs font-bold text-blue-700">
+                                        {getInitials(
+                                          user,
+                                        )}
+                                      </div>
+                                    )}
 
-                            <div className="min-w-0">
-                              <div className="truncate text-sm font-semibold text-slate-900">
-                                {getFullName(
-                                  user,
-                                )}
-                              </div>
+                                    <div className="min-w-0">
+                                      <p className="truncate text-sm font-semibold text-slate-900">
+                                        {getFullName(
+                                          user,
+                                        )}
+                                      </p>
 
-                              <div className="mt-0.5 text-[11px] text-slate-400">
-                                ID:{" "}
-                                {user.id.slice(
-                                  0,
-                                  8,
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
+                                      <p className="mt-0.5 truncate text-xs text-slate-400">
+                                        {user.id}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </td>
 
-                        {/* Contact */}
-                        <td className="px-5 py-4">
-                          <div className="text-xs font-medium text-slate-700">
-                            {user.phone ||
-                              "-"}
-                          </div>
+                                {/* Contact */}
+                                <td className="px-5 py-4">
+                                  <div>
+                                    <p className="text-sm text-slate-700">
+                                      {user.phone ||
+                                        "-"}
+                                    </p>
 
-                          <div className="mt-1 max-w-[220px] truncate text-[11px] text-slate-400">
-                            {user.email ||
-                              "-"}
-                          </div>
-                        </td>
+                                    <p className="mt-0.5 text-xs text-slate-400">
+                                      {user.email ||
+                                        "-"}
+                                    </p>
+                                  </div>
+                                </td>
 
-                        {/* Roles */}
-                        <td className="px-5 py-4">
-                          <div className="flex max-w-[220px] flex-wrap gap-1.5">
-                            {user.roles
-                              ?.length ? (
-                              user.roles.map(
-                                (
-                                  role,
-                                ) => (
-                                  <RoleBadge
-                                    key={
-                                      role.id
-                                    }
-                                    name={
-                                      role.name
+                                {/* Roles */}
+                                <td className="px-5 py-4">
+                                  <div className="flex max-w-[260px] flex-wrap gap-1.5">
+                                    {user.roles &&
+                                    user.roles
+                                      .length >
+                                      0 ? (
+                                      user.roles.map(
+                                        (
+                                          role,
+                                        ) => (
+                                          <RoleBadge
+                                            key={
+                                              role.id
+                                            }
+                                            name={
+                                              role.name
+                                            }
+                                          />
+                                        ),
+                                      )
+                                    ) : (
+                                      <span className="text-xs text-slate-400">
+                                        No roles
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+
+                                {/* Status */}
+                                <td className="px-5 py-4">
+                                  <StatusBadge
+                                    status={
+                                      user.status
                                     }
                                   />
-                                ),
-                              )
-                            ) : (
-                              <span className="text-xs text-slate-400">
-                                No role
-                              </span>
-                            )}
-                          </div>
-                        </td>
+                                </td>
 
-                        {/* Status */}
-                        <td className="px-5 py-4">
-                          <StatusBadge
-                            status={
-                              user.status
-                            }
+                                {/* Created */}
+                                <td className="px-5 py-4 text-sm text-slate-600">
+                                  {formatDate(
+                                    user.createdAt,
+                                  )}
+                                </td>
+
+                                {/* Actions */}
+                                <td className="px-5 py-4 text-right">
+                                  <button
+                                    type="button"
+                                    className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
+                                  >
+                                    View
+                                  </button>
+                                </td>
+                              </tr>
+                            ),
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Pagination */}
+                    <div className="flex flex-col gap-3 border-t border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                      <p className="text-xs text-slate-500">
+                        Showing{" "}
+                        <span className="font-semibold text-slate-700">
+                          {showingFrom}
+                        </span>{" "}
+                        to{" "}
+                        <span className="font-semibold text-slate-700">
+                          {showingTo}
+                        </span>{" "}
+                        of{" "}
+                        <span className="font-semibold text-slate-700">
+                          {meta.total}
+                        </span>{" "}
+                        users
+                      </p>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={
+                            handlePreviousPage
+                          }
+                          disabled={
+                            meta.page <=
+                              1 ||
+                            loading
+                          }
+                          className="inline-flex h-9 items-center gap-1 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <ChevronLeft
+                            size={15}
                           />
-                        </td>
 
-                        {/* Created */}
-                        <td className="px-5 py-4">
-                          <span className="text-xs text-slate-600">
-                            {formatDate(
-                              user.createdAt,
-                            )}
-                          </span>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                          Previous
+                        </button>
 
-            {/* Footer / Pagination */}
-            <div className="flex flex-col gap-3 border-t border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="text-xs text-slate-500">
-                Showing{" "}
-                <span className="font-semibold text-slate-700">
-                  {showingFrom}
-                </span>{" "}
-                to{" "}
-                <span className="font-semibold text-slate-700">
-                  {showingTo}
-                </span>{" "}
-                of{" "}
-                <span className="font-semibold text-slate-700">
-                  {meta.total}
-                </span>{" "}
-                users
-              </div>
+                        <span className="px-2 text-xs font-semibold text-slate-600">
+                          Page{" "}
+                          {meta.page}{" "}
+                          of{" "}
+                          {meta.totalPages ||
+                            1}
+                        </span>
 
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={
-                    handlePreviousPage
-                  }
-                  disabled={
-                    loading ||
-                    meta.page <= 1
-                  }
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                  title="Previous page"
-                >
-                  <ChevronLeft
-                    size={16}
-                  />
-                </button>
+                        <button
+                          type="button"
+                          onClick={
+                            handleNextPage
+                          }
+                          disabled={
+                            meta.page >=
+                              meta.totalPages ||
+                            loading
+                          }
+                          className="inline-flex h-9 items-center gap-1 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          Next
 
-                <span className="px-2 text-xs font-semibold text-slate-600">
-                  Page {meta.page} of{" "}
-                  {Math.max(
-                    meta.totalPages,
-                    1,
-                  )}
-                </span>
-
-                <button
-                  type="button"
-                  onClick={
-                    handleNextPage
-                  }
-                  disabled={
-                    loading ||
-                    meta.page >=
-                      meta.totalPages
-                  }
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                  title="Next page"
-                >
-                  <ChevronRight
-                    size={16}
-                  />
-                </button>
-              </div>
+                          <ChevronRight
+                            size={15}
+                          />
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
             </div>
           </div>
+        </main>
+      </div>
 
-          {/* Small RBAC note */}
-          <div className="mt-4 flex items-start gap-2 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
-            <Filter
-              size={15}
-              className="mt-0.5 shrink-0 text-blue-600"
-            />
-
-            <p className="text-xs leading-5 text-blue-700">
-              User management actions will be
-              permission-aware. Creation,
-              editing, role management,
-              activation and deletion will be
-              enabled in the next UI pass.
-            </p>
-          </div>
-        </div>
-      </main>
-    </div>
-    </AdminShell>
-  );
-}
-
-function UsersIcon() {
-  return (
-    <svg
-      width="19"
-      height="19"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="text-blue-600"
-      aria-hidden="true"
-    >
-      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-      <circle
-        cx="9"
-        cy="7"
-        r="4"
+      {/* Create User Dialog */}
+      <CreateUserDialog
+        open={createUserOpen}
+        roles={roles}
+        rolesLoading={
+          rolesLoading
+        }
+        onClose={() =>
+          setCreateUserOpen(false)
+        }
+        onSubmit={
+          handleCreateUser
+        }
       />
-      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-    </svg>
+    </AdminShell>
   );
 }
