@@ -1,10 +1,8 @@
 "use client";
 
 import {
-    useCallback,
     useEffect,
-    useState,
-    useRef
+    useState
 } from "react";
 
 import {
@@ -190,119 +188,52 @@ export default function UserDetailsPage() {
     const [error, setError] =
         useState<string | null>(null);
 
-    const hasFetchedRef = useRef(false);
-
-    const fetchUser = useCallback(
-        async () => {
-            if (!userId) {
-                setError(
-                    "User ID is missing.",
-                );
-                setLoading(false);
-                return;
-            }
-
-            setLoading(true);
-            setError(null);
-
-            try {
-                const response =
-                    await fetch(
-                        `/api/users/${userId}`,
-                        {
-                            method: "GET",
-                            credentials: "include",
-                            cache: "no-store",
-                        },
-                    );
-
-                const data =
-                    await response
-                        .json()
-                        .catch(() => ({}));
-
-                if (!response.ok) {
-                    const message =
-                        typeof data?.message ===
-                            "string"
-                            ? data.message
-                            : "Unable to fetch user.";
-
-                    throw new Error(message);
-                }
-
-                setUser(data as User);
-            } catch (err) {
-                setError(
-                    err instanceof Error
-                        ? err.message
-                        : "Unable to fetch user.",
-                );
-            } finally {
-                setLoading(false);
-            }
-        },
-        [userId],
-    );
-
-    useEffect(() => {
+    const loadUser = async () => {
         if (!userId) {
             setError("User ID is missing.");
             setLoading(false);
             return;
         }
 
-        let cancelled = false;
+        setLoading(true);
+        setError(null);
 
-        const loadUser = async () => {
-            setLoading(true);
-            setError(null);
+        try {
+            const response = await fetch(
+                `/api/users/${userId}`,
+                {
+                    method: "GET",
+                    credentials: "include",
+                    cache: "no-store",
+                },
+            );
 
-            try {
-                const response = await fetch(
-                    `/api/users/${userId}`,
-                    {
-                        method: "GET",
-                        credentials: "include",
-                        cache: "no-store",
-                    },
+            const data = await response
+                .json()
+                .catch(() => ({}));
+
+            if (!response.ok) {
+                throw new Error(
+                    typeof data?.message === "string"
+                        ? data.message
+                        : "Unable to fetch user.",
                 );
-
-                const data = await response
-                    .json()
-                    .catch(() => ({}));
-
-                if (!response.ok) {
-                    throw new Error(
-                        typeof data?.message === "string"
-                            ? data.message
-                            : "Unable to fetch user.",
-                    );
-                }
-
-                if (!cancelled) {
-                    setUser(data as User);
-                }
-            } catch (err) {
-                if (!cancelled) {
-                    setError(
-                        err instanceof Error
-                            ? err.message
-                            : "Unable to fetch user.",
-                    );
-                }
-            } finally {
-                if (!cancelled) {
-                    setLoading(false);
-                }
             }
-        };
 
+            setUser(data as User);
+        } catch (err) {
+            setError(
+                err instanceof Error
+                    ? err.message
+                    : "Unable to fetch user.",
+            );
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
         void loadUser();
-
-        return () => {
-            cancelled = true;
-        };
     }, [userId]);
 
     return (
@@ -380,7 +311,7 @@ export default function UserDetailsPage() {
                                         <button
                                             type="button"
                                             onClick={() =>
-                                                void fetchUser()
+                                                void loadUser()
                                             }
                                             className="inline-flex items-center gap-2 rounded-lg bg-[#0864ec] px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-blue-700"
                                         >
