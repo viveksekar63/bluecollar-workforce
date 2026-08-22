@@ -5,6 +5,8 @@ import {
 
 export class UpdateRolePermissionsDto {
   @IsArray()
-  @IsUUID("4", { each: true })
-  permissionIds: string[];
+  @IsUUID("4", {
+    each: true,
+  })
+  permissionIds!: string[];
 }

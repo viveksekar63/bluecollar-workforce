@@ -11,6 +11,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Plus,
+  Power,
   RefreshCw,
   Search,
   ShieldCheck,
@@ -234,6 +235,15 @@ export default function UsersPage() {
   const [deleteError, setDeleteError] =
     useState<string | null>(null);
 
+  const [statusUserOpen, setStatusUserOpen] =
+    useState(false);
+
+  const [statusLoading, setStatusLoading] =
+    useState(false);
+
+  const [statusError, setStatusError] =
+    useState<string | null>(null);
+
   const {
     users,
     meta,
@@ -241,6 +251,7 @@ export default function UsersPage() {
     error,
     fetchUsers,
     createUser,
+    updateUserStatus,
     deleteUser,
   } = useUsers({
     page,
@@ -455,6 +466,54 @@ export default function UsersPage() {
       );
     } finally {
       setDeleteLoading(false);
+    }
+  }
+
+  async function handleUpdateUserStatus() {
+    if (!selectedUser) {
+      return;
+    }
+
+    const currentStatus =
+      selectedUser.status.toUpperCase();
+
+    const nextStatus =
+      currentStatus === "ACTIVE"
+        ? "INACTIVE"
+        : "ACTIVE";
+
+    setStatusLoading(true);
+    setStatusError(null);
+
+    try {
+      await updateUserStatus(
+        selectedUser.id,
+        {
+          status: nextStatus,
+        },
+      );
+
+      setStatusUserOpen(false);
+      setSelectedUser(null);
+
+      await fetchUsers({
+        page,
+        limit: PAGE_SIZE,
+        search:
+          search || undefined,
+        status:
+          status || undefined,
+        roleId:
+          roleId || undefined,
+      });
+    } catch (err) {
+      setStatusError(
+        err instanceof Error
+          ? err.message
+          : "Unable to update user status",
+      );
+    } finally {
+      setStatusLoading(false);
     }
   }
 
@@ -945,7 +1004,24 @@ export default function UsersPage() {
                                     >
                                       View
                                     </Link>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setSelectedUser(user);
+                                        setStatusError(null);
+                                        setStatusUserOpen(true);
+                                      }}
+                                      className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${user.status.toUpperCase() === "ACTIVE"
+                                          ? "border-amber-200 text-amber-700 hover:bg-amber-50"
+                                          : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                                        }`}
+                                    >
+                                      <Power size={13} />
 
+                                      {user.status.toUpperCase() === "ACTIVE"
+                                        ? "Deactivate"
+                                        : "Activate"}
+                                    </button>
                                     <button
                                       type="button"
                                       onClick={() => {
@@ -1119,6 +1195,133 @@ export default function UsersPage() {
                 {deleteLoading
                   ? "Deleting..."
                   : "Delete User"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {statusUserOpen && selectedUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
+          <div className="w-full max-w-md rounded-xl bg-white shadow-xl">
+            <div className="border-b border-slate-200 px-6 py-5">
+              <div className="flex items-center gap-3">
+                <div
+                  className={`flex h-10 w-10 items-center justify-center rounded-full ${selectedUser.status.toUpperCase() ===
+                      "ACTIVE"
+                      ? "bg-amber-50"
+                      : "bg-emerald-50"
+                    }`}
+                >
+                  <Power
+                    size={18}
+                    className={
+                      selectedUser.status.toUpperCase() ===
+                        "ACTIVE"
+                        ? "text-amber-600"
+                        : "text-emerald-600"
+                    }
+                  />
+                </div>
+
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900">
+                    {selectedUser.status.toUpperCase() ===
+                      "ACTIVE"
+                      ? "Deactivate User"
+                      : "Activate User"}
+                  </h2>
+
+                  <p className="mt-1 text-sm text-slate-500">
+                    Change the user's account status.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-6 py-5">
+              <p className="text-sm text-slate-700">
+                Are you sure you want to{" "}
+                <span className="font-semibold text-slate-900">
+                  {selectedUser.status.toUpperCase() ===
+                    "ACTIVE"
+                    ? "deactivate"
+                    : "activate"}
+                </span>{" "}
+                user{" "}
+                <span className="font-semibold text-slate-900">
+                  {getFullName(selectedUser)}
+                </span>
+                ?
+              </p>
+
+              {selectedUser.status.toUpperCase() ===
+                "ACTIVE" && (
+                  <div className="mt-4 rounded-lg border border-amber-100 bg-amber-50 px-4 py-3 text-xs text-amber-700">
+                    The user will no longer be able to
+                    access features that require an
+                    active account.
+                  </div>
+                )}
+
+              {selectedUser.status.toUpperCase() ===
+                "INACTIVE" && (
+                  <div className="mt-4 rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-3 text-xs text-emerald-700">
+                    The user will regain access to
+                    features available to active users.
+                  </div>
+                )}
+
+              {statusError && (
+                <div className="mt-4 flex items-start gap-2 rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-xs text-red-700">
+                  <AlertCircle
+                    size={15}
+                    className="mt-0.5 shrink-0"
+                  />
+
+                  <span>{statusError}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 border-t border-slate-200 px-6 py-4">
+              <button
+                type="button"
+                disabled={statusLoading}
+                onClick={() => {
+                  setStatusUserOpen(false);
+                  setSelectedUser(null);
+                  setStatusError(null);
+                }}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                disabled={statusLoading}
+                onClick={() =>
+                  void handleUpdateUserStatus()
+                }
+                className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-50 ${selectedUser.status.toUpperCase() ===
+                    "ACTIVE"
+                    ? "bg-amber-600 hover:bg-amber-700"
+                    : "bg-emerald-600 hover:bg-emerald-700"
+                  }`}
+              >
+                {statusLoading && (
+                  <RefreshCw
+                    size={15}
+                    className="animate-spin"
+                  />
+                )}
+
+                {statusLoading
+                  ? "Updating..."
+                  : selectedUser.status.toUpperCase() ===
+                    "ACTIVE"
+                    ? "Deactivate User"
+                    : "Activate User"}
               </button>
             </div>
           </div>

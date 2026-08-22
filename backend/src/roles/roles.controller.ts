@@ -29,29 +29,47 @@ export class RolesController {
   }
 
   @Get("permissions")
-  @RequirePermissions(PERMISSIONS.ROLES_READ)
+  @RequirePermissions(
+    PERMISSIONS.ROLES_READ,
+  )
   async findPermissions() {
     return this.rolesService.findPermissions();
   }
 
   @Get(":id")
-  @RequirePermissions(PERMISSIONS.ROLES_READ)
-  async findOne(@Param("id") id: string) {
+  @RequirePermissions(
+    PERMISSIONS.ROLES_READ,
+  )
+  async findOne(
+    @Param("id") id: string,
+  ) {
     return this.rolesService.findOne(id);
   }
 
   @Get(":id/permissions")
-  @RequirePermissions(PERMISSIONS.ROLES_READ)
-  async findRolePermissions(@Param("id") id: string) {
-    return this.rolesService.findRolePermissions(id);
+  @RequirePermissions(
+    PERMISSIONS.ROLES_READ,
+  )
+  async findRolePermissions(
+    @Param("id") id: string,
+  ) {
+    return this.rolesService.findRolePermissions(
+      id,
+    );
   }
 
   @Patch(":id/permissions")
-  @RequirePermissions(PERMISSIONS.ROLES_UPDATE)
+  @RequirePermissions(
+    PERMISSIONS.ROLES_UPDATE,
+  )
   async updatePermissions(
     @Param("id") id: string,
-    @Body() dto: UpdateRolePermissionsDto,
+    @Body()
+    dto: UpdateRolePermissionsDto,
   ) {
-    return this.rolesService.updatePermissions(id, dto);
+    return this.rolesService.updatePermissions(
+      id,
+      dto,
+    );
   }
 }

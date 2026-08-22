@@ -32,7 +32,6 @@ const items: SidebarItem[] = [
   // User Management
   ["Users", "/users", UserRoundCheck],
   ["Roles & Permissions", "/roles", KeyRound],
-
   ["Workers", "/workers", Users],
   ["Employers", "/employers", Building2],
   ["Jobs", "/jobs", BriefcaseBusiness],
