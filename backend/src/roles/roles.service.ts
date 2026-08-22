@@ -116,18 +116,8 @@ export class RolesService {
         name: "asc",
       },
     });
-
-    if (!role) {
-      throw new NotFoundException("Role not found");
-    }
-
-    return {
-      id: role.id,
-      name: role.name,
-      users: role.users.map(({ user }) => user),
-      permissions: role.permissions.map(({ permission }) => permission),
-    };
   }
+
   async findRolePermissions(
     id: string,
   ) {
@@ -169,7 +159,7 @@ export class RolesService {
   ) {
     await this.ensureRole(id);
 
-    const permissionIds = [
+    const permissionIds: string[] = [
       ...new Set(dto.permissionIds),
     ];
 
@@ -196,6 +186,7 @@ export class RolesService {
         "One or more permissions do not exist",
       );
     }
+
     await this.prisma.$transaction(
       async (tx) => {
         await tx.rolePermission.deleteMany(
