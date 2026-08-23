@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 
 import { loginWorker } from '@/api/auth';
 import { setAccessToken } from '@/api/client';
+import { BrandColors } from '@/constants/theme';
 import { useAuthStore } from '@/store/auth';
 
 export default function LoginScreen() {
@@ -33,6 +34,9 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
+      <View style={styles.brandMark}>
+        <Text style={styles.brandMarkText}>W</Text>
+      </View>
       <View style={styles.header}>
         <Text style={styles.eyebrow}>WORKTRUST</Text>
         <Text style={styles.title}>Welcome back</Text>
@@ -41,10 +45,10 @@ export default function LoginScreen() {
 
       <View style={styles.form}>
         <Text style={styles.label}>Mobile or email</Text>
-        <TextInput value={identifier} onChangeText={setIdentifier} placeholder="9876543210 or you@example.com" autoCapitalize="none" keyboardType="email-address" style={styles.input} />
+        <TextInput value={identifier} onChangeText={setIdentifier} placeholder="9876543210 or you@example.com" placeholderTextColor={BrandColors.muted} autoCapitalize="none" keyboardType="email-address" style={styles.input} />
 
         <Text style={styles.label}>Password</Text>
-        <TextInput value={password} onChangeText={setPassword} placeholder="Enter your password" secureTextEntry style={styles.input} />
+        <TextInput value={password} onChangeText={setPassword} placeholder="Enter your password" placeholderTextColor={BrandColors.muted} secureTextEntry style={styles.input} />
 
         <Pressable style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, loading && styles.disabled]} onPress={handleLogin} disabled={loading}>
           {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>Sign in</Text>}
@@ -59,18 +63,20 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F7F8FA', paddingHorizontal: 24, paddingTop: 72 },
+  container: { flex: 1, backgroundColor: BrandColors.background, paddingHorizontal: 24, paddingTop: 56 },
+  brandMark: { width: 52, height: 52, borderRadius: 16, backgroundColor: BrandColors.burgundy, alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
+  brandMarkText: { color: '#fff', fontSize: 25, fontWeight: '900' },
   header: { marginBottom: 36 },
-  eyebrow: { fontSize: 12, fontWeight: '800', letterSpacing: 2, color: '#2563EB', marginBottom: 12 },
-  title: { fontSize: 34, fontWeight: '800', color: '#111827', marginBottom: 10 },
-  subtitle: { fontSize: 16, lineHeight: 24, color: '#6B7280' },
+  eyebrow: { fontSize: 12, fontWeight: '800', letterSpacing: 2, color: BrandColors.rose, marginBottom: 12 },
+  title: { fontSize: 34, fontWeight: '800', color: BrandColors.text, marginBottom: 10 },
+  subtitle: { fontSize: 16, lineHeight: 24, color: BrandColors.textSecondary },
   form: { gap: 12 },
-  label: { fontSize: 14, fontWeight: '700', color: '#374151', marginTop: 6 },
-  input: { height: 54, borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 12, backgroundColor: '#fff', paddingHorizontal: 16, fontSize: 16, color: '#111827' },
-  primaryButton: { height: 54, borderRadius: 12, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center', marginTop: 12 },
+  label: { fontSize: 14, fontWeight: '700', color: BrandColors.text, marginTop: 6 },
+  input: { height: 54, borderWidth: 1, borderColor: BrandColors.border, borderRadius: 14, backgroundColor: BrandColors.surface, paddingHorizontal: 16, fontSize: 16, color: BrandColors.text },
+  primaryButton: { height: 54, borderRadius: 14, backgroundColor: BrandColors.burgundy, alignItems: 'center', justifyContent: 'center', marginTop: 12, shadowColor: BrandColors.burgundy, shadowOpacity: 0.18, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 3 },
   primaryText: { color: '#fff', fontSize: 16, fontWeight: '800' },
   secondaryButton: { alignItems: 'center', paddingVertical: 16 },
-  secondaryText: { color: '#2563EB', fontSize: 15, fontWeight: '700' },
+  secondaryText: { color: BrandColors.burgundy, fontSize: 15, fontWeight: '700' },
   pressed: { opacity: 0.85 },
   disabled: { opacity: 0.6 },
 });
