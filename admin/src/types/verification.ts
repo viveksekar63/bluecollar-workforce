@@ -44,6 +44,28 @@ export interface VerificationCheck {
   result?: VerificationResult | null;
 }
 
+export interface WorkerDocumentEvidence {
+  id: string;
+  workerId: string;
+  type: string;
+  fileName: string;
+  storageKey: string;
+  mimeType: string;
+  fileSize: number;
+  documentNumber?: string | null;
+  verificationStatus: VerificationStatus;
+  uploadedAt: string;
+  verifiedAt?: string | null;
+  verification?: {
+    id: string;
+    provider?: string | null;
+    providerRef?: string | null;
+    status: VerificationStatus;
+    remarks?: string | null;
+    verifiedAt?: string | null;
+  } | null;
+}
+
 export interface VerificationWorker {
   id: string;
   workerCode: string;
@@ -58,6 +80,7 @@ export interface VerificationWorker {
     profilePhotoUrl?: string | null;
     status?: string;
   };
+  documents?: WorkerDocumentEvidence[];
 }
 
 export interface VerificationRequest {
