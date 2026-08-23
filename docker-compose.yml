@@ -68,6 +68,7 @@ services:
       - ./backend/.env
     environment:
       MINIO_ENDPOINT: http://minio:9000
+      MINIO_PUBLIC_ENDPOINT: http://localhost:9000
       MINIO_ACCESS_KEY: bluecollar
       MINIO_SECRET_KEY: bluecollar_minio_password
       MINIO_BUCKET: worker-documents
