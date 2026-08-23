@@ -70,7 +70,7 @@ export default function SkillsScreen() {
         skills: skills.map((skill) => skill.trim()).filter(Boolean),
         languages: languages.map((language) => language.trim()).filter(Boolean),
       });
-      setTimeout(() => router.replace('/home'), 100);
+      setTimeout(() => router.replace('/profession'), 100);
     } catch (error: any) {
       const message = error?.response?.data?.message;
       Alert.alert('Unable to save', Array.isArray(message) ? message.join('\n') : message ?? 'Please try again.');
