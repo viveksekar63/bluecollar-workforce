@@ -1,4 +1,5 @@
 import { api } from './client';
+import { Platform } from 'react-native';
 
 export type WorkerDocumentType =
   | 'ID_PROOF'
@@ -40,21 +41,16 @@ export async function getMyDocuments() {
 
 export async function uploadMyDocument(
   type: WorkerDocumentType,
-  asset: {
-    uri: string;
-    name: string;
-    mimeType?: string | null;
-    size?: number | null;
-    file?: File;
-  },
+  asset: { uri: string; name: string; mimeType?: string | null; size?: number | null },
   documentNumber?: string,
 ) {
   const formData = new FormData();
   formData.append('type', type);
   if (documentNumber?.trim()) formData.append('documentNumber', documentNumber.trim());
 
-  if (asset.file) {
-    formData.append('file', asset.file, asset.name);
+  if (Platform.OS === 'web') {
+    const blob = await fetch(asset.uri).then((response) => response.blob());
+    formData.append('file', blob, asset.name);
   } else {
     formData.append(
       'file',
