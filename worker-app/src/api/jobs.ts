@@ -70,13 +70,31 @@ export async function getJob(jobId: string) {
 }
 
 export async function applyForJob(jobId: string) {
-  const response = await api.post<{
-    alreadyApplied: boolean;
-    application: JobApplication & {
-      jobId: string;
-      workerId: string;
-    };
-  }>(`/jobs/${jobId}/apply`);
+  const response = await api.post<
+    | {
+        alreadyApplied: boolean;
+        application: JobApplication & {
+          jobId: string;
+          workerId: string;
+        };
+      }
+    | (JobApplication & {
+        jobId: string;
+        workerId: string;
+      })
+  >(`/jobs/${jobId}/apply`);
 
-  return response.data;
+  const data = response.data;
+
+  // The current backend returns the application object directly.
+  // Keep the mobile API contract stable so the job-details screen can
+  // consume both the current response and the wrapped response shape.
+  if ('application' in data) {
+    return data;
+  }
+
+  return {
+    alreadyApplied: false,
+    application: data,
+  };
 }
