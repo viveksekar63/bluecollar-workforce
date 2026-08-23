@@ -62,9 +62,12 @@ export default function ProfileScreen() {
       });
 
       setCompletion(40);
-      Alert.alert('Profile saved', 'Your basic profile has been updated.', [
-        { text: 'Continue', onPress: () => router.replace('/address') },
-      ]);
+
+      // Navigate directly after a successful save. Using Alert.alert with an
+      // onPress callback blocks the onboarding transition on some Expo Web
+      // versions, so the web app could remain on Step 1 even though the API
+      // request succeeded.
+      router.replace('/address');
     } catch (error: any) {
       const message = error?.response?.data?.message;
       Alert.alert(
