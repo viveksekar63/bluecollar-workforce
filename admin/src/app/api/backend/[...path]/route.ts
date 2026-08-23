@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const BACKEND_URL = process.env.BACKEND_API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1";
+const BACKEND_URL =
+  process.env.BACKEND_API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1";
 
 async function proxy(request: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
-  const token = request.cookies.get("worktrust_access_token")?.value;
+  const token =
+    request.cookies.get("worktrust_employer_access_token")?.value ||
+    request.cookies.get("worktrust_access_token")?.value;
+
   if (!token) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
 
   const { path } = await params;
