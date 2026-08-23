@@ -8,6 +8,10 @@ import { UpdateWorkerOnboardingDto } from "./dto/update-worker-onboarding.dto";
 import { UpdateWorkerProfileDto } from "./dto/update-worker-profile.dto";
 import { WorkersQueryDto } from "./dto/workers-query.dto";
 import { UpdateWorkerSkillsDto } from "./dto/update-worker-skills.dto";
+import {
+  CreateWorkerEmploymentDto,
+  UpdateWorkerEmploymentDto,
+} from "./dto/worker-employment.dto";
 
 @Injectable()
 export class WorkersService {
@@ -104,6 +108,8 @@ export class WorkersService {
           dateOfBirth: true,
           bio: true,
           experienceYears: true,
+          professionCategory: true,
+          profession: true,
           verificationStatus: true,
           verificationScore: true,
           availabilityStatus: true,
@@ -154,6 +160,8 @@ export class WorkersService {
         email: worker.user.email,
         profileImageUrl: worker.user.profilePhotoUrl,
         primarySkill: worker.skills[0]?.skill.name ?? "Not specified",
+        professionCategory: worker.professionCategory,
+        profession: worker.profession,
         experienceYears: Number(worker.experienceYears ?? 0),
         city: worker.addresses[0]?.city ?? "Not specified",
         state: worker.addresses[0]?.state ?? "Not specified",
@@ -180,6 +188,8 @@ export class WorkersService {
         maritalStatus: true,
         bio: true,
         experienceYears: true,
+        professionCategory: true,
+        profession: true,
         profileCompletion: true,
         verificationStatus: true,
         verificationScore: true,
@@ -280,6 +290,8 @@ export class WorkersService {
         maritalStatus: true,
         bio: true,
         experienceYears: true,
+        professionCategory: true,
+        profession: true,
         profileCompletion: true,
         verificationStatus: true,
         verificationScore: true,
@@ -330,6 +342,26 @@ export class WorkersService {
         },
         education: true,
         certifications: true,
+        employmentHistory: {
+          orderBy: { startDate: "desc" },
+          select: {
+            id: true,
+            companyName: true,
+            companyAddress: true,
+            designation: true,
+            startDate: true,
+            endDate: true,
+            salary: true,
+            employmentType: true,
+            supervisorName: true,
+            supervisorPhone: true,
+            supervisorEmail: true,
+            reasonForLeaving: true,
+            verificationStatus: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
       },
     });
 
@@ -338,6 +370,204 @@ export class WorkersService {
     }
 
     return worker;
+  }
+
+  async getMyEmploymentHistory(userId: string) {
+    const worker = await this.prisma.worker.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+
+    if (!worker) {
+      throw new NotFoundException("Worker profile not found");
+    }
+
+    return this.prisma.employmentHistory.findMany({
+      where: { workerId: worker.id },
+      orderBy: { startDate: "desc" },
+      select: {
+        id: true,
+        companyName: true,
+        companyAddress: true,
+        designation: true,
+        startDate: true,
+        endDate: true,
+        salary: true,
+        employmentType: true,
+        supervisorName: true,
+        supervisorPhone: true,
+        supervisorEmail: true,
+        reasonForLeaving: true,
+        verificationStatus: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+  }
+
+  async createMyEmploymentHistory(
+    userId: string,
+    dto: CreateWorkerEmploymentDto,
+  ) {
+    const worker = await this.prisma.worker.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+
+    if (!worker) {
+      throw new NotFoundException("Worker profile not found");
+    }
+
+    const startDate = new Date(dto.startDate);
+    const endDate = dto.endDate ? new Date(dto.endDate) : null;
+
+    if (Number.isNaN(startDate.getTime())) {
+      throw new Error("Invalid start date");
+    }
+
+    if (endDate && Number.isNaN(endDate.getTime())) {
+      throw new Error("Invalid end date");
+    }
+
+    if (endDate && endDate < startDate) {
+      throw new Error("End date cannot be before start date");
+    }
+
+    const employment = await this.prisma.employmentHistory.create({
+      data: {
+        workerId: worker.id,
+        companyName: dto.companyName.trim(),
+        companyAddress: dto.companyAddress?.trim() || null,
+        designation: dto.designation.trim(),
+        startDate,
+        endDate,
+        salary: dto.salary ?? null,
+        employmentType: dto.employmentType,
+        supervisorName: dto.supervisorName?.trim() || null,
+        supervisorPhone: dto.supervisorPhone?.trim() || null,
+        supervisorEmail: dto.supervisorEmail?.trim() || null,
+        reasonForLeaving: dto.reasonForLeaving?.trim() || null,
+      },
+      select: {
+        id: true,
+        companyName: true,
+        companyAddress: true,
+        designation: true,
+        startDate: true,
+        endDate: true,
+        salary: true,
+        employmentType: true,
+        supervisorName: true,
+        supervisorPhone: true,
+        supervisorEmail: true,
+        reasonForLeaving: true,
+        verificationStatus: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    return employment;
+  }
+
+  async updateMyEmploymentHistory(
+    userId: string,
+    employmentId: string,
+    dto: UpdateWorkerEmploymentDto,
+  ) {
+    const worker = await this.prisma.worker.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+
+    if (!worker) {
+      throw new NotFoundException("Worker profile not found");
+    }
+
+    const existing = await this.prisma.employmentHistory.findFirst({
+      where: {
+        id: employmentId,
+        workerId: worker.id,
+      },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      throw new NotFoundException("Employment record not found");
+    }
+
+    const startDate = new Date(dto.startDate);
+    const endDate = dto.endDate ? new Date(dto.endDate) : null;
+
+    if (endDate && endDate < startDate) {
+      throw new Error("End date cannot be before start date");
+    }
+
+    return this.prisma.employmentHistory.update({
+      where: { id: existing.id },
+      data: {
+        companyName: dto.companyName.trim(),
+        companyAddress: dto.companyAddress?.trim() || null,
+        designation: dto.designation.trim(),
+        startDate,
+        endDate,
+        salary: dto.salary ?? null,
+        employmentType: dto.employmentType,
+        supervisorName: dto.supervisorName?.trim() || null,
+        supervisorPhone: dto.supervisorPhone?.trim() || null,
+        supervisorEmail: dto.supervisorEmail?.trim() || null,
+        reasonForLeaving: dto.reasonForLeaving?.trim() || null,
+      },
+      select: {
+        id: true,
+        companyName: true,
+        companyAddress: true,
+        designation: true,
+        startDate: true,
+        endDate: true,
+        salary: true,
+        employmentType: true,
+        supervisorName: true,
+        supervisorPhone: true,
+        supervisorEmail: true,
+        reasonForLeaving: true,
+        verificationStatus: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+  }
+
+  async deleteMyEmploymentHistory(
+    userId: string,
+    employmentId: string,
+  ) {
+    const worker = await this.prisma.worker.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+
+    if (!worker) {
+      throw new NotFoundException("Worker profile not found");
+    }
+
+    const existing = await this.prisma.employmentHistory.findFirst({
+      where: {
+        id: employmentId,
+        workerId: worker.id,
+      },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      throw new NotFoundException("Employment record not found");
+    }
+
+    await this.prisma.employmentHistory.delete({
+      where: { id: existing.id },
+    });
+
+    return { success: true };
   }
 
   async updateMySkills(
@@ -392,7 +622,6 @@ export class WorkersService {
 
       const skills: WorkerSkill[] = [];
       const languages: WorkerLanguage[] = [];
-
 
       for (const name of skillNames) {
         const skill = await tx.skill.upsert({
