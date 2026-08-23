@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -7,8 +8,13 @@ import {
   Patch,
   Post,
   Req,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
+import { DocumentType } from "@prisma/client";
+import { memoryStorage } from "multer";
 
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { PermissionGuard } from "../auth/permissions/permission.guard";
@@ -29,15 +35,45 @@ export class DocumentsController {
     return this.documentsService.findMine(request.user.userId);
   }
 
+  @Post("me/upload")
+  @UseInterceptors(
+    FileInterceptor("file", {
+      storage: memoryStorage(),
+      limits: { fileSize: 10 * 1024 * 1024 },
+    }),
+  )
+  async uploadMine(
+    @Req() request: any,
+    @UploadedFile() file: Express.Multer.File,
+    @Body("type") type: string,
+    @Body("documentNumber") documentNumber?: string,
+  ) {
+    if (!type || !Object.values(DocumentType).includes(type as DocumentType)) {
+      throw new BadRequestException("A valid document type is required");
+    }
+
+    return this.documentsService.uploadForWorker(
+      request.user.userId,
+      file,
+      type as DocumentType,
+      documentNumber,
+    );
+  }
+
+  @Get("me/:id/url")
+  async getMineDownloadUrl(
+    @Req() request: any,
+    @Param("id") id: string,
+  ) {
+    return this.documentsService.getMineDownloadUrl(request.user.userId, id);
+  }
+
   @Post("me")
   async createMine(
     @Req() request: any,
     @Body() dto: CreateDocumentDto,
   ) {
-    return this.documentsService.createForWorker(
-      request.user.userId,
-      dto,
-    );
+    return this.documentsService.createForWorker(request.user.userId, dto);
   }
 
   @Patch("me/:id")
@@ -46,18 +82,11 @@ export class DocumentsController {
     @Param("id") id: string,
     @Body() dto: UpdateDocumentDto,
   ) {
-    return this.documentsService.updateMine(
-      request.user.userId,
-      id,
-      dto,
-    );
+    return this.documentsService.updateMine(request.user.userId, id, dto);
   }
 
   @Delete("me/:id")
-  async deleteMine(
-    @Req() request: any,
-    @Param("id") id: string,
-  ) {
+  async deleteMine(@Req() request: any, @Param("id") id: string) {
     return this.documentsService.deleteMine(request.user.userId, id);
   }
 
@@ -75,10 +104,6 @@ export class DocumentsController {
     @Param("id") id: string,
     @Body() dto: UpdateDocumentStatusDto,
   ) {
-    return this.documentsService.updateStatus(
-      id,
-      dto.status,
-      dto.remarks,
-    );
+    return this.documentsService.updateStatus(id, dto.status, dto.remarks);
   }
 }
