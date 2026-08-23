@@ -354,7 +354,7 @@ model VerificationCheck {
   providerReference String?
   startedAt         DateTime?
   completedAt       DateTime?
-  createdAt         DateTime              @default(now())
+  createdAt         DateTime            @default(now())
   verification      VerificationRequest @relation(fields: [verificationId], references: [id], onDelete: Cascade)
   result            VerificationResult?
   @@index([verificationId])
@@ -455,7 +455,7 @@ model JobAssignment {
   createdAt  DateTime         @default(now())
   attendance Attendance[]
   job        Job              @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  worker     Worker            @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  worker     Worker           @relation(fields: [workerId], references: [id], onDelete: Cascade)
   @@index([workerId])
   @@index([jobId])
   @@index([status])
@@ -476,3 +476,145 @@ model Attendance {
   assignment   JobAssignment     @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
   worker       Worker            @relation(fields: [workerId], references: [id], onDelete: Cascade)
   breaks       AttendanceBreak[]
+  @@unique([assignmentId, workerId, date])
+  @@index([workerId, date])
+  @@index([assignmentId, date])
+}
+
+model AttendanceBreak {
+  id           String     @id @default(uuid())
+  attendanceId String
+  startTime    DateTime
+  endTime      DateTime?
+  attendance   Attendance @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+  @@index([attendanceId])
+}
+
+model WorkerRating {
+  id         String   @id @default(uuid())
+  workerId   String
+  employerId String
+  rating     Int
+  comment    String?
+  createdAt  DateTime @default(now())
+  employer   Employer @relation(fields: [employerId], references: [id], onDelete: Cascade)
+  worker     Worker   @relation("WorkerRatings", fields: [workerId], references: [id], onDelete: Cascade)
+  @@index([workerId])
+  @@index([employerId])
+}
+
+model WorkerReview {
+  id         String   @id @default(uuid())
+  workerId   String
+  employerId String
+  title      String?
+  comment    String
+  createdAt  DateTime @default(now())
+  employer   Employer @relation(fields: [employerId], references: [id], onDelete: Cascade)
+  worker     Worker   @relation("WorkerReviews", fields: [workerId], references: [id], onDelete: Cascade)
+  @@index([workerId])
+  @@index([employerId])
+}
+
+model PaymentAccount {
+  id                String               @id @default(uuid())
+  workerId          String
+  provider          String?
+  providerAccountId String?
+  status            PaymentAccountStatus @default(PENDING)
+  createdAt         DateTime             @default(now())
+  worker            Worker               @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  @@index([workerId])
+}
+
+model PaymentTransaction {
+  id        String        @id @default(uuid())
+  workerId  String
+  amount    Decimal
+  currency  String        @default("INR")
+  type      PaymentType
+  status    PaymentStatus
+  reference String?
+  metadata  Json?
+  createdAt DateTime      @default(now())
+  worker    Worker        @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  @@index([workerId])
+  @@index([status])
+  @@index([type])
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  title     String
+  message   String
+  type      NotificationType
+  data      Json?
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, readAt])
+  @@index([type])
+}
+
+model Complaint {
+  id          String          @id @default(uuid())
+  workerId    String?
+  employerId  String?
+  type        ComplaintType
+  subject     String
+  description String
+  status      ComplaintStatus @default(OPEN)
+  resolution  String?
+  createdAt   DateTime        @default(now())
+  resolvedAt  DateTime?
+  employer    Employer?       @relation(fields: [employerId], references: [id])
+  worker      Worker?         @relation("WorkerComplaints", fields: [workerId], references: [id])
+  @@index([workerId])
+  @@index([employerId])
+  @@index([status])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  action    String
+  entity    String
+  entityId  String?
+  oldData   Json?
+  newData   Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id])
+  @@index([entity, entityId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+enum UserStatus { ACTIVE INACTIVE BLOCKED }
+enum RoleName { SUPER_ADMIN ADMIN VERIFICATION_AGENT EMPLOYER SUPERVISOR WORKER }
+enum Gender { MALE FEMALE OTHER }
+enum MaritalStatus { SINGLE MARRIED OTHER }
+enum AddressType { CURRENT PERMANENT }
+enum AvailabilityStatus { AVAILABLE WORKING NOT_AVAILABLE }
+enum VerificationStatus { PENDING IN_PROGRESS VERIFIED FAILED MANUAL_REVIEW EXPIRED }
+enum VerificationType { IDENTITY ADDRESS DOCUMENT EMPLOYMENT REFERENCE EDUCATION CRIMINAL SKILL }
+enum VerificationResultStatus { MATCH PARTIAL_MATCH NO_MATCH NOT_FOUND MANUAL_REVIEW }
+enum ConsentType { IDENTITY_CHECK ADDRESS_CHECK EMPLOYMENT_CHECK REFERENCE_CHECK BACKGROUND_CHECK DOCUMENT_STORAGE PROFILE_SHARING }
+enum SkillLevel { BEGINNER INTERMEDIATE ADVANCED EXPERT }
+enum LanguageLevel { BASIC CONVERSATIONAL FLUENT NATIVE }
+enum EmploymentType { FULL_TIME PART_TIME CONTRACT DAILY_WAGE TEMPORARY SELF_EMPLOYED }
+enum DocumentType { PROFILE_PHOTO ID_PROOF ADDRESS_PROOF EXPERIENCE_LETTER SALARY_SLIP EDUCATION_CERTIFICATE SKILL_CERTIFICATE BANK_DOCUMENT OTHER }
+enum EmployerStatus { PENDING VERIFIED SUSPENDED }
+enum SalaryType { HOURLY DAILY WEEKLY MONTHLY CONTRACT }
+enum JobStatus { DRAFT PUBLISHED PAUSED CLOSED CANCELLED }
+enum ApplicationStatus { APPLIED SHORTLISTED INTERVIEW SELECTED REJECTED WITHDRAWN }
+enum AssignmentStatus { ACTIVE COMPLETED CANCELLED }
+enum AttendanceStatus { PRESENT ABSENT HALF_DAY LEAVE }
+enum PaymentAccountStatus { PENDING VERIFIED BLOCKED }
+enum PaymentType { SALARY DAILY_WAGE BONUS REFUND OTHER }
+enum PaymentStatus { PENDING PROCESSING COMPLETED FAILED REFUNDED }
+enum NotificationType { JOB APPLICATION VERIFICATION PAYMENT SYSTEM }
+enum ComplaintType { WORKER EMPLOYER PAYMENT SAFETY FRAUD OTHER }
+enum ComplaintStatus { OPEN INVESTIGATING RESOLVED REJECTED }
