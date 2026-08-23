@@ -2,7 +2,8 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ShieldCheck, Loader2 } from "lucide-react";
+import Link from "next/link";
+import { ShieldCheck, Loader2, BriefcaseBusiness } from "lucide-react";
 
 export default function Login() {
   const router = useRouter();
@@ -54,35 +55,22 @@ export default function Login() {
           <p className="mt-1 text-sm text-slate-500">Sign in to your admin account</p>
 
           <div className="mt-8 space-y-4">
-            <input
-              required
-              type="email"
-              autoComplete="username"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-xl border p-3 text-sm outline-none focus:border-blue-600"
-              placeholder="Email address"
-            />
-            <input
-              required
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-xl border p-3 text-sm outline-none focus:border-blue-600"
-              placeholder="Password"
-            />
+            <input required type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full rounded-xl border p-3 text-sm outline-none focus:border-blue-600" placeholder="Email address" />
+            <input required type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full rounded-xl border p-3 text-sm outline-none focus:border-blue-600" placeholder="Password" />
             {error && <div className="rounded-xl bg-red-50 p-3 text-xs font-medium text-red-700">{error}</div>}
-            <button
-              disabled={loading}
-              type="submit"
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#0757d8] p-3 text-sm font-bold text-white disabled:opacity-60"
-            >
+            <button disabled={loading} type="submit" className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#0757d8] p-3 text-sm font-bold text-white disabled:opacity-60">
               {loading && <Loader2 size={16} className="animate-spin" />}
               {loading ? "Signing in..." : "Sign In"}
             </button>
           </div>
-          <p className="mt-6 text-center text-xs text-slate-400">Protected admin access • WorkTrust</p>
+
+          <div className="mt-7 border-t border-slate-100 pt-5 text-center">
+            <p className="text-xs text-slate-400">Are you hiring workers?</p>
+            <Link href="/employer/login" className="mt-2 inline-flex items-center gap-1.5 text-sm font-bold text-[#0757d8] hover:underline">
+              <BriefcaseBusiness size={15} /> Employer Login
+            </Link>
+          </div>
+          <p className="mt-5 text-center text-xs text-slate-400">Protected admin access • WorkTrust</p>
         </form>
       </div>
     </main>
