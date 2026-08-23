@@ -32,4 +32,12 @@ export class UpdateWorkerProfileDto {
   @Min(0)
   @Max(100)
   experienceYears?: number;
+
+  @IsOptional()
+  @IsString()
+  professionCategory?: string;
+
+  @IsOptional()
+  @IsString()
+  profession?: string;
 }
