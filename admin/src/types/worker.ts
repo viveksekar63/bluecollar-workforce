@@ -24,12 +24,17 @@ export interface EmploymentHistory {
 
 export interface WorkerDocument {
   id: string;
-  type: string;
-  name: string;
-  status: VerificationStatus;
+  type?: string;
+  name?: string;
+  status?: VerificationStatus;
   issuedDate?: string | null;
   expiryDate?: string | null;
   fileUrl?: string | null;
+  verification?: {
+    status?: VerificationStatus;
+    remarks?: string | null;
+    verifiedAt?: string | null;
+  } | null;
 }
 
 export interface WorkerVerification {
@@ -41,6 +46,57 @@ export interface WorkerVerification {
   score?: number | null;
   verifiedAt?: string | null;
   remarks?: string | null;
+}
+
+export interface WorkerUser {
+  id: string;
+  phone: string;
+  email?: string | null;
+  firstName: string;
+  lastName?: string | null;
+  profilePhotoUrl?: string | null;
+  status?: string;
+}
+
+export interface WorkerAddress {
+  id: string;
+  addressLine1?: string | null;
+  addressLine2?: string | null;
+  city?: string | null;
+  district?: string | null;
+  state?: string | null;
+  pincode?: string | null;
+  isCurrent?: boolean;
+}
+
+export interface WorkerSkill {
+  experienceYears?: number | null;
+  skillLevel?: string | null;
+  verified?: boolean;
+  skill: {
+    id: string;
+    name: string;
+    category?: string | null;
+  };
+}
+
+export interface WorkerVerificationRequest {
+  id: string;
+  status: VerificationStatus;
+  overallScore?: number | null;
+  createdAt?: string;
+  completedAt?: string | null;
+  checks?: Array<{
+    id: string;
+    type: string;
+    status: VerificationStatus;
+    result?: {
+      result?: string | null;
+      score?: number | null;
+      remarks?: string | null;
+      verifiedAt?: string | null;
+    } | null;
+  }>;
 }
 
 export interface Worker {
@@ -64,6 +120,19 @@ export interface Worker {
   employmentHistory?: EmploymentHistory[];
   documents?: WorkerDocument[];
   verifications?: WorkerVerification[];
+  user?: WorkerUser;
+  addresses?: WorkerAddress[];
+  emergencyContacts?: unknown[];
+  skills?: WorkerSkill[];
+  education?: unknown[];
+  certifications?: unknown[];
+  verificationRequests?: WorkerVerificationRequest[];
+  profileCompletion?: number;
+  gender?: string | null;
+  maritalStatus?: string | null;
+  availabilityStatus?: WorkerAvailability;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface PaginatedWorkers {
