@@ -1,4 +1,11 @@
-export type VerificationStatus = "VERIFIED" | "IN_PROGRESS" | "PENDING" | "REJECTED";
+export type VerificationStatus =
+  | "VERIFIED"
+  | "IN_PROGRESS"
+  | "PENDING"
+  | "FAILED"
+  | "MANUAL_REVIEW"
+  | "EXPIRED";
+
 export type WorkerAvailability = "AVAILABLE" | "WORKING" | "UNAVAILABLE";
 
 export interface EmploymentHistory {
