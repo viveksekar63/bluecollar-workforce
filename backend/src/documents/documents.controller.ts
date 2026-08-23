@@ -9,7 +9,6 @@ import {
   Req,
   UseGuards,
 } from "@nestjs/common";
-import { VerificationStatus } from "@prisma/client";
 
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { PermissionGuard } from "../auth/permissions/permission.guard";
@@ -17,6 +16,7 @@ import { PERMISSIONS } from "../auth/permissions/permissions";
 import { RequirePermissions } from "../auth/permissions/permission.decorator";
 import { CreateDocumentDto } from "./dto/create-document.dto";
 import { UpdateDocumentDto } from "./dto/update-document.dto";
+import { UpdateDocumentStatusDto } from "./dto/update-document-status.dto";
 import { DocumentsService } from "./documents.service";
 
 @Controller("documents")
@@ -73,16 +73,12 @@ export class DocumentsController {
   @RequirePermissions(PERMISSIONS.DOCUMENTS_UPDATE)
   async updateStatus(
     @Param("id") id: string,
-    @Body()
-    body: {
-      status: VerificationStatus;
-      remarks?: string;
-    },
+    @Body() dto: UpdateDocumentStatusDto,
   ) {
     return this.documentsService.updateStatus(
       id,
-      body.status,
-      body.remarks,
+      dto.status,
+      dto.remarks,
     );
   }
 }
