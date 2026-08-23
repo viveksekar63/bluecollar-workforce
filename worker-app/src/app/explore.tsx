@@ -1,180 +1,257 @@
-import { Image } from 'expo-image';
-import { SymbolView } from 'expo-symbols';
-import { Platform, Pressable, ScrollView, StyleSheet } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  ActivityIndicator,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { router } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 
-import { ExternalLink } from '@/components/external-link';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Collapsible } from '@/components/ui/collapsible';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { getRecommendedJobs, WorkerJob } from '@/api/jobs';
+import { BrandColors } from '@/constants/theme';
 
-export default function TabTwoScreen() {
-  const safeAreaInsets = useSafeAreaInsets();
-  const insets = {
-    ...safeAreaInsets,
-    bottom: safeAreaInsets.bottom + BottomTabInset + Spacing.three,
-  };
-  const theme = useTheme();
+function formatSalary(job: WorkerJob) {
+  const min = Number(job.salaryMin ?? 0);
+  const max = Number(job.salaryMax ?? 0);
 
-  const contentPlatformStyle = Platform.select({
-    android: {
-      paddingTop: insets.top,
-      paddingLeft: insets.left,
-      paddingRight: insets.right,
-      paddingBottom: insets.bottom,
-    },
-    web: {
-      paddingTop: Spacing.six,
-      paddingBottom: Spacing.four,
-    },
+  if (!min && !max) return 'Salary not specified';
+
+  const type = job.salaryType.replace(/_/g, ' ').toLowerCase();
+  const suffix = type.includes('month') ? '/ month' : type.includes('day') ? '/ day' : '';
+
+  if (min && max) {
+    return `₹${min.toLocaleString('en-IN')} – ₹${max.toLocaleString('en-IN')} ${suffix}`.trim();
+  }
+
+  return `₹${(min || max).toLocaleString('en-IN')} ${suffix}`.trim();
+}
+
+function JobCard({ job }: { job: WorkerJob }) {
+  return (
+    <Pressable
+      onPress={() => router.push({ pathname: '/job-details', params: { id: job.id } })}
+      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+    >
+      <View style={styles.cardTop}>
+        <View style={styles.jobIcon}>
+          <Text style={styles.jobIconText}>✦</Text>
+        </View>
+        <View style={styles.titleBlock}>
+          <Text style={styles.jobTitle} numberOfLines={1}>{job.title}</Text>
+          <Text style={styles.company} numberOfLines={1}>{job.employer.companyName}</Text>
+        </View>
+        {job.matchScore !== undefined && (
+          <View style={styles.matchBadge}>
+            <Text style={styles.matchText}>{job.matchScore}% match</Text>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.metaRow}>
+        <Text style={styles.meta}>📍 {job.city}, {job.state}</Text>
+        <Text style={styles.meta}>{job.openings} opening{job.openings === 1 ? '' : 's'}</Text>
+      </View>
+
+      <Text style={styles.salary}>{formatSalary(job)}</Text>
+
+      <View style={styles.skillsRow}>
+        {job.skills.slice(0, 3).map((item) => (
+          <View key={item.skill.id} style={styles.skillPill}>
+            <Text style={styles.skillText}>{item.skill.name}</Text>
+          </View>
+        ))}
+        {job.applied && (
+          <View style={styles.appliedPill}>
+            <Text style={styles.appliedText}>Applied</Text>
+          </View>
+        )}
+      </View>
+    </Pressable>
+  );
+}
+
+export default function ExploreScreen() {
+  const [jobs, setJobs] = useState<WorkerJob[]>([]);
+  const [location, setLocation] = useState('');
+  const [query, setQuery] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState('');
+
+  const loadJobs = useCallback(async (city?: string) => {
+    try {
+      setError('');
+      const result = await getRecommendedJobs(city?.trim() || undefined, 30);
+      setJobs(result.items);
+    } catch (err) {
+      console.error('Failed to load jobs', err);
+      setError('Unable to load jobs right now. Please try again.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadJobs();
+  }, [loadJobs]);
+
+  const filteredJobs = jobs.filter((job) => {
+    const value = query.trim().toLowerCase();
+    if (!value) return true;
+    return [
+      job.title,
+      job.employer.companyName,
+      job.city,
+      job.state,
+      ...job.skills.map((item) => item.skill.name),
+    ].some((item) => item?.toLowerCase().includes(value));
   });
 
   return (
-    <ScrollView
-      style={[styles.scrollView, { backgroundColor: theme.background }]}
-      contentInset={insets}
-      contentContainerStyle={[styles.contentContainer, contentPlatformStyle]}>
-      <ThemedView style={styles.container}>
-        <ThemedView style={styles.titleContainer}>
-          <ThemedText type="subtitle">Explore</ThemedText>
-          <ThemedText style={styles.centerText} themeColor="textSecondary">
-            This starter app includes example{'\n'}code to help you get started.
-          </ThemedText>
+    <View style={styles.screen}>
+      <ScrollView
+        contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              loadJobs(location);
+            }}
+            tintColor={BrandColors.burgundy}
+          />
+        }
+      >
+        <View style={styles.header}>
+          <Pressable onPress={() => router.back()} style={styles.backButton}>
+            <Text style={styles.backText}>‹</Text>
+          </Pressable>
+          <View style={styles.headerCopy}>
+            <Text style={styles.eyebrow}>WORK OPPORTUNITIES</Text>
+            <Text style={styles.title}>Find your next job</Text>
+          </View>
+        </View>
 
-          <ExternalLink href="https://docs.expo.dev" asChild>
-            <Pressable style={({ pressed }) => pressed && styles.pressed}>
-              <ThemedView type="backgroundElement" style={styles.linkButton}>
-                <ThemedText type="link">Expo documentation</ThemedText>
-                <SymbolView
-                  tintColor={theme.text}
-                  name={{ ios: 'arrow.up.right.square', android: 'link', web: 'link' }}
-                  size={12}
-                />
-              </ThemedView>
+        <View style={styles.searchBox}>
+          <Text style={styles.searchIcon}>⌕</Text>
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search job, skill or employer"
+            placeholderTextColor={BrandColors.muted}
+            style={styles.searchInput}
+          />
+        </View>
+
+        <View style={styles.locationRow}>
+          <TextInput
+            value={location}
+            onChangeText={setLocation}
+            placeholder="Location"
+            placeholderTextColor={BrandColors.muted}
+            style={styles.locationInput}
+            autoCapitalize="words"
+          />
+          <Pressable
+            onPress={() => loadJobs(location)}
+            style={({ pressed }) => [styles.locationButton, pressed && styles.pressed]}
+          >
+            <Text style={styles.locationButtonText}>Search</Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.sectionHeader}>
+          <View>
+            <Text style={styles.sectionTitle}>Recommended for you</Text>
+            <Text style={styles.sectionSubtitle}>
+              Matched using your profession, skills and location
+            </Text>
+          </View>
+          {!loading && <Text style={styles.count}>{filteredJobs.length} jobs</Text>}
+        </View>
+
+        {loading ? (
+          <View style={styles.centerState}>
+            <ActivityIndicator size="large" color={BrandColors.burgundy} />
+            <Text style={styles.stateText}>Finding suitable jobs…</Text>
+          </View>
+        ) : error ? (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyTitle}>Something went wrong</Text>
+            <Text style={styles.emptyText}>{error}</Text>
+            <Pressable onPress={() => loadJobs(location)} style={styles.retryButton}>
+              <Text style={styles.retryText}>Try again</Text>
             </Pressable>
-          </ExternalLink>
-        </ThemedView>
-
-        <ThemedView style={styles.sectionsWrapper}>
-          <Collapsible title="File-based routing">
-            <ThemedText type="small">
-              This app has two screens: <ThemedText type="code">src/app/index.tsx</ThemedText> and{' '}
-              <ThemedText type="code">src/app/explore.tsx</ThemedText>
-            </ThemedText>
-            <ThemedText type="small">
-              The layout file in <ThemedText type="code">src/app/_layout.tsx</ThemedText> sets up
-              the tab navigator.
-            </ThemedText>
-            <ExternalLink href="https://docs.expo.dev/router/introduction">
-              <ThemedText type="linkPrimary">Learn more</ThemedText>
-            </ExternalLink>
-          </Collapsible>
-
-          <Collapsible title="Android, iOS, and web support">
-            <ThemedView type="backgroundElement" style={styles.collapsibleContent}>
-              <ThemedText type="small">
-                You can open this project on Android, iOS, and the web. To open the web version,
-                press <ThemedText type="smallBold">w</ThemedText> in the terminal running this
-                project.
-              </ThemedText>
-              <Image
-                source={require('@/assets/images/tutorial-web.png')}
-                style={styles.imageTutorial}
-              />
-            </ThemedView>
-          </Collapsible>
-
-          <Collapsible title="Images">
-            <ThemedText type="small">
-              For static images, you can use the <ThemedText type="code">@2x</ThemedText> and{' '}
-              <ThemedText type="code">@3x</ThemedText> suffixes to provide files for different
-              screen densities.
-            </ThemedText>
-            <Image source={require('@/assets/images/react-logo.png')} style={styles.imageReact} />
-            <ExternalLink href="https://reactnative.dev/docs/images">
-              <ThemedText type="linkPrimary">Learn more</ThemedText>
-            </ExternalLink>
-          </Collapsible>
-
-          <Collapsible title="Light and dark mode components">
-            <ThemedText type="small">
-              This template has light and dark mode support. The{' '}
-              <ThemedText type="code">useColorScheme()</ThemedText> hook lets you inspect what the
-              user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-            </ThemedText>
-            <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-              <ThemedText type="linkPrimary">Learn more</ThemedText>
-            </ExternalLink>
-          </Collapsible>
-
-          <Collapsible title="Animations">
-            <ThemedText type="small">
-              This template includes an example of an animated component. The{' '}
-              <ThemedText type="code">src/components/ui/collapsible.tsx</ThemedText> component uses
-              the powerful <ThemedText type="code">react-native-reanimated</ThemedText> library to
-              animate opening this hint.
-            </ThemedText>
-          </Collapsible>
-        </ThemedView>
-        {Platform.OS === 'web' && <WebBadge />}
-      </ThemedView>
-    </ScrollView>
+          </View>
+        ) : filteredJobs.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyIcon}>⌕</Text>
+            <Text style={styles.emptyTitle}>No matching jobs yet</Text>
+            <Text style={styles.emptyText}>
+              Try another search or update your profession and skills to improve your matches.
+            </Text>
+            <Pressable onPress={() => router.push('/profession')} style={styles.retryButton}>
+              <Text style={styles.retryText}>Update profession</Text>
+            </Pressable>
+          </View>
+        ) : (
+          filteredJobs.map((job) => <JobCard key={job.id} job={job} />)
+        )}
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  scrollView: {
-    flex: 1,
-  },
-  contentContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-  },
-  container: {
-    maxWidth: MaxContentWidth,
-    flexGrow: 1,
-  },
-  titleContainer: {
-    gap: Spacing.three,
-    alignItems: 'center',
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.six,
-  },
-  centerText: {
-    textAlign: 'center',
-  },
-  pressed: {
-    opacity: 0.7,
-  },
-  linkButton: {
-    flexDirection: 'row',
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.five,
-    justifyContent: 'center',
-    gap: Spacing.one,
-    alignItems: 'center',
-  },
-  sectionsWrapper: {
-    gap: Spacing.five,
-    paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.three,
-  },
-  collapsibleContent: {
-    alignItems: 'center',
-  },
-  imageTutorial: {
-    width: '100%',
-    aspectRatio: 296 / 171,
-    borderRadius: Spacing.three,
-    marginTop: Spacing.two,
-  },
-  imageReact: {
-    width: 100,
-    height: 100,
-    alignSelf: 'center',
-  },
+  screen: { flex: 1, backgroundColor: BrandColors.background },
+  container: { padding: 20, paddingTop: 54, paddingBottom: 40 },
+  header: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
+  backButton: { width: 42, height: 42, borderRadius: 14, backgroundColor: BrandColors.surface, borderWidth: 1, borderColor: BrandColors.border, alignItems: 'center', justifyContent: 'center' },
+  backText: { color: BrandColors.burgundy, fontSize: 30, lineHeight: 32 },
+  headerCopy: { marginLeft: 12, flex: 1 },
+  eyebrow: { color: BrandColors.rose, fontSize: 10, fontWeight: '800', letterSpacing: 1.4 },
+  title: { color: BrandColors.text, fontSize: 24, fontWeight: '800', marginTop: 3 },
+  searchBox: { height: 52, borderRadius: 16, backgroundColor: BrandColors.surface, borderWidth: 1, borderColor: BrandColors.border, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, marginBottom: 10 },
+  searchIcon: { color: BrandColors.burgundy, fontSize: 23, marginRight: 8 },
+  searchInput: { flex: 1, color: BrandColors.text, fontSize: 14 },
+  locationRow: { flexDirection: 'row', marginBottom: 26 },
+  locationInput: { flex: 1, height: 48, borderRadius: 14, backgroundColor: BrandColors.surface, borderWidth: 1, borderColor: BrandColors.border, paddingHorizontal: 14, color: BrandColors.text, fontSize: 13 },
+  locationButton: { marginLeft: 8, height: 48, paddingHorizontal: 18, borderRadius: 14, backgroundColor: BrandColors.burgundy, alignItems: 'center', justifyContent: 'center' },
+  locationButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 12 },
+  sectionTitle: { color: BrandColors.text, fontSize: 18, fontWeight: '800' },
+  sectionSubtitle: { color: BrandColors.textSecondary, fontSize: 11, marginTop: 4, maxWidth: 285 },
+  count: { color: BrandColors.rose, fontSize: 11, fontWeight: '800', marginBottom: 2 },
+  card: { backgroundColor: BrandColors.surface, borderRadius: 18, borderWidth: 1, borderColor: BrandColors.border, padding: 16, marginBottom: 12 },
+  cardTop: { flexDirection: 'row', alignItems: 'center' },
+  jobIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: BrandColors.burgundySoft, alignItems: 'center', justifyContent: 'center' },
+  jobIconText: { color: BrandColors.burgundy, fontSize: 20, fontWeight: '800' },
+  titleBlock: { flex: 1, marginLeft: 11, marginRight: 7 },
+  jobTitle: { color: BrandColors.text, fontSize: 15, fontWeight: '800' },
+  company: { color: BrandColors.textSecondary, fontSize: 12, marginTop: 3 },
+  matchBadge: { backgroundColor: BrandColors.blushSoft, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 6 },
+  matchText: { color: BrandColors.burgundy, fontSize: 9, fontWeight: '800' },
+  metaRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 14 },
+  meta: { color: BrandColors.textSecondary, fontSize: 11 },
+  salary: { color: BrandColors.burgundy, fontSize: 14, fontWeight: '800', marginTop: 10 },
+  skillsRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 11 },
+  skillPill: { backgroundColor: BrandColors.background, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5, marginRight: 6, marginBottom: 5 },
+  skillText: { color: BrandColors.textSecondary, fontSize: 9, fontWeight: '700' },
+  appliedPill: { backgroundColor: BrandColors.successSoft, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5, marginBottom: 5 },
+  appliedText: { color: '#147957', fontSize: 9, fontWeight: '800' },
+  centerState: { alignItems: 'center', paddingVertical: 70 },
+  stateText: { color: BrandColors.textSecondary, fontSize: 13, marginTop: 12 },
+  emptyCard: { backgroundColor: BrandColors.surface, borderRadius: 20, borderWidth: 1, borderColor: BrandColors.border, padding: 24, alignItems: 'center', marginTop: 8 },
+  emptyIcon: { color: BrandColors.burgundy, fontSize: 30, marginBottom: 8 },
+  emptyTitle: { color: BrandColors.text, fontSize: 17, fontWeight: '800', textAlign: 'center' },
+  emptyText: { color: BrandColors.textSecondary, fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 7 },
+  retryButton: { backgroundColor: BrandColors.burgundy, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 11, marginTop: 16 },
+  retryText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
+  pressed: { opacity: 0.82 },
 });
