@@ -10,6 +10,7 @@ import {
 } from "@nestjs/common";
 
 import { WorkersService } from "./workers.service";
+import { UpdateWorkerOnboardingDto } from "./dto/update-worker-onboarding.dto";
 import { UpdateWorkerProfileDto } from "./dto/update-worker-profile.dto";
 import { WorkersQueryDto } from "./dto/workers-query.dto";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
@@ -51,6 +52,17 @@ export class WorkersController {
     @Body() dto: UpdateWorkerProfileDto,
   ) {
     return this.workersService.updateMyProfile(
+      request.user.userId,
+      dto,
+    );
+  }
+
+  @Patch("me/onboarding")
+  async updateMyOnboarding(
+    @Req() request: any,
+    @Body() dto: UpdateWorkerOnboardingDto,
+  ) {
+    return this.workersService.updateMyOnboarding(
       request.user.userId,
       dto,
     );
