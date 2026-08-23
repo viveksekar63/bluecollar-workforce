@@ -11,25 +11,21 @@ import { ObjectStorageService } from "../storage/object-storage.service";
 import { CreateDocumentDto } from "./dto/create-document.dto";
 import { UpdateDocumentDto } from "./dto/update-document.dto";
 
+type UploadedDocumentFile = {
+  buffer: Buffer;
+  size: number;
+  mimetype: string;
+  originalname: string;
+};
+
 @Injectable()
 export class DocumentsService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly storage: ObjectStorageService,
-  ) {}
+  constructor(private readonly prisma: PrismaService, private readonly storage: ObjectStorageService) {}
 
   private readonly documentSelect = {
-    id: true,
-    workerId: true,
-    type: true,
-    fileName: true,
-    storageKey: true,
-    mimeType: true,
-    fileSize: true,
-    documentNumber: true,
-    verificationStatus: true,
-    uploadedAt: true,
-    verifiedAt: true,
+    id: true, workerId: true, type: true, fileName: true, storageKey: true,
+    mimeType: true, fileSize: true, documentNumber: true, verificationStatus: true,
+    uploadedAt: true, verifiedAt: true,
     verification: { select: { id: true, provider: true, providerRef: true, status: true, remarks: true, verifiedAt: true } },
   } as const;
 
@@ -45,11 +41,10 @@ export class DocumentsService {
     return this.prisma.document.create({ data: { workerId: worker.id, type: dto.type, fileName: dto.fileName, storageKey: dto.storageKey, mimeType: dto.mimeType, fileSize: dto.fileSize, documentNumber: dto.documentNumber }, select: this.documentSelect });
   }
 
-  async uploadForWorker(userId: string, file: Express.Multer.File, type: DocumentType, documentNumber?: string) {
+  async uploadForWorker(userId: string, file: UploadedDocumentFile, type: DocumentType, documentNumber?: string) {
     if (!file) throw new BadRequestException("A document file is required");
     if (!Object.values(DocumentType).includes(type)) throw new BadRequestException("Invalid document type");
     if (file.size > 10 * 1024 * 1024) throw new BadRequestException("Document size must not exceed 10 MB");
-
     const allowedMimeTypes = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
     if (!allowedMimeTypes.includes(file.mimetype)) throw new BadRequestException("Only PDF, JPG, PNG or WEBP files are allowed");
 
@@ -57,8 +52,8 @@ export class DocumentsService {
     await this.ensureNoActiveDocument(worker.id, type);
     const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "-").replace(/-+/g, "-").slice(0, 120);
     const storageKey = `workers/${worker.id}/documents/${randomUUID()}-${safeName}`;
-
     await this.storage.putObject(storageKey, file.buffer, file.mimetype);
+
     try {
       const document = await this.prisma.document.create({ data: { workerId: worker.id, type, fileName: file.originalname.slice(0, 255), storageKey, mimeType: file.mimetype, fileSize: file.size, documentNumber: documentNumber?.trim() || undefined }, select: this.documentSelect });
       return { ...document, downloadUrl: await this.storage.getSignedUrl(storageKey) };
