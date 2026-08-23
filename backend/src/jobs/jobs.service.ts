@@ -180,10 +180,66 @@ export class JobsService {
   async getRecommendedJobs(userId: string, city?: string, limit = 20) {
     const worker = await this.prisma.worker.findUnique({
       where: { userId },
-      include: { skills: { include: { skill: true } }, addresses: { where: { isCurrent: true }, take: 1 } },
+      include: {
+        skills: { include: { skill: true } },
+        addresses: { where: { isCurrent: true }, take: 1 },
+      },
     });
     if (!worker) throw new NotFoundException('Worker profile not found');
-    return this.prisma.job.findMany({ where: { status: 'PUBLISHED' as any, ...(city ? { city } : {}) }, take: Math.min(limit, 50), orderBy: { createdAt: 'desc' } });
+
+    const workerSkillIds = new Set(worker.skills.map((item) => item.skillId));
+    const requestedCity = city?.trim();
+    const workerCity = worker.addresses[0]?.city?.trim();
+
+    const jobs = await this.prisma.job.findMany({
+      where: {
+        status: 'PUBLISHED' as any,
+        ...(requestedCity ? { city: requestedCity } : {}),
+      },
+      take: Math.min(limit, 50),
+      orderBy: { createdAt: 'desc' },
+      include: {
+        employer: {
+          select: {
+            id: true,
+            companyName: true,
+            companyType: true,
+            description: true,
+            status: true,
+          },
+        },
+        skills: {
+          include: { skill: true },
+        },
+      },
+    });
+
+    const items = jobs
+      .map((job) => {
+        const matchedSkills = job.skills.filter((item) => workerSkillIds.has(item.skillId)).length;
+        const matchScore = job.skills.length > 0
+          ? Math.round((matchedSkills / job.skills.length) * 100)
+          : 0;
+
+        return {
+          ...job,
+          matchScore,
+          matchedSkills,
+          applied: false,
+          applicationStatus: null,
+          application: null,
+        };
+      })
+      .sort((a, b) => {
+        if (b.matchScore !== a.matchScore) return b.matchScore - a.matchScore;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+
+    return {
+      items,
+      total: items.length,
+      location: requestedCity || workerCity || null,
+    };
   }
 
   async findOneForWorker(userId: string, jobId: string) {
