@@ -20,6 +20,31 @@ interface EmployerListQuery {
 export class EmployersService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private readonly employerSelect = {
+    id: true,
+    companyName: true,
+    companyType: true,
+    registrationNo: true,
+    gstNumber: true,
+    description: true,
+    status: true,
+    createdAt: true,
+    updatedAt: true,
+    user: {
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        email: true,
+        status: true,
+      },
+    },
+    _count: {
+      select: { jobs: true },
+    },
+  } as const;
+
   async findAll(query: EmployerListQuery) {
     const page = Math.max(query.page ?? 1, 1);
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 100);
@@ -50,30 +75,7 @@ export class EmployersService {
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
-        select: {
-          id: true,
-          companyName: true,
-          companyType: true,
-          registrationNo: true,
-          gstNumber: true,
-          description: true,
-          status: true,
-          createdAt: true,
-          updatedAt: true,
-          user: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              phone: true,
-              email: true,
-              status: true,
-            },
-          },
-          _count: {
-            select: { jobs: true },
-          },
-        },
+        select: this.employerSelect,
       }),
       this.prisma.employer.count({ where }),
     ]);
@@ -87,6 +89,19 @@ export class EmployersService {
         totalPages: Math.ceil(total / limit),
       },
     };
+  }
+
+  async findOne(id: string) {
+    const employer = await this.prisma.employer.findUnique({
+      where: { id },
+      select: this.employerSelect,
+    });
+
+    if (!employer) {
+      throw new NotFoundException('Employer not found');
+    }
+
+    return employer;
   }
 
   async create(dto: CreateEmployerDto) {
@@ -129,7 +144,7 @@ export class EmployersService {
         },
       });
 
-      const employer = await tx.employer.create({
+      return tx.employer.create({
         data: {
           userId: user.id,
           companyName: dto.companyName.trim(),
@@ -139,29 +154,36 @@ export class EmployersService {
           description: dto.description?.trim() || null,
           status: EmployerStatus.PENDING,
         },
-        select: {
-          id: true,
-          companyName: true,
-          companyType: true,
-          registrationNo: true,
-          gstNumber: true,
-          description: true,
-          status: true,
-          createdAt: true,
-          user: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              phone: true,
-              email: true,
-              status: true,
-            },
-          },
-        },
+        select: this.employerSelect,
+      });
+    });
+  }
+
+  async updateStatus(id: string, status: 'VERIFIED' | 'SUSPENDED') {
+    const employer = await this.prisma.employer.findUnique({
+      where: { id },
+      select: { id: true, userId: true },
+    });
+
+    if (!employer) {
+      throw new NotFoundException('Employer not found');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.employer.update({
+        where: { id },
+        data: { status: status as EmployerStatus },
       });
 
-      return employer;
+      await tx.user.update({
+        where: { id: employer.userId },
+        data: { status: status === 'VERIFIED' ? 'ACTIVE' : 'INACTIVE' },
+      });
+
+      return tx.employer.findUnique({
+        where: { id },
+        select: this.employerSelect,
+      });
     });
   }
 }
