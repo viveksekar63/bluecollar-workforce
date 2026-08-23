@@ -140,7 +140,7 @@ export class JobsService {
     if (!job.title || !job.description || !job.city || !job.state) throw new BadRequestException('Complete the job details before publishing');
     if (job.skills.length === 0) throw new BadRequestException('Add at least one required skill before publishing');
 
-    return this.prisma.job.update({ where: { id: jobId }, data: { status: 'OPEN' as any } });
+    return this.prisma.job.update({ where: { id: jobId }, data: { status: 'PUBLISHED' as any } });
   }
 
   async getEmployerApplications(userId: string, jobId: string) {
@@ -183,7 +183,7 @@ export class JobsService {
       include: { skills: { include: { skill: true } }, addresses: { where: { isCurrent: true }, take: 1 } },
     });
     if (!worker) throw new NotFoundException('Worker profile not found');
-    return this.prisma.job.findMany({ where: { status: 'OPEN' as any, ...(city ? { city } : {}) }, take: Math.min(limit, 50), orderBy: { createdAt: 'desc' } });
+    return this.prisma.job.findMany({ where: { status: 'PUBLISHED' as any, ...(city ? { city } : {}) }, take: Math.min(limit, 50), orderBy: { createdAt: 'desc' } });
   }
 
   async findOneForWorker(userId: string, jobId: string) {
@@ -195,7 +195,7 @@ export class JobsService {
     if (!worker) throw new NotFoundException('Worker profile not found');
     const job = await this.prisma.job.findUnique({ where: { id: jobId }, select: { id: true, status: true } });
     if (!job) throw new NotFoundException('Job not found');
-    if (String(job.status) !== 'OPEN') throw new BadRequestException('Job is not open');
+    if (String(job.status) !== 'PUBLISHED') throw new BadRequestException('Job is not open');
     return this.prisma.jobApplication.upsert({
       where: { jobId_workerId: { jobId, workerId: worker.id } },
       update: {},
