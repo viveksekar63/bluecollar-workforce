@@ -13,6 +13,7 @@ export default function RootLayout() {
         <Stack.Screen name="address" />
         <Stack.Screen name="home" />
         <Stack.Screen name="skills" />
+        <Stack.Screen name="profession" />
       </Stack>
     </>
   );
