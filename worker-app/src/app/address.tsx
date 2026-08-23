@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, Text
 import { router } from 'expo-router';
 
 import { getMyWorkerProfile, updateMyOnboarding } from '@/api/worker';
+import { BrandColors } from '@/constants/theme';
 
 const initialForm = { addressLine1: '', addressLine2: '', city: '', district: '', state: '', pincode: '', emergencyName: '', emergencyRelationship: '', emergencyPhone: '' };
 
@@ -38,36 +39,23 @@ export default function AddressScreen() {
 
   async function save() {
     const required = [
-      ['Address', form.addressLine1],
-      ['City', form.city],
-      ['State', form.state],
-      ['Pincode', form.pincode],
-      ['Emergency contact name', form.emergencyName],
-      ['Relationship', form.emergencyRelationship],
-      ['Emergency phone', form.emergencyPhone],
+      ['Address', form.addressLine1], ['City', form.city], ['State', form.state], ['Pincode', form.pincode],
+      ['Emergency contact name', form.emergencyName], ['Relationship', form.emergencyRelationship], ['Emergency phone', form.emergencyPhone],
     ];
 
     const missing = required.find(([, value]) => !value.trim());
-
     if (missing) {
-      Alert.alert(
-        'Missing information',
-        `Please enter ${missing[0]}.`,
-      );
+      Alert.alert('Missing information', `Please enter ${missing[0]}.`);
       return;
     }
 
     if (!/^\d{6}$/.test(form.pincode)) {
-      Alert.alert(
-        'Invalid pincode',
-        'Please enter a valid 6-digit pincode.',
-      );
+      Alert.alert('Invalid pincode', 'Please enter a valid 6-digit pincode.');
       return;
     }
 
     try {
       setSaving(true);
-
       await updateMyOnboarding({
         addressType: 'CURRENT',
         addressLine1: form.addressLine1.trim(),
@@ -81,29 +69,17 @@ export default function AddressScreen() {
         emergencyPhone: form.emergencyPhone.trim(),
       });
 
-      // API succeeded. Do not use Alert.alert() for navigation
-      // because Expo Web can block the route transition.
       setSaving(false);
-
-      setTimeout(() => {
-        router.replace('/skills');
-      }, 100);
+      setTimeout(() => router.replace('/skills'), 100);
     } catch (error: any) {
       setSaving(false);
-
       const message = error?.response?.data?.message;
-
-      Alert.alert(
-        'Unable to save',
-        Array.isArray(message)
-          ? message.join('\n')
-          : message ?? 'Please try again.',
-      );
+      Alert.alert('Unable to save', Array.isArray(message) ? message.join('\n') : message ?? 'Please try again.');
     }
   }
 
   if (loading) {
-    return <View style={styles.center}><ActivityIndicator size="large" color="#2563EB" /></View>;
+    return <View style={styles.center}><ActivityIndicator size="large" color={BrandColors.burgundy} /></View>;
   }
 
   return (
@@ -113,7 +89,7 @@ export default function AddressScreen() {
       <Text style={styles.subtitle}>Add your current address and someone we can contact in an emergency.</Text>
 
       <View style={styles.progressCard}>
-        <View style={styles.progressRow}><Text style={styles.progressLabel}>Profile completion</Text><Text style={styles.progressValue}>40%</Text></View>
+        <View style={styles.progressRow}><Text style={styles.progressLabel}>Profile completion</Text><Text style={styles.progressValue}>60%</Text></View>
         <View style={styles.track}><View style={styles.fill} /></View>
       </View>
 
@@ -133,35 +109,35 @@ export default function AddressScreen() {
       <Pressable style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, saving && styles.disabled]} onPress={save} disabled={saving}>
         {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>Save & Continue</Text>}
       </Pressable>
-      <Pressable onPress={() => router.replace('/home')} style={styles.skipButton} disabled={saving}><Text style={styles.skipText}>Complete later</Text></Pressable>
+      <Pressable onPress={() => router.replace('/home')} style={({ pressed }) => [styles.skipButton, pressed && styles.pressed]} disabled={saving}><Text style={styles.skipText}>Complete later</Text></Pressable>
     </ScrollView>
   );
 }
 
 function Field({ label, value, placeholder, onChangeText, keyboardType }: { label: string; value: string; placeholder: string; onChangeText: (value: string) => void; keyboardType?: 'default' | 'number-pad' | 'phone-pad' }) {
-  return <View style={styles.field}><Text style={styles.label}>{label}</Text><TextInput value={value} onChangeText={onChangeText} placeholder={placeholder} keyboardType={keyboardType} style={styles.input} /></View>;
+  return <View style={styles.field}><Text style={styles.label}>{label}</Text><TextInput value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={BrandColors.muted} keyboardType={keyboardType} style={styles.input} /></View>;
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, backgroundColor: '#F7F8FA', padding: 24, paddingTop: 56 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  eyebrow: { fontSize: 12, fontWeight: '800', letterSpacing: 1.5, color: '#2563EB', marginBottom: 10 },
-  title: { fontSize: 30, fontWeight: '800', color: '#111827', marginBottom: 8 },
-  subtitle: { fontSize: 15, lineHeight: 22, color: '#6B7280', marginBottom: 22 },
-  progressCard: { backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 24 },
+  container: { flexGrow: 1, backgroundColor: BrandColors.background, padding: 24, paddingTop: 56, paddingBottom: 40 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: BrandColors.background },
+  eyebrow: { fontSize: 12, fontWeight: '800', letterSpacing: 1.5, color: BrandColors.rose, marginBottom: 10 },
+  title: { fontSize: 30, fontWeight: '800', color: BrandColors.text, marginBottom: 8 },
+  subtitle: { fontSize: 15, lineHeight: 22, color: BrandColors.textSecondary, marginBottom: 22 },
+  progressCard: { backgroundColor: BrandColors.surface, borderRadius: 16, borderWidth: 1, borderColor: BrandColors.border, padding: 16, marginBottom: 24 },
   progressRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-  progressLabel: { fontWeight: '700', color: '#374151' },
-  progressValue: { fontWeight: '800', color: '#2563EB' },
-  track: { height: 8, borderRadius: 8, backgroundColor: '#E5E7EB', overflow: 'hidden' },
-  fill: { width: '60%', height: 8, borderRadius: 8, backgroundColor: '#2563EB' },
-  sectionTitle: { fontSize: 19, fontWeight: '800', color: '#111827', marginBottom: 14, marginTop: 2 },
+  progressLabel: { fontWeight: '700', color: BrandColors.text },
+  progressValue: { fontWeight: '800', color: BrandColors.burgundy },
+  track: { height: 8, borderRadius: 8, backgroundColor: '#EEE5E7', overflow: 'hidden' },
+  fill: { width: '60%', height: 8, borderRadius: 8, backgroundColor: BrandColors.burgundy },
+  sectionTitle: { fontSize: 19, fontWeight: '800', color: BrandColors.text, marginBottom: 14, marginTop: 2 },
   field: { marginBottom: 14 },
-  label: { fontSize: 14, fontWeight: '700', color: '#374151', marginBottom: 7 },
-  input: { minHeight: 54, borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 12, backgroundColor: '#fff', paddingHorizontal: 16, fontSize: 16, color: '#111827' },
-  primaryButton: { height: 54, borderRadius: 12, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center', marginTop: 8 },
+  label: { fontSize: 14, fontWeight: '700', color: BrandColors.text, marginBottom: 7 },
+  input: { minHeight: 54, borderWidth: 1, borderColor: BrandColors.border, borderRadius: 14, backgroundColor: BrandColors.surface, paddingHorizontal: 16, fontSize: 16, color: BrandColors.text },
+  primaryButton: { height: 54, borderRadius: 14, backgroundColor: BrandColors.burgundy, alignItems: 'center', justifyContent: 'center', marginTop: 8, shadowColor: BrandColors.burgundy, shadowOpacity: 0.18, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 3 },
   primaryText: { color: '#fff', fontSize: 16, fontWeight: '800' },
   skipButton: { alignItems: 'center', padding: 16 },
-  skipText: { color: '#6B7280', fontWeight: '700' },
+  skipText: { color: BrandColors.textSecondary, fontWeight: '700' },
   pressed: { opacity: 0.85 },
   disabled: { opacity: 0.6 },
 });
