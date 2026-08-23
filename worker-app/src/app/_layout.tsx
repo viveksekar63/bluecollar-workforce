@@ -17,6 +17,8 @@ export default function RootLayout() {
         <Stack.Screen name="experience" />
         <Stack.Screen name="verification" />
         <Stack.Screen name="documents" />
+        <Stack.Screen name="explore" />
+        <Stack.Screen name="job-details" />
       </Stack>
     </>
   );
