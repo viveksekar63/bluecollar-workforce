@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   ParseIntPipe,
+  Post,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -23,11 +24,7 @@ export class JobsController {
     @Query('city') city?: string,
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit?: number,
   ) {
-    return this.jobsService.getRecommendedJobs(
-      user.userId,
-      city,
-      limit,
-    );
+    return this.jobsService.getRecommendedJobs(user.userId, city, limit);
   }
 
   @Get(':id')
@@ -36,5 +33,13 @@ export class JobsController {
     @Param('id') jobId: string,
   ) {
     return this.jobsService.findOneForWorker(user.userId, jobId);
+  }
+
+  @Post(':id/apply')
+  async apply(
+    @CurrentUser() user: { userId: string },
+    @Param('id') jobId: string,
+  ) {
+    return this.jobsService.applyForJob(user.userId, jobId);
   }
 }
