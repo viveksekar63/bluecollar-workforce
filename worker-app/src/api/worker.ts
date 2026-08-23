@@ -27,10 +27,11 @@ export interface WorkerProfile {
   maritalStatus?: string | null;
   bio?: string | null;
   experienceYears?: number | string | null;
+  professionCategory?: string | null;
+  profession?: string | null;
   profileCompletion?: number;
   verificationStatus?: string;
   availabilityStatus?: string;
-
   user?: {
     id: string;
     firstName?: string | null;
@@ -39,7 +40,6 @@ export interface WorkerProfile {
     phone?: string | null;
     profilePhotoUrl?: string | null;
   };
-
   addresses?: WorkerAddress[];
   emergencyContacts?: EmergencyContact[];
   skills?: WorkerSkill[];
@@ -51,22 +51,12 @@ export interface UpdateWorkerSkillsInput {
   languages: string[];
 }
 
-export async function updateMySkills(
-  input: UpdateWorkerSkillsInput,
-) {
+export async function updateMySkills(input: UpdateWorkerSkillsInput) {
   const { data } = await api.patch<{
     worker: WorkerProfile;
-    skills: Array<{
-      id: string;
-      name: string;
-      category?: string | null;
-    }>;
-    languages: Array<{
-      id: string;
-      name: string;
-    }>;
+    skills: Array<{ id: string; name: string; category?: string | null }>;
+    languages: Array<{ id: string; name: string }>;
   }>('/workers/me/skills', input);
-
   return data;
 }
 
@@ -76,6 +66,8 @@ export interface UpdateWorkerProfileInput {
   maritalStatus?: string;
   experienceYears?: number;
   bio?: string;
+  professionCategory?: string;
+  profession?: string;
 }
 
 export interface UpdateWorkerOnboardingInput {
@@ -91,23 +83,27 @@ export interface UpdateWorkerOnboardingInput {
   emergencyPhone: string;
 }
 
+export interface WorkerProfession {
+  professionCategory?: string | null;
+  profession?: string | null;
+  profileCompletion?: number;
+}
+
+export interface UpdateWorkerProfessionInput {
+  professionCategory: string;
+  profession: string;
+}
+
 export interface WorkerSkill {
   experienceYears?: number | string | null;
   skillLevel?: string;
   verified?: boolean;
-  skill: {
-    id: string;
-    name: string;
-    category?: string | null;
-  };
+  skill: { id: string; name: string; category?: string | null };
 }
 
 export interface WorkerLanguage {
   proficiency?: string;
-  language: {
-    id: string;
-    name: string;
-  };
+  language: { id: string; name: string };
 }
 
 export async function getMyWorkerProfile() {
@@ -117,6 +113,16 @@ export async function getMyWorkerProfile() {
 
 export async function updateMyWorkerProfile(input: UpdateWorkerProfileInput) {
   const { data } = await api.patch<WorkerProfile>('/workers/me', input);
+  return data;
+}
+
+export async function getMyProfession() {
+  const { data } = await api.get<WorkerProfession>('/workers/me/profession');
+  return data;
+}
+
+export async function updateMyProfession(input: UpdateWorkerProfessionInput) {
+  const { data } = await api.patch<WorkerProfile>('/workers/me/profession', input);
   return data;
 }
 
