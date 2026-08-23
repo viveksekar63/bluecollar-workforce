@@ -254,7 +254,6 @@ export class WorkersService {
                 result: true,
               },
             },
-            consents: true,
           },
         },
       },
