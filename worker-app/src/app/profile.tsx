@@ -53,7 +53,7 @@ export default function ProfileScreen() {
 
     try {
       setSaving(true);
-      const worker = await updateMyWorkerProfile({
+      await updateMyWorkerProfile({
         dateOfBirth: form.dateOfBirth || undefined,
         gender: form.gender || undefined,
         maritalStatus: form.maritalStatus || undefined,
@@ -61,9 +61,9 @@ export default function ProfileScreen() {
         bio: form.bio || undefined,
       });
 
-      setCompletion(worker.profileCompletion ?? Math.max(completion, 40));
+      setCompletion(40);
       Alert.alert('Profile saved', 'Your basic profile has been updated.', [
-        { text: 'Continue', onPress: () => router.replace('/home') },
+        { text: 'Continue', onPress: () => router.replace('/address') },
       ]);
     } catch (error: any) {
       const message = error?.response?.data?.message;
@@ -102,12 +102,7 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      <Field
-        label="Date of birth"
-        value={form.dateOfBirth}
-        placeholder="YYYY-MM-DD"
-        onChangeText={(value) => setForm({ ...form, dateOfBirth: value })}
-      />
+      <Field label="Date of birth" value={form.dateOfBirth} placeholder="YYYY-MM-DD" onChangeText={(value) => setForm({ ...form, dateOfBirth: value })} />
 
       <Text style={styles.label}>Gender</Text>
       <OptionGroup
@@ -125,91 +120,33 @@ export default function ProfileScreen() {
         onSelect={(value) => setForm({ ...form, maritalStatus: value })}
       />
 
-      <Field
-        label="Years of experience"
-        value={form.experienceYears}
-        placeholder="e.g. 5"
-        keyboardType="number-pad"
-        onChangeText={(value) => setForm({ ...form, experienceYears: value.replace(/[^0-9]/g, '') })}
-      />
+      <Field label="Years of experience" value={form.experienceYears} placeholder="e.g. 5" keyboardType="number-pad" onChangeText={(value) => setForm({ ...form, experienceYears: value.replace(/[^0-9]/g, '') })} />
+      <Field label="About you" value={form.bio} placeholder="Tell employers about your experience and strengths" multiline onChangeText={(value) => setForm({ ...form, bio: value })} />
 
-      <Field
-        label="About you"
-        value={form.bio}
-        placeholder="Tell employers about your experience and strengths"
-        multiline
-        onChangeText={(value) => setForm({ ...form, bio: value })}
-      />
-
-      <Pressable
-        style={({ pressed }) => [
-          styles.primaryButton,
-          pressed && styles.pressed,
-          saving && styles.disabled,
-        ]}
-        onPress={save}
-        disabled={saving}
-      >
+      <Pressable style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, saving && styles.disabled]} onPress={save} disabled={saving}>
         {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>Save & Continue</Text>}
       </Pressable>
     </ScrollView>
   );
 }
 
-function OptionGroup<T extends string>({
-  values,
-  selected,
-  labels,
-  onSelect,
-}: {
-  values: readonly T[];
-  selected: T | '';
-  labels: Record<T, string>;
-  onSelect: (value: T) => void;
-}) {
+function OptionGroup<T extends string>({ values, selected, labels, onSelect }: { values: readonly T[]; selected: T | ''; labels: Record<T, string>; onSelect: (value: T) => void }) {
   return (
     <View style={styles.optionRow}>
       {values.map((value) => (
-        <Pressable
-          key={value}
-          onPress={() => onSelect(value)}
-          style={[styles.option, selected === value && styles.optionSelected]}
-        >
-          <Text style={[styles.optionText, selected === value && styles.optionTextSelected]}>
-            {labels[value]}
-          </Text>
+        <Pressable key={value} onPress={() => onSelect(value)} style={[styles.option, selected === value && styles.optionSelected]}>
+          <Text style={[styles.optionText, selected === value && styles.optionTextSelected]}>{labels[value]}</Text>
         </Pressable>
       ))}
     </View>
   );
 }
 
-function Field({
-  label,
-  value,
-  placeholder,
-  onChangeText,
-  multiline,
-  keyboardType,
-}: {
-  label: string;
-  value: string;
-  placeholder: string;
-  onChangeText: (value: string) => void;
-  multiline?: boolean;
-  keyboardType?: 'default' | 'number-pad';
-}) {
+function Field({ label, value, placeholder, onChangeText, multiline, keyboardType }: { label: string; value: string; placeholder: string; onChangeText: (value: string) => void; multiline?: boolean; keyboardType?: 'default' | 'number-pad' }) {
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
-      <TextInput
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        multiline={multiline}
-        keyboardType={keyboardType}
-        style={[styles.input, multiline && styles.textArea]}
-      />
+      <TextInput value={value} onChangeText={onChangeText} placeholder={placeholder} multiline={multiline} keyboardType={keyboardType} style={[styles.input, multiline && styles.textArea]} />
     </View>
   );
 }
