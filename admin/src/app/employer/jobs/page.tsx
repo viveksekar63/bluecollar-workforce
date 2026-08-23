@@ -1,0 +1,111 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { BriefcaseBusiness, ChevronRight, Plus, RefreshCw } from "lucide-react";
+import { AdminShell } from "@/components/layout/admin-shell";
+
+type Job = {
+  id: string;
+  title: string;
+  description?: string;
+  city?: string;
+  district?: string | null;
+  state?: string;
+  salaryMin?: number | null;
+  salaryMax?: number | null;
+  salaryType?: string;
+  openings?: number;
+  status?: string;
+  createdAt?: string;
+  _count?: { applications?: number };
+  skills?: Array<{ skill?: { name?: string } }>;
+};
+
+function money(value?: number | null) {
+  if (value == null) return "-";
+  return `₹${Number(value).toLocaleString("en-IN")}`;
+}
+
+export default function EmployerJobsPage() {
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  async function loadJobs() {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/backend/jobs/employer/my", {
+        credentials: "include",
+        cache: "no-store",
+      });
+      const data = await response.json().catch(() => []);
+      if (!response.ok) throw new Error(data?.message || "Unable to load jobs");
+      setJobs(Array.isArray(data) ? data : data?.data ?? []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to load jobs");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { void loadJobs(); }, []);
+
+  return (
+    <AdminShell>
+      <div className="mb-6 flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">My Jobs</h1>
+          <p className="mt-1 text-xs text-slate-500">Create and manage blue-collar job openings.</p>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={() => void loadJobs()} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+            <RefreshCw size={15} /> Refresh
+          </button>
+          <Link href="/employer/jobs/new" className="inline-flex items-center gap-2 rounded-lg bg-[#0864ec] px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+            <Plus size={16} /> Create Job
+          </Link>
+        </div>
+      </div>
+
+      {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+
+      {loading ? (
+        <div className="rounded-xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">Loading jobs...</div>
+      ) : jobs.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-slate-300 bg-white p-14 text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50"><BriefcaseBusiness className="text-blue-600" size={22} /></div>
+          <h2 className="mt-4 text-lg font-bold text-slate-900">No jobs yet</h2>
+          <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">Create your first opening for a cook, mechanic, driver, cleaner, mason, delivery worker or any other practical profession.</p>
+          <Link href="/employer/jobs/new" className="mt-5 inline-flex items-center gap-2 rounded-lg bg-[#0864ec] px-4 py-2.5 text-sm font-semibold text-white">Create your first job <ChevronRight size={15} /></Link>
+        </div>
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {jobs.map((job) => (
+            <div key={job.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-base font-bold text-slate-900">{job.title}</h2>
+                  <p className="mt-1 text-xs text-slate-500">{[job.city, job.district, job.state].filter(Boolean).join(", ") || "Location not specified"}</p>
+                </div>
+                <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${job.status === "OPEN" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>{job.status || "DRAFT"}</span>
+              </div>
+              <div className="mt-4 grid grid-cols-3 gap-3">
+                <div className="rounded-lg bg-slate-50 p-3"><div className="text-[10px] uppercase text-slate-400">Salary</div><div className="mt-1 text-sm font-bold text-slate-900">{money(job.salaryMin)}{job.salaryMax ? ` - ${money(job.salaryMax)}` : ""}</div></div>
+                <div className="rounded-lg bg-slate-50 p-3"><div className="text-[10px] uppercase text-slate-400">Openings</div><div className="mt-1 text-sm font-bold text-slate-900">{job.openings ?? 1}</div></div>
+                <div className="rounded-lg bg-slate-50 p-3"><div className="text-[10px] uppercase text-slate-400">Applicants</div><div className="mt-1 text-sm font-bold text-slate-900">{job._count?.applications ?? 0}</div></div>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {(job.skills ?? []).slice(0, 5).map((item, index) => <span key={`${job.id}-${index}`} className="rounded-md bg-blue-50 px-2 py-1 text-[11px] font-semibold text-blue-700">{item.skill?.name}</span>)}
+              </div>
+              <div className="mt-5 border-t border-slate-100 pt-4 text-right">
+                <Link href={`/employer/jobs/${job.id}`} className="text-sm font-semibold text-[#0864ec] hover:underline">View job & applicants →</Link>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </AdminShell>
+  );
+}
