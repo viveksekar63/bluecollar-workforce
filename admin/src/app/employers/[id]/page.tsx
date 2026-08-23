@@ -84,7 +84,7 @@ export default function EmployerDetailsPage({ params }: { params: Promise<{ id: 
     setSaving(true);
     setError(null);
     try {
-      const response = await fetch(`/api/employers/${employer.id}`, {
+      const response = await fetch(`/api/employers/${employer.id}/status`, {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
