@@ -102,7 +102,7 @@ export default function ProfessionScreen() {
         professionCategory: category,
         profession: selectedProfession,
       });
-      router.replace('/home');
+      router.replace('/experience');
     } catch (error: any) {
       const message = error?.response?.data?.message;
       Alert.alert('Unable to save', Array.isArray(message) ? message.join('\n') : message ?? 'Please try again.');
@@ -197,7 +197,7 @@ export default function ProfessionScreen() {
       ) : null}
 
       <Pressable style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, saving && styles.disabled]} onPress={save} disabled={saving}>
-        {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>Finish Profile</Text>}
+        {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>Continue to Work Experience</Text>}
       </Pressable>
       <Pressable onPress={completeLater} style={({ pressed }) => [styles.skipButton, pressed && styles.pressed]} disabled={saving}>
         <Text style={styles.skipText}>Complete later</Text>
