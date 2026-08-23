@@ -5,6 +5,7 @@ import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
 
 import { PrismaModule } from "./prisma/prisma.module";
+import { StorageModule } from "./storage/storage.module";
 
 import { AuthModule } from "./auth/auth.module";
 import { DashboardModule } from "./dashboard/dashboard.module";
@@ -34,6 +35,7 @@ import { AuditModule } from "./audit/audit.module";
 
     // Core
     PrismaModule,
+    StorageModule,
 
     // Authentication & Authorization
     AuthModule,
@@ -60,12 +62,7 @@ import { AuditModule } from "./audit/audit.module";
     AuditModule,
   ],
 
-  controllers: [
-    AppController,
-  ],
-
-  providers: [
-    AppService,
-  ],
+  controllers: [AppController],
+  providers: [AppService],
 })
 export class AppModule {}
