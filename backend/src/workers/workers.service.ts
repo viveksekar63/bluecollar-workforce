@@ -4,6 +4,7 @@ import {
 } from "@nestjs/common";
 
 import { PrismaService } from "../prisma/prisma.service";
+import { UpdateWorkerOnboardingDto } from "./dto/update-worker-onboarding.dto";
 import { UpdateWorkerProfileDto } from "./dto/update-worker-profile.dto";
 import { WorkersQueryDto } from "./dto/workers-query.dto";
 
@@ -369,6 +370,7 @@ export class WorkersService {
         ...(dto.experienceYears !== undefined
           ? { experienceYears: dto.experienceYears }
           : {}),
+        profileCompletion: 40,
       },
       select: {
         id: true,
@@ -387,5 +389,65 @@ export class WorkersService {
     });
 
     return updated;
+  }
+
+  async updateMyOnboarding(
+    userId: string,
+    dto: UpdateWorkerOnboardingDto,
+  ) {
+    const worker = await this.prisma.worker.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+
+    if (!worker) {
+      throw new NotFoundException("Worker profile not found");
+    }
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      await tx.workerAddress.updateMany({
+        where: { workerId: worker.id, isCurrent: true },
+        data: { isCurrent: false },
+      });
+
+      const address = await tx.workerAddress.create({
+        data: {
+          workerId: worker.id,
+          type: dto.addressType,
+          addressLine1: dto.addressLine1,
+          addressLine2: dto.addressLine2 || null,
+          city: dto.city,
+          district: dto.district || null,
+          state: dto.state,
+          pincode: dto.pincode,
+          isCurrent: true,
+        },
+      });
+
+      const emergencyContact = await tx.emergencyContact.create({
+        data: {
+          workerId: worker.id,
+          name: dto.emergencyName,
+          relationship: dto.emergencyRelationship,
+          phone: dto.emergencyPhone,
+        },
+      });
+
+      const updatedWorker = await tx.worker.update({
+        where: { id: worker.id },
+        data: { profileCompletion: 60 },
+        select: {
+          id: true,
+          workerCode: true,
+          profileCompletion: true,
+          verificationStatus: true,
+          availabilityStatus: true,
+        },
+      });
+
+      return { worker: updatedWorker, address, emergencyContact };
+    });
+
+    return result;
   }
 }
