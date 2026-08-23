@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, Text
 import { router } from 'expo-router';
 
 import { getMyWorkerProfile, updateMyWorkerProfile } from '@/api/worker';
+import { BrandColors } from '@/constants/theme';
 import { useAuthStore } from '@/store/auth';
 
 const GENDER_VALUES = ['MALE', 'FEMALE', 'OTHER'] as const;
@@ -62,18 +63,10 @@ export default function ProfileScreen() {
       });
 
       setCompletion(40);
-
-      // Navigate directly after a successful save. Using Alert.alert with an
-      // onPress callback blocks the onboarding transition on some Expo Web
-      // versions, so the web app could remain on Step 1 even though the API
-      // request succeeded.
       router.replace('/address');
     } catch (error: any) {
       const message = error?.response?.data?.message;
-      Alert.alert(
-        'Unable to save',
-        Array.isArray(message) ? message.join('\n') : message ?? 'Please try again.',
-      );
+      Alert.alert('Unable to save', Array.isArray(message) ? message.join('\n') : message ?? 'Please try again.');
     } finally {
       setSaving(false);
     }
@@ -82,7 +75,7 @@ export default function ProfileScreen() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#2563EB" />
+        <ActivityIndicator size="large" color={BrandColors.burgundy} />
       </View>
     );
   }
@@ -108,20 +101,10 @@ export default function ProfileScreen() {
       <Field label="Date of birth" value={form.dateOfBirth} placeholder="YYYY-MM-DD" onChangeText={(value) => setForm({ ...form, dateOfBirth: value })} />
 
       <Text style={styles.label}>Gender</Text>
-      <OptionGroup
-        values={GENDER_VALUES}
-        selected={form.gender}
-        labels={{ MALE: 'Male', FEMALE: 'Female', OTHER: 'Other' }}
-        onSelect={(value) => setForm({ ...form, gender: value })}
-      />
+      <OptionGroup values={GENDER_VALUES} selected={form.gender} labels={{ MALE: 'Male', FEMALE: 'Female', OTHER: 'Other' }} onSelect={(value) => setForm({ ...form, gender: value })} />
 
       <Text style={[styles.label, styles.optionLabel]}>Marital status</Text>
-      <OptionGroup
-        values={MARITAL_STATUS_VALUES}
-        selected={form.maritalStatus}
-        labels={{ SINGLE: 'Single', MARRIED: 'Married', OTHER: 'Other' }}
-        onSelect={(value) => setForm({ ...form, maritalStatus: value })}
-      />
+      <OptionGroup values={MARITAL_STATUS_VALUES} selected={form.maritalStatus} labels={{ SINGLE: 'Single', MARRIED: 'Married', OTHER: 'Other' }} onSelect={(value) => setForm({ ...form, maritalStatus: value })} />
 
       <Field label="Years of experience" value={form.experienceYears} placeholder="e.g. 5" keyboardType="number-pad" onChangeText={(value) => setForm({ ...form, experienceYears: value.replace(/[^0-9]/g, '') })} />
       <Field label="About you" value={form.bio} placeholder="Tell employers about your experience and strengths" multiline onChangeText={(value) => setForm({ ...form, bio: value })} />
@@ -149,34 +132,34 @@ function Field({ label, value, placeholder, onChangeText, multiline, keyboardTyp
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
-      <TextInput value={value} onChangeText={onChangeText} placeholder={placeholder} multiline={multiline} keyboardType={keyboardType} style={[styles.input, multiline && styles.textArea]} />
+      <TextInput value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={BrandColors.muted} multiline={multiline} keyboardType={keyboardType} style={[styles.input, multiline && styles.textArea]} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, backgroundColor: '#F7F8FA', padding: 24, paddingTop: 56 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  eyebrow: { fontSize: 12, fontWeight: '800', letterSpacing: 1.5, color: '#2563EB', marginBottom: 10 },
-  title: { fontSize: 32, fontWeight: '800', color: '#111827', marginBottom: 8 },
-  subtitle: { fontSize: 15, lineHeight: 22, color: '#6B7280', marginBottom: 22 },
-  progressCard: { backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 22 },
+  container: { flexGrow: 1, backgroundColor: BrandColors.background, padding: 24, paddingTop: 56, paddingBottom: 40 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: BrandColors.background },
+  eyebrow: { fontSize: 12, fontWeight: '800', letterSpacing: 1.5, color: BrandColors.rose, marginBottom: 10 },
+  title: { fontSize: 32, fontWeight: '800', color: BrandColors.text, marginBottom: 8 },
+  subtitle: { fontSize: 15, lineHeight: 22, color: BrandColors.textSecondary, marginBottom: 22 },
+  progressCard: { backgroundColor: BrandColors.surface, borderRadius: 16, borderWidth: 1, borderColor: BrandColors.border, padding: 16, marginBottom: 22 },
   progressRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-  progressLabel: { fontWeight: '700', color: '#374151' },
-  progressValue: { fontWeight: '800', color: '#2563EB' },
-  track: { height: 8, borderRadius: 8, backgroundColor: '#E5E7EB', overflow: 'hidden' },
-  fill: { height: 8, borderRadius: 8, backgroundColor: '#2563EB' },
+  progressLabel: { fontWeight: '700', color: BrandColors.text },
+  progressValue: { fontWeight: '800', color: BrandColors.burgundy },
+  track: { height: 8, borderRadius: 8, backgroundColor: '#EEE5E7', overflow: 'hidden' },
+  fill: { height: 8, borderRadius: 8, backgroundColor: BrandColors.burgundy },
   field: { marginBottom: 14 },
-  label: { fontSize: 14, fontWeight: '700', color: '#374151', marginBottom: 7 },
+  label: { fontSize: 14, fontWeight: '700', color: BrandColors.text, marginBottom: 7 },
   optionLabel: { marginTop: 4 },
   optionRow: { flexDirection: 'row', gap: 8, marginBottom: 14 },
-  option: { flex: 1, minHeight: 50, borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 12, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
-  optionSelected: { borderColor: '#2563EB', backgroundColor: '#EFF6FF' },
-  optionText: { color: '#374151', fontSize: 15, fontWeight: '600' },
-  optionTextSelected: { color: '#2563EB', fontWeight: '800' },
-  input: { minHeight: 54, borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 12, backgroundColor: '#fff', paddingHorizontal: 16, fontSize: 16, color: '#111827' },
+  option: { flex: 1, minHeight: 50, borderWidth: 1, borderColor: BrandColors.border, borderRadius: 14, backgroundColor: BrandColors.surface, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
+  optionSelected: { borderColor: BrandColors.burgundy, backgroundColor: BrandColors.burgundySoft },
+  optionText: { color: BrandColors.text, fontSize: 15, fontWeight: '600' },
+  optionTextSelected: { color: BrandColors.burgundy, fontWeight: '800' },
+  input: { minHeight: 54, borderWidth: 1, borderColor: BrandColors.border, borderRadius: 14, backgroundColor: BrandColors.surface, paddingHorizontal: 16, fontSize: 16, color: BrandColors.text },
   textArea: { minHeight: 110, paddingTop: 14, textAlignVertical: 'top' },
-  primaryButton: { height: 54, borderRadius: 12, backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center', marginTop: 8 },
+  primaryButton: { height: 54, borderRadius: 14, backgroundColor: BrandColors.burgundy, alignItems: 'center', justifyContent: 'center', marginTop: 8, shadowColor: BrandColors.burgundy, shadowOpacity: 0.18, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 3 },
   primaryText: { color: '#fff', fontSize: 16, fontWeight: '800' },
   pressed: { opacity: 0.85 },
   disabled: { opacity: 0.6 },
