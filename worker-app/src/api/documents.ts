@@ -40,29 +40,36 @@ export async function getMyDocuments() {
 
 export async function uploadMyDocument(
   type: WorkerDocumentType,
-  asset: { uri: string; name: string; mimeType?: string | null; size?: number | null },
+  asset: {
+    uri: string;
+    name: string;
+    mimeType?: string | null;
+    size?: number | null;
+    file?: File;
+  },
   documentNumber?: string,
 ) {
   const formData = new FormData();
   formData.append('type', type);
-  if (documentNumber?.trim()) {
-    formData.append('documentNumber', documentNumber.trim());
-  }
+  if (documentNumber?.trim()) formData.append('documentNumber', documentNumber.trim());
 
-  formData.append(
-    'file',
-    {
-      uri: asset.uri,
-      name: asset.name,
-      type: asset.mimeType || 'application/octet-stream',
-    } as any,
-  );
+  if (asset.file) {
+    formData.append('file', asset.file, asset.name);
+  } else {
+    formData.append(
+      'file',
+      {
+        uri: asset.uri,
+        name: asset.name,
+        type: asset.mimeType || 'application/octet-stream',
+      } as any,
+    );
+  }
 
   const { data } = await api.post<WorkerDocument>('/documents/me/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
     timeout: 60000,
   });
-
   return data;
 }
 
@@ -72,8 +79,6 @@ export async function deleteMyDocument(documentId: string) {
 }
 
 export async function getMyDocumentUrl(documentId: string) {
-  const { data } = await api.get<{ documentId: string; url: string; expiresIn: number }>(
-    `/documents/me/${documentId}/url`,
-  );
+  const { data } = await api.get<{ documentId: string; url: string; expiresIn: number }>(`/documents/me/${documentId}/url`);
   return data;
 }
