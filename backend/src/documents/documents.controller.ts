@@ -35,11 +35,7 @@ export class DocumentsController {
   }
 
   @Post("me/upload")
-  @UseInterceptors(
-    FileInterceptor("file", {
-      limits: { fileSize: 10 * 1024 * 1024 },
-    }),
-  )
+  @UseInterceptors(FileInterceptor("file", { limits: { fileSize: 10 * 1024 * 1024 } }))
   async uploadMine(
     @Req() request: any,
     @UploadedFile() file: Express.Multer.File,
@@ -49,20 +45,11 @@ export class DocumentsController {
     if (!type || !Object.values(DocumentType).includes(type as DocumentType)) {
       throw new BadRequestException("A valid document type is required");
     }
-
-    return this.documentsService.uploadForWorker(
-      request.user.userId,
-      file,
-      type as DocumentType,
-      documentNumber,
-    );
+    return this.documentsService.uploadForWorker(request.user.userId, file, type as DocumentType, documentNumber);
   }
 
   @Get("me/:id/url")
-  async getMineDownloadUrl(
-    @Req() request: any,
-    @Param("id") id: string,
-  ) {
+  async getMineDownloadUrl(@Req() request: any, @Param("id") id: string) {
     return this.documentsService.getMineDownloadUrl(request.user.userId, id);
   }
 
@@ -72,11 +59,7 @@ export class DocumentsController {
   }
 
   @Patch("me/:id")
-  async updateMine(
-    @Req() request: any,
-    @Param("id") id: string,
-    @Body() dto: UpdateDocumentDto,
-  ) {
+  async updateMine(@Req() request: any, @Param("id") id: string, @Body() dto: UpdateDocumentDto) {
     return this.documentsService.updateMine(request.user.userId, id, dto);
   }
 
@@ -92,13 +75,17 @@ export class DocumentsController {
     return this.documentsService.findByWorker(workerId);
   }
 
+  @Get("worker/:workerId/:id/url")
+  @UseGuards(PermissionGuard)
+  @RequirePermissions(PERMISSIONS.DOCUMENTS_READ)
+  async getWorkerDocumentUrl(@Param("workerId") workerId: string, @Param("id") documentId: string) {
+    return this.documentsService.getWorkerDocumentUrl(workerId, documentId);
+  }
+
   @Patch(":id/status")
   @UseGuards(PermissionGuard)
   @RequirePermissions(PERMISSIONS.DOCUMENTS_UPDATE)
-  async updateStatus(
-    @Param("id") id: string,
-    @Body() dto: UpdateDocumentStatusDto,
-  ) {
+  async updateStatus(@Param("id") id: string, @Body() dto: UpdateDocumentStatusDto) {
     return this.documentsService.updateStatus(id, dto.status, dto.remarks);
   }
 }
