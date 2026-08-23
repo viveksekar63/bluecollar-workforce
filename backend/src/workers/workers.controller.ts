@@ -1,15 +1,21 @@
 import {
-  Body,
   Controller,
   Get,
+  Param,
   Patch,
+  Body,
+  Query,
   Req,
   UseGuards,
 } from "@nestjs/common";
 
 import { WorkersService } from "./workers.service";
 import { UpdateWorkerProfileDto } from "./dto/update-worker-profile.dto";
+import { WorkersQueryDto } from "./dto/workers-query.dto";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { PermissionGuard } from "../auth/permissions/permission.guard";
+import { RequirePermissions } from "../auth/permissions/permission.decorator";
+import { PERMISSIONS } from "../auth/permissions/permissions";
 
 @Controller("workers")
 @UseGuards(JwtAuthGuard)
@@ -18,11 +24,25 @@ export class WorkersController {
     private readonly workersService: WorkersService,
   ) {}
 
+  @Get()
+  @UseGuards(PermissionGuard)
+  @RequirePermissions(PERMISSIONS.WORKERS_READ)
+  async findAll(@Query() query: WorkersQueryDto) {
+    return this.workersService.findAll(query);
+  }
+
   @Get("me")
   async getMyProfile(@Req() request: any) {
     return this.workersService.getMyProfile(
       request.user.userId,
     );
+  }
+
+  @Get(":id")
+  @UseGuards(PermissionGuard)
+  @RequirePermissions(PERMISSIONS.WORKERS_READ)
+  async findOne(@Param("id") id: string) {
+    return this.workersService.findOne(id);
   }
 
   @Patch("me")
