@@ -14,7 +14,6 @@ import {
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { DocumentType } from "@prisma/client";
-import { memoryStorage } from "multer";
 
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { PermissionGuard } from "../auth/permissions/permission.guard";
@@ -38,7 +37,6 @@ export class DocumentsController {
   @Post("me/upload")
   @UseInterceptors(
     FileInterceptor("file", {
-      storage: memoryStorage(),
       limits: { fileSize: 10 * 1024 * 1024 },
     }),
   )
@@ -69,10 +67,7 @@ export class DocumentsController {
   }
 
   @Post("me")
-  async createMine(
-    @Req() request: any,
-    @Body() dto: CreateDocumentDto,
-  ) {
+  async createMine(@Req() request: any, @Body() dto: CreateDocumentDto) {
     return this.documentsService.createForWorker(request.user.userId, dto);
   }
 
