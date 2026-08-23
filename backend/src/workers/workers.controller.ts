@@ -26,6 +26,7 @@ import { RequirePermissions } from "../auth/permissions/permission.decorator";
 import { PERMISSIONS } from "../auth/permissions/permissions";
 import { UpdateWorkerSkillsDto } from "./dto/update-worker-skills.dto";
 import { WorkerProfessionService } from "./worker-profession.service";
+import { WorkerVerificationService } from "./worker-verification.service";
 
 @Controller("workers")
 @UseGuards(JwtAuthGuard)
@@ -33,6 +34,7 @@ export class WorkersController {
   constructor(
     private readonly workersService: WorkersService,
     private readonly workerProfessionService: WorkerProfessionService,
+    private readonly workerVerificationService: WorkerVerificationService,
   ) { }
 
   @Get()
@@ -59,6 +61,13 @@ export class WorkersController {
   @Get("me/experience")
   async getMyEmploymentHistory(@Req() request: any) {
     return this.workersService.getMyEmploymentHistory(
+      request.user.userId,
+    );
+  }
+
+  @Get("me/verification")
+  async getMyVerification(@Req() request: any) {
+    return this.workerVerificationService.getMyVerification(
       request.user.userId,
     );
   }
@@ -122,6 +131,15 @@ export class WorkersController {
     return this.workersService.createMyEmploymentHistory(
       request.user.userId,
       dto,
+    );
+  }
+
+  @Post("me/verification")
+  async submitVerificationConsent(@Req() request: any) {
+    return this.workerVerificationService.submitConsentAndStart(
+      request.user.userId,
+      request.ip,
+      request.headers?.["user-agent"],
     );
   }
 
