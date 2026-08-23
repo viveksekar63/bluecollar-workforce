@@ -38,21 +38,36 @@ export default function AddressScreen() {
 
   async function save() {
     const required = [
-      ['Address', form.addressLine1], ['City', form.city], ['State', form.state], ['Pincode', form.pincode],
-      ['Emergency contact name', form.emergencyName], ['Relationship', form.emergencyRelationship], ['Emergency phone', form.emergencyPhone],
+      ['Address', form.addressLine1],
+      ['City', form.city],
+      ['State', form.state],
+      ['Pincode', form.pincode],
+      ['Emergency contact name', form.emergencyName],
+      ['Relationship', form.emergencyRelationship],
+      ['Emergency phone', form.emergencyPhone],
     ];
+
     const missing = required.find(([, value]) => !value.trim());
+
     if (missing) {
-      Alert.alert('Missing information', `Please enter ${missing[0]}.`);
+      Alert.alert(
+        'Missing information',
+        `Please enter ${missing[0]}.`,
+      );
       return;
     }
+
     if (!/^\d{6}$/.test(form.pincode)) {
-      Alert.alert('Invalid pincode', 'Please enter a valid 6-digit pincode.');
+      Alert.alert(
+        'Invalid pincode',
+        'Please enter a valid 6-digit pincode.',
+      );
       return;
     }
 
     try {
       setSaving(true);
+
       await updateMyOnboarding({
         addressType: 'CURRENT',
         addressLine1: form.addressLine1.trim(),
@@ -66,17 +81,24 @@ export default function AddressScreen() {
         emergencyPhone: form.emergencyPhone.trim(),
       });
 
-      Alert.alert('Saved', 'Address and emergency contact have been saved.', [
-        {
-          text: 'Continue',
-          onPress: () => router.replace('/skills'),
-        }
-      ]);
-    } catch (error: any) {
-      const message = error?.response?.data?.message;
-      Alert.alert('Unable to save', Array.isArray(message) ? message.join('\n') : message ?? 'Please try again.');
-    } finally {
+      // API succeeded. Do not use Alert.alert() for navigation
+      // because Expo Web can block the route transition.
       setSaving(false);
+
+      setTimeout(() => {
+        router.replace('/skills');
+      }, 100);
+    } catch (error: any) {
+      setSaving(false);
+
+      const message = error?.response?.data?.message;
+
+      Alert.alert(
+        'Unable to save',
+        Array.isArray(message)
+          ? message.join('\n')
+          : message ?? 'Please try again.',
+      );
     }
   }
 

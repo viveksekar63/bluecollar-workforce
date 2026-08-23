@@ -51,8 +51,14 @@ export default function SkillsScreen() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    let mounted = true;
+
     getMyWorkerProfile()
       .then((worker) => {
+        if (!mounted) {
+          return;
+        }
+
         setSkills(
           worker.skills?.map((item) => item.skill.name) ?? [],
         );
@@ -63,8 +69,18 @@ export default function SkillsScreen() {
           ) ?? [],
         );
       })
-      .catch(() => undefined)
-      .finally(() => setLoading(false));
+      .catch(() => {
+        // Profile may not have skills/languages yet.
+      })
+      .finally(() => {
+        if (mounted) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   function toggleSkill(skill: string) {
@@ -90,9 +106,13 @@ export default function SkillsScreen() {
       return;
     }
 
-    if (!skills.includes(value)) {
-      setSkills((current) => [...current, value]);
-    }
+    setSkills((current) => {
+      if (current.includes(value)) {
+        return current;
+      }
+
+      return [...current, value];
+    });
 
     setCustomSkill('');
   }
@@ -104,12 +124,13 @@ export default function SkillsScreen() {
       return;
     }
 
-    if (!languages.includes(value)) {
-      setLanguages((current) => [
-        ...current,
-        value,
-      ]);
-    }
+    setLanguages((current) => {
+      if (current.includes(value)) {
+        return current;
+      }
+
+      return [...current, value];
+    });
 
     setCustomLanguage('');
   }
@@ -131,24 +152,31 @@ export default function SkillsScreen() {
       return;
     }
 
+    if (saving) {
+      return;
+    }
+
     try {
       setSaving(true);
 
       await updateMySkills({
-        skills,
-        languages,
+        skills: skills.map((skill) => skill.trim()).filter(Boolean),
+        languages: languages
+          .map((language) => language.trim())
+          .filter(Boolean),
       });
 
-      Alert.alert(
-        'Saved',
-        'Your skills and languages have been saved.',
-        [
-          {
-            text: 'Continue',
-            onPress: () => router.replace('/documents'),
-          },
-        ],
-      );
+      /*
+       * Do not put router.replace() inside Alert.alert()
+       * callback. Expo Web can sometimes keep the route
+       * transition blocked until the alert is dismissed.
+       *
+       * The Documents screen is not created yet, so we
+       * temporarily continue to Home.
+       */
+      setTimeout(() => {
+        router.replace('/home');
+      }, 100);
     } catch (error: any) {
       const message = error?.response?.data?.message;
 
@@ -158,9 +186,17 @@ export default function SkillsScreen() {
           ? message.join('\n')
           : message ?? 'Please try again.',
       );
-    } finally {
+
       setSaving(false);
     }
+  }
+
+  function completeLater() {
+    if (saving) {
+      return;
+    }
+
+    router.replace('/home');
   }
 
   if (loading) {
@@ -225,16 +261,16 @@ export default function SkillsScreen() {
             <Pressable
               key={skill}
               onPress={() => toggleSkill(skill)}
-              style={[
+              style={({ pressed }) => [
                 styles.option,
                 selected && styles.optionSelected,
+                pressed && styles.pressed,
               ]}
             >
               <Text
                 style={[
                   styles.optionText,
-                  selected &&
-                    styles.optionTextSelected,
+                  selected && styles.optionTextSelected,
                 ]}
               >
                 {skill}
@@ -249,12 +285,18 @@ export default function SkillsScreen() {
           value={customSkill}
           onChangeText={setCustomSkill}
           placeholder="Other skill"
+          placeholderTextColor="#9CA3AF"
           style={styles.customInput}
+          onSubmitEditing={addCustomSkill}
+          returnKeyType="done"
         />
 
         <Pressable
           onPress={addCustomSkill}
-          style={styles.addButton}
+          style={({ pressed }) => [
+            styles.addButton,
+            pressed && styles.pressed,
+          ]}
         >
           <Text style={styles.addButtonText}>
             Add
@@ -273,7 +315,10 @@ export default function SkillsScreen() {
               <Pressable
                 key={skill}
                 onPress={() => toggleSkill(skill)}
-                style={styles.chip}
+                style={({ pressed }) => [
+                  styles.chip,
+                  pressed && styles.pressed,
+                ]}
               >
                 <Text style={styles.chipText}>
                   {skill} ×
@@ -294,25 +339,22 @@ export default function SkillsScreen() {
 
       <View style={styles.options}>
         {LANGUAGE_OPTIONS.map((language) => {
-          const selected =
-            languages.includes(language);
+          const selected = languages.includes(language);
 
           return (
             <Pressable
               key={language}
-              onPress={() =>
-                toggleLanguage(language)
-              }
-              style={[
+              onPress={() => toggleLanguage(language)}
+              style={({ pressed }) => [
                 styles.option,
                 selected && styles.optionSelected,
+                pressed && styles.pressed,
               ]}
             >
               <Text
                 style={[
                   styles.optionText,
-                  selected &&
-                    styles.optionTextSelected,
+                  selected && styles.optionTextSelected,
                 ]}
               >
                 {language}
@@ -327,12 +369,18 @@ export default function SkillsScreen() {
           value={customLanguage}
           onChangeText={setCustomLanguage}
           placeholder="Other language"
+          placeholderTextColor="#9CA3AF"
           style={styles.customInput}
+          onSubmitEditing={addCustomLanguage}
+          returnKeyType="done"
         />
 
         <Pressable
           onPress={addCustomLanguage}
-          style={styles.addButton}
+          style={({ pressed }) => [
+            styles.addButton,
+            pressed && styles.pressed,
+          ]}
         >
           <Text style={styles.addButtonText}>
             Add
@@ -350,10 +398,11 @@ export default function SkillsScreen() {
             {languages.map((language) => (
               <Pressable
                 key={language}
-                onPress={() =>
-                  toggleLanguage(language)
-                }
-                style={styles.chip}
+                onPress={() => toggleLanguage(language)}
+                style={({ pressed }) => [
+                  styles.chip,
+                  pressed && styles.pressed,
+                ]}
               >
                 <Text style={styles.chipText}>
                   {language} ×
@@ -383,8 +432,11 @@ export default function SkillsScreen() {
       </Pressable>
 
       <Pressable
-        onPress={() => router.replace('/home')}
-        style={styles.skipButton}
+        onPress={completeLater}
+        style={({ pressed }) => [
+          styles.skipButton,
+          pressed && styles.pressed,
+        ]}
         disabled={saving}
       >
         <Text style={styles.skipText}>
@@ -401,12 +453,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#F7F8FA',
     padding: 24,
     paddingTop: 56,
+    paddingBottom: 40,
   },
 
   center: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#F7F8FA',
   },
 
   eyebrow: {
@@ -505,9 +559,9 @@ const styles = StyleSheet.create({
   },
 
   optionText: {
+    color: '#374151',
     fontSize: 14,
     fontWeight: '700',
-    color: '#374151',
   },
 
   optionTextSelected: {
@@ -516,6 +570,7 @@ const styles = StyleSheet.create({
 
   customRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 10,
     marginBottom: 18,
   },
@@ -533,16 +588,17 @@ const styles = StyleSheet.create({
   },
 
   addButton: {
-    minWidth: 70,
+    height: 50,
+    paddingHorizontal: 20,
     borderRadius: 12,
     backgroundColor: '#111827',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 16,
   },
 
   addButtonText: {
     color: '#fff',
+    fontSize: 14,
     fontWeight: '800',
   },
 
@@ -550,14 +606,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 14,
     padding: 16,
-    marginBottom: 24,
+    marginBottom: 22,
   },
 
   selectedTitle: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '800',
-    color: '#374151',
-    marginBottom: 10,
+    color: '#111827',
+    marginBottom: 12,
   },
 
   chips: {
@@ -568,6 +624,8 @@ const styles = StyleSheet.create({
 
   chip: {
     backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -575,8 +633,8 @@ const styles = StyleSheet.create({
 
   chipText: {
     color: '#2563EB',
-    fontWeight: '700',
     fontSize: 13,
+    fontWeight: '700',
   },
 
   primaryButton: {
