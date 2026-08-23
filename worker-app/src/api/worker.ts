@@ -139,6 +139,47 @@ export interface WorkerLanguage {
   language: { id: string; name: string };
 }
 
+export interface VerificationResult {
+  id: string;
+  result: string;
+  score?: number | null;
+  remarks?: string | null;
+}
+
+export interface VerificationCheck {
+  id: string;
+  type: string;
+  status: string;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  result?: VerificationResult | null;
+}
+
+export interface VerificationRequest {
+  id: string;
+  status: string;
+  overallScore?: number | null;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  createdAt: string;
+  checks: VerificationCheck[];
+}
+
+export interface VerificationConsent {
+  id: string;
+  consentType: string;
+  consented: boolean;
+  version: string;
+  consentedAt: string;
+}
+
+export interface WorkerVerification {
+  workerStatus: string;
+  verificationScore?: number | null;
+  request?: VerificationRequest | null;
+  consents: VerificationConsent[];
+}
+
 export async function getMyWorkerProfile() {
   const { data } = await api.get<WorkerProfile>('/workers/me');
   return data;
@@ -193,5 +234,15 @@ export async function deleteMyEmploymentHistory(employmentId: string) {
   const { data } = await api.delete<{ success: boolean }>(
     `/workers/me/experience/${employmentId}`,
   );
+  return data;
+}
+
+export async function getMyVerification() {
+  const { data } = await api.get<WorkerVerification>('/workers/me/verification');
+  return data;
+}
+
+export async function submitVerificationConsent() {
+  const { data } = await api.post<WorkerVerification>('/workers/me/verification');
   return data;
 }
