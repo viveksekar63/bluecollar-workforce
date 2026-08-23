@@ -24,6 +24,13 @@ import { UpdateDocumentDto } from "./dto/update-document.dto";
 import { UpdateDocumentStatusDto } from "./dto/update-document-status.dto";
 import { DocumentsService } from "./documents.service";
 
+type UploadedDocumentFile = {
+  buffer: Buffer;
+  size: number;
+  mimetype: string;
+  originalname: string;
+};
+
 @Controller("documents")
 @UseGuards(JwtAuthGuard)
 export class DocumentsController {
@@ -38,7 +45,7 @@ export class DocumentsController {
   @UseInterceptors(FileInterceptor("file", { limits: { fileSize: 10 * 1024 * 1024 } }))
   async uploadMine(
     @Req() request: any,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: UploadedDocumentFile,
     @Body("type") type: string,
     @Body("documentNumber") documentNumber?: string,
   ) {
