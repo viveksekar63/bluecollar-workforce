@@ -6,6 +6,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
+import { PERMISSIONS } from "./permissions/permissions";
 
 import {
   generateRefreshToken,
@@ -20,7 +21,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly permissionService: PermissionService,
-  ) {}
+  ) { }
 
   async adminLogin(
     email: string,
@@ -41,7 +42,7 @@ export class AuthService {
 
     if (!user || !user.passwordHash) {
       throw new UnauthorizedException(
-        'Invalid email or password',
+        "Invalid email or password",
       );
     }
 
@@ -52,13 +53,13 @@ export class AuthService {
 
     if (!passwordValid) {
       throw new UnauthorizedException(
-        'Invalid email or password',
+        "Invalid email or password",
       );
     }
 
-    if (user.status !== 'ACTIVE') {
+    if (user.status !== "ACTIVE") {
       throw new UnauthorizedException(
-        'User account is not active',
+        "User account is not active",
       );
     }
 
@@ -66,19 +67,15 @@ export class AuthService {
       (userRole) => userRole.role.name,
     );
 
-    const adminRoles = [
-      'SUPER_ADMIN',
-      'ADMIN',
-      'VERIFICATION_AGENT',
-    ];
+    const hasAdminAccess =
+      await this.permissionService.hasPermission(
+        user.id,
+        PERMISSIONS.DASHBOARD_VIEW,
+      );
 
-    const isAdmin = roles.some((role) =>
-      adminRoles.includes(role),
-    );
-
-    if (!isAdmin) {
+    if (!hasAdminAccess) {
       throw new UnauthorizedException(
-        'User does not have admin access',
+        "User does not have admin access",
       );
     }
 
@@ -91,9 +88,9 @@ export class AuthService {
 
   async getAdminPermissions(userId: string) {
     return this.permissionService.getUserPermissions(
-        userId,
+      userId,
     );
- }
+  }
 
   private async generateAuthTokens(
     userId: string,
@@ -185,19 +182,15 @@ export class AuthService {
       (userRole) => userRole.role.name,
     );
 
-    const adminRoles = [
-      'SUPER_ADMIN',
-      'ADMIN',
-      'VERIFICATION_AGENT',
-    ];
+    const hasAdminAccess =
+      await this.permissionService.hasPermission(
+        user.id,
+        PERMISSIONS.DASHBOARD_VIEW,
+      );
 
-    const isAdmin = roles.some((role) =>
-      adminRoles.includes(role),
-    );
-
-    if (!isAdmin) {
+    if (!hasAdminAccess) {
       throw new UnauthorizedException(
-        'User does not have admin access',
+        "User does not have admin access",
       );
     }
 

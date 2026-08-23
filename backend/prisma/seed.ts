@@ -50,7 +50,10 @@ async function main() {
     RoleName.WORKER,
   ];
 
-  const roles = new Map<RoleName, { id: string; name: RoleName }>();
+  const roles = new Map<
+    RoleName,
+    { id: string; name: string }
+  >();
 
   for (const roleName of roleNames) {
     const role = await prisma.role.upsert({

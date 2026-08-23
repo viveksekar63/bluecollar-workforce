@@ -8,21 +8,25 @@ const BACKEND_URL =
   process.env.NEXT_PUBLIC_API_URL ||
   "http://localhost:3001/api/v1";
 
-interface RouteContext {
-  params: Promise<{
-    id: string;
-  }>;
+function getAccessToken(
+  request: NextRequest,
+) {
+  return request.cookies.get(
+    "worktrust_access_token",
+  )?.value;
 }
 
 export async function GET(
   request: NextRequest,
-  context: RouteContext,
+  context: {
+    params: Promise<{
+      id: string;
+    }>;
+  },
 ) {
   try {
     const accessToken =
-      request.cookies.get(
-        "worktrust_access_token",
-      )?.value;
+      getAccessToken(request);
 
     if (!accessToken) {
       return NextResponse.json(
@@ -39,19 +43,8 @@ export async function GET(
     const { id } =
       await context.params;
 
-    if (!id) {
-      return NextResponse.json(
-        {
-          message: "Role ID is required",
-        },
-        {
-          status: 400,
-        },
-      );
-    }
-
     const response = await fetch(
-      `${BACKEND_URL}/roles/${id}`,
+      `${BACKEND_URL}/roles/${encodeURIComponent(id)}`,
       {
         method: "GET",
         headers: {
@@ -70,7 +63,8 @@ export async function GET(
     if (!response.ok) {
       return NextResponse.json(
         data ?? {
-          message: "Unable to load role",
+          message:
+            "Unable to load role",
         },
         {
           status: response.status,
@@ -82,6 +76,85 @@ export async function GET(
   } catch (error) {
     console.error(
       "Role details API error:",
+      error,
+    );
+
+    return NextResponse.json(
+      {
+        message:
+          "Unable to connect to roles service",
+      },
+      {
+        status: 503,
+      },
+    );
+  }
+}
+
+export async function PATCH(
+  request: NextRequest,
+  context: {
+    params: Promise<{
+      id: string;
+    }>;
+  },
+) {
+  try {
+    const accessToken =
+      getAccessToken(request);
+
+    if (!accessToken) {
+      return NextResponse.json(
+        {
+          message:
+            "Authentication required",
+        },
+        {
+          status: 401,
+        },
+      );
+    }
+
+    const { id } =
+      await context.params;
+
+    const body =
+      await request.json();
+
+    const response = await fetch(
+      `${BACKEND_URL}/roles/${encodeURIComponent(id)}`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type":
+            "application/json",
+        },
+        body: JSON.stringify(body),
+        cache: "no-store",
+      },
+    );
+
+    const data = await response
+      .json()
+      .catch(() => null);
+
+    if (!response.ok) {
+      return NextResponse.json(
+        data ?? {
+          message:
+            "Unable to update role",
+        },
+        {
+          status: response.status,
+        },
+      );
+    }
+
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error(
+      "Update role API error:",
       error,
     );
 

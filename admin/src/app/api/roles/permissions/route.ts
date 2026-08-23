@@ -61,14 +61,14 @@ export async function GET(
     return NextResponse.json(data);
   } catch (error) {
     console.error(
-      "Role permissions API error:",
+      "Permissions API error:",
       error,
     );
 
     return NextResponse.json(
       {
         message:
-          "Unable to connect to roles service",
+          "Unable to connect to permissions service",
       },
       {
         status: 503,

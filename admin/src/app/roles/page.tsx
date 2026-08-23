@@ -17,6 +17,7 @@ import {
 } from "react";
 
 import { AdminShell } from "@/components/layout/admin-shell";
+import { useRouter } from "next/navigation";
 import { useRoles } from "@/hooks/use-roles";
 
 import type { Role } from "@/types/roles";
@@ -109,6 +110,7 @@ function RolesIcon() {
 }
 
 export default function RolesPage() {
+  const router = useRouter();
   const {
     roles,
     loading,
@@ -181,9 +183,10 @@ export default function RolesPage() {
 
           <button
             type="button"
-            disabled
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0864ec] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-            title="Role creation will be enabled in the next step"
+            onClick={() =>
+              router.push("/roles/create")
+            }
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0864ec] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
           >
             <Plus size={16} />
             Add Role
@@ -280,11 +283,10 @@ export default function RolesPage() {
               <p className="mt-1 text-xs text-slate-500">
                 {loading
                   ? "Loading roles..."
-                  : `${filteredRoles.length} ${
-                      filteredRoles.length === 1
-                        ? "role"
-                        : "roles"
-                    }`}
+                  : `${filteredRoles.length} ${filteredRoles.length === 1
+                    ? "role"
+                    : "roles"
+                  }`}
               </p>
             </div>
 

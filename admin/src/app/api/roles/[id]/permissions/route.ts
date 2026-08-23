@@ -8,21 +8,25 @@ const BACKEND_URL =
   process.env.NEXT_PUBLIC_API_URL ||
   "http://localhost:3001/api/v1";
 
-interface RouteContext {
-  params: Promise<{
-    id: string;
-  }>;
+function getAccessToken(
+  request: NextRequest,
+) {
+  return request.cookies.get(
+    "worktrust_access_token",
+  )?.value;
 }
 
 export async function GET(
   request: NextRequest,
-  context: RouteContext,
+  context: {
+    params: Promise<{
+      id: string;
+    }>;
+  },
 ) {
   try {
     const accessToken =
-      request.cookies.get(
-        "worktrust_access_token",
-      )?.value;
+      getAccessToken(request);
 
     if (!accessToken) {
       return NextResponse.json(
@@ -39,20 +43,10 @@ export async function GET(
     const { id } =
       await context.params;
 
-    if (!id) {
-      return NextResponse.json(
-        {
-          message:
-            "Role ID is required",
-        },
-        {
-          status: 400,
-        },
-      );
-    }
-
     const response = await fetch(
-      `${BACKEND_URL}/roles/${id}/permissions`,
+      `${BACKEND_URL}/roles/${encodeURIComponent(
+        id,
+      )}/permissions`,
       {
         method: "GET",
         headers: {
@@ -101,13 +95,15 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  context: RouteContext,
+  context: {
+    params: Promise<{
+      id: string;
+    }>;
+  },
 ) {
   try {
     const accessToken =
-      request.cookies.get(
-        "worktrust_access_token",
-      )?.value;
+      getAccessToken(request);
 
     if (!accessToken) {
       return NextResponse.json(
@@ -124,23 +120,13 @@ export async function PATCH(
     const { id } =
       await context.params;
 
-    if (!id) {
-      return NextResponse.json(
-        {
-          message:
-            "Role ID is required",
-        },
-        {
-          status: 400,
-        },
-      );
-    }
-
     const body =
       await request.json();
 
     const response = await fetch(
-      `${BACKEND_URL}/roles/${id}/permissions`,
+      `${BACKEND_URL}/roles/${encodeURIComponent(
+        id,
+      )}/permissions`,
       {
         method: "PATCH",
         headers: {

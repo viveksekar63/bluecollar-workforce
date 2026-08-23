@@ -1,6 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
 
 import type {
   Role,
@@ -9,12 +13,21 @@ import type {
   UpdateRolePermissionsRequest,
 } from "@/types/roles";
 
+interface CreateRoleRequest {
+  name: string;
+  description?: string;
+}
+
 interface UseRolesResult {
   roles: Role[];
   loading: boolean;
   error: string | null;
 
   fetchRoles: () => Promise<void>;
+
+  createRole: (
+    payload: CreateRoleRequest,
+  ) => Promise<Role>;
 
   getRole: (
     id: string,
@@ -95,9 +108,6 @@ export function useRoles(): UseRolesResult {
   const [error, setError] =
     useState<string | null>(null);
 
-  /**
-   * Get all roles.
-   */
   const fetchRoles =
     useCallback(async () => {
       setLoading(true);
@@ -132,10 +142,47 @@ export function useRoles(): UseRolesResult {
       }
     }, []);
 
-  /**
-   * Get a single role with users
-   * and assigned permissions.
-   */
+  const createRole =
+    useCallback(
+      async (
+        payload: CreateRoleRequest,
+      ): Promise<Role> => {
+        const response = await fetch(
+          "/api/roles",
+          {
+            method: "POST",
+            credentials: "include",
+            cache: "no-store",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body: JSON.stringify({
+              name: payload.name.trim(),
+              description:
+                payload.description?.trim() ||
+                undefined,
+            }),
+          },
+        );
+
+        const data =
+          await parseResponse(response);
+
+        const role = (
+          data?.data ?? data
+        ) as Role;
+
+        setRoles((current) => [
+          ...current,
+          role,
+        ]);
+
+        return role;
+      },
+      [],
+    );
+
   const getRole =
     useCallback(
       async (
@@ -154,16 +201,12 @@ export function useRoles(): UseRolesResult {
           await parseResponse(response);
 
         return (
-          data?.data ??
-          data
+          data?.data ?? data
         ) as RoleDetails;
       },
       [],
     );
 
-  /**
-   * Get all available permissions.
-   */
   const getPermissions =
     useCallback(
       async (): Promise<
@@ -190,10 +233,6 @@ export function useRoles(): UseRolesResult {
       [],
     );
 
-  /**
-   * Get permissions assigned
-   * to a specific role.
-   */
   const getRolePermissions =
     useCallback(
       async (
@@ -222,10 +261,6 @@ export function useRoles(): UseRolesResult {
       [],
     );
 
-  /**
-   * Update permissions assigned
-   * to a role.
-   */
   const updateRolePermissions =
     useCallback(
       async (
@@ -252,8 +287,7 @@ export function useRoles(): UseRolesResult {
           await parseResponse(response);
 
         return (
-          data?.data ??
-          data
+          data?.data ?? data
         ) as RoleDetails;
       },
       [],
@@ -269,13 +303,11 @@ export function useRoles(): UseRolesResult {
     error,
 
     fetchRoles,
+    createRole,
 
     getRole,
-
     getPermissions,
-
     getRolePermissions,
-
     updateRolePermissions,
   };
 }
