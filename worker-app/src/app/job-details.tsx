@@ -1,5 +1,6 @@
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,14 +10,18 @@ import {
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 
-import { getJob, WorkerJob } from '@/api/jobs';
+import { applyForJob, getJob, WorkerJob } from '@/api/jobs';
 import { BrandColors } from '@/constants/theme';
 
 function formatSalary(job: WorkerJob) {
   const min = Number(job.salaryMin ?? 0);
   const max = Number(job.salaryMax ?? 0);
   if (!min && !max) return 'Salary not specified';
-  const suffix = job.salaryType.toLowerCase().includes('month') ? ' / month' : job.salaryType.toLowerCase().includes('day') ? ' / day' : '';
+  const suffix = job.salaryType.toLowerCase().includes('month')
+    ? ' / month'
+    : job.salaryType.toLowerCase().includes('day')
+      ? ' / day'
+      : '';
   if (min && max) return `₹${min.toLocaleString('en-IN')} – ₹${max.toLocaleString('en-IN')}${suffix}`;
   return `₹${(min || max).toLocaleString('en-IN')}${suffix}`;
 }
@@ -25,6 +30,7 @@ export default function JobDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [job, setJob] = useState<WorkerJob | null>(null);
   const [loading, setLoading] = useState(true);
+  const [applying, setApplying] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -37,6 +43,40 @@ export default function JobDetailsScreen() {
       })
       .finally(() => setLoading(false));
   }, [id]);
+
+  async function handleApply() {
+    if (!job || !id || applying) return;
+
+    try {
+      setApplying(true);
+      const result = await applyForJob(id);
+      setJob((current) =>
+        current
+          ? {
+              ...current,
+              applied: true,
+              applicationStatus: result.application.status,
+              application: result.application,
+            }
+          : current,
+      );
+
+      Alert.alert(
+        result.alreadyApplied ? 'Already applied' : 'Application submitted',
+        result.alreadyApplied
+          ? 'You have already applied for this job.'
+          : 'Your application has been submitted successfully.',
+      );
+    } catch (err: any) {
+      console.error('Failed to apply for job', err);
+      Alert.alert(
+        'Unable to apply',
+        err?.response?.data?.message || 'Please try again later.',
+      );
+    } finally {
+      setApplying(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -117,13 +157,31 @@ export default function JobDetailsScreen() {
         {job.applied ? (
           <View style={styles.appliedBanner}>
             <Text style={styles.appliedTitle}>Application submitted</Text>
-            <Text style={styles.appliedText}>You have already applied for this job.</Text>
+            <Text style={styles.appliedText}>Your application is currently {job.applicationStatus ?? 'submitted'}.</Text>
           </View>
         ) : (
-          <View style={styles.applyPlaceholder}>
+          <View style={styles.applyCard}>
             <Text style={styles.applyTitle}>Ready to apply?</Text>
-            <Text style={styles.applyText}>Your profile and verified documents will be used for the application.</Text>
-            <Text style={styles.comingSoon}>Apply flow coming next</Text>
+            <Text style={styles.applyText}>
+              Your profile and verified documents will be used for the application.
+            </Text>
+            <Pressable
+              disabled={applying || job.openings <= 0}
+              onPress={handleApply}
+              style={({ pressed }) => [
+                styles.applyButton,
+                pressed && styles.pressed,
+                (applying || job.openings <= 0) && styles.disabledButton,
+              ]}
+            >
+              {applying ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.applyButtonText}>
+                  {job.openings <= 0 ? 'No openings available' : 'Apply for this job'}
+                </Text>
+              )}
+            </Pressable>
           </View>
         )}
       </ScrollView>
@@ -164,10 +222,13 @@ const styles = StyleSheet.create({
   appliedBanner: { backgroundColor: BrandColors.successSoft, borderRadius: 18, padding: 17, marginTop: 4 },
   appliedTitle: { color: '#147957', fontSize: 15, fontWeight: '800' },
   appliedText: { color: '#397D68', fontSize: 12, marginTop: 4 },
-  applyPlaceholder: { backgroundColor: BrandColors.blushSoft, borderRadius: 18, padding: 18, marginTop: 4 },
+  applyCard: { backgroundColor: BrandColors.blushSoft, borderRadius: 18, padding: 18, marginTop: 4 },
   applyTitle: { color: BrandColors.burgundy, fontSize: 16, fontWeight: '800' },
   applyText: { color: BrandColors.textSecondary, fontSize: 12, lineHeight: 18, marginTop: 5 },
-  comingSoon: { color: BrandColors.burgundy, fontSize: 11, fontWeight: '800', marginTop: 12 },
+  applyButton: { minHeight: 48, borderRadius: 13, backgroundColor: BrandColors.burgundy, alignItems: 'center', justifyContent: 'center', marginTop: 15 },
+  applyButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
+  disabledButton: { opacity: 0.55 },
   primaryButton: { backgroundColor: BrandColors.burgundy, borderRadius: 12, paddingHorizontal: 20, paddingVertical: 12, marginTop: 18 },
   primaryText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
+  pressed: { opacity: 0.82 },
 });
