@@ -4,11 +4,12 @@ import { PrismaModule } from "../prisma/prisma.module";
 import { AuthModule } from "../auth/auth.module";
 import { WorkersController } from "./workers.controller";
 import { WorkersService } from "./workers.service";
+import { WorkerProfessionService } from "./worker-profession.service";
 
 @Module({
   imports: [PrismaModule, AuthModule],
   controllers: [WorkersController],
-  providers: [WorkersService],
-  exports: [WorkersService],
+  providers: [WorkersService, WorkerProfessionService],
+  exports: [WorkersService, WorkerProfessionService],
 })
 export class WorkersModule {}
