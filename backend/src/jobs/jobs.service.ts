@@ -16,8 +16,8 @@ export class JobsService {
       select: { id: true, status: true, companyName: true },
     });
     if (!employer) throw new NotFoundException('Employer profile not found');
-    if (String(employer.status) !== 'ACTIVE') {
-      throw new BadRequestException('Employer account is not active');
+    if (String(employer.status) !== 'VERIFIED') {
+      throw new BadRequestException('Employer account is not verified');
     }
     return employer;
   }
