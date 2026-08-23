@@ -6,4 +6,18 @@
     ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace;
   --font-rounded: 'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif;
   --font-serif: Georgia, 'Times New Roman', serif;
+
+  /* WorkTrust brand palette */
+  --brand-blush: #E18C88;
+  --brand-rose: #B86F77;
+  --brand-burgundy: #713442;
+  --brand-burgundy-dark: #5D2938;
+  --brand-burgundy-soft: #F6E7E8;
+  --brand-blush-soft: #FBEFEE;
+  --brand-text: #18233D;
+  --brand-text-secondary: #6F6870;
+  --brand-background: #FAF8F8;
+  --brand-surface: #FFFFFF;
+  --brand-border: #E8DADC;
+  --brand-success: #20A77A;
 }
