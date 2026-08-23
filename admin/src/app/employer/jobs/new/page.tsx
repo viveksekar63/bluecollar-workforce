@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { ArrowLeft, BriefcaseBusiness, Plus, X } from "lucide-react";
-import { AdminShell } from "@/components/layout/admin-shell";
+import { EmployerShell } from "@/components/layout/employer-shell";
 
 const PROFESSIONS = [
   "Parotta Master", "Tea Master", "Cook", "Baker", "Kitchen Helper",
@@ -82,7 +82,7 @@ export default function CreateEmployerJobPage() {
   }
 
   return (
-    <AdminShell>
+    <EmployerShell>
       <div className="mb-6 flex items-center gap-3">
         <Link href="/employer/jobs" className="rounded-lg border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50"><ArrowLeft size={17} /></Link>
         <div><h1 className="text-2xl font-bold text-slate-900">Create Job</h1><p className="mt-1 text-xs text-slate-500">Find the right blue-collar worker for your opening.</p></div>
@@ -116,7 +116,7 @@ export default function CreateEmployerJobPage() {
         <div className="mt-7 flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end"><Link href="/employer/jobs" className="rounded-lg border border-slate-200 px-5 py-2.5 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</Link><button disabled={saving || publishing} onClick={() => void submit(false)} className="rounded-lg border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-800 disabled:opacity-50">{saving ? "Saving..." : "Save Draft"}</button><button disabled={saving || publishing} onClick={() => void submit(true)} className="rounded-lg bg-[#0864ec] px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">{publishing ? "Publishing..." : "Publish Job"}</button></div>
       </div>
       <style jsx>{`.input{width:100%;border:1px solid #e2e8f0;border-radius:.5rem;padding:.65rem .75rem;font-size:.875rem;color:#0f172a;background:#fff;outline:none}.input:focus{border-color:#0864ec;box-shadow:0 0 0 2px rgba(8,100,236,.1)}`}</style>
-    </AdminShell>
+    </EmployerShell>
   );
 }
 
