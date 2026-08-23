@@ -12,13 +12,14 @@ import {
 import { WorkersService } from "./workers.service";
 import { UpdateWorkerOnboardingDto } from "./dto/update-worker-onboarding.dto";
 import { UpdateWorkerProfileDto } from "./dto/update-worker-profile.dto";
+import { UpdateWorkerProfessionDto } from "./dto/update-worker-profession.dto";
 import { WorkersQueryDto } from "./dto/workers-query.dto";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { PermissionGuard } from "../auth/permissions/permission.guard";
 import { RequirePermissions } from "../auth/permissions/permission.decorator";
 import { PERMISSIONS } from "../auth/permissions/permissions";
 import { UpdateWorkerSkillsDto } from "./dto/update-worker-skills.dto";
-import { WorkerProfessionService, UpdateWorkerProfessionInput } from "./worker-profession.service";
+import { WorkerProfessionService } from "./worker-profession.service";
 
 @Controller("workers")
 @UseGuards(JwtAuthGuard)
@@ -92,7 +93,7 @@ export class WorkersController {
   @Patch("me/profession")
   async updateMyProfession(
     @Req() request: any,
-    @Body() dto: UpdateWorkerProfessionInput,
+    @Body() dto: UpdateWorkerProfessionDto,
   ) {
     return this.workerProfessionService.updateMyProfession(
       request.user.userId,
