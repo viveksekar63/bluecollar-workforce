@@ -83,16 +83,7 @@ export class DocumentsService {
 
   async updateMine(userId: string, documentId: string, dto: UpdateDocumentDto) {
     const worker = await this.getWorkerByUserId(userId);
-    const document = await this.getDocumentForWorker(worker.id, documentId);
-
-    if (
-      dto.verificationStatus !== undefined &&
-      dto.verificationStatus !== document.verificationStatus
-    ) {
-      throw new BadRequestException(
-        "Workers cannot change document verification status",
-      );
-    }
+    await this.getDocumentForWorker(worker.id, documentId);
 
     return this.prisma.document.update({
       where: { id: documentId },
