@@ -4,17 +4,7 @@ import { router } from 'expo-router';
 
 import { getMyWorkerProfile, updateMyOnboarding } from '@/api/worker';
 
-const initialForm = {
-  addressLine1: '',
-  addressLine2: '',
-  city: '',
-  district: '',
-  state: '',
-  pincode: '',
-  emergencyName: '',
-  emergencyRelationship: '',
-  emergencyPhone: '',
-};
+const initialForm = { addressLine1: '', addressLine2: '', city: '', district: '', state: '', pincode: '', emergencyName: '', emergencyRelationship: '', emergencyPhone: '' };
 
 export default function AddressScreen() {
   const [form, setForm] = useState(initialForm);
@@ -26,7 +16,6 @@ export default function AddressScreen() {
       .then((worker) => {
         const address = worker.addresses?.[0];
         const emergency = worker.emergencyContacts?.[0];
-
         setForm({
           addressLine1: address?.addressLine1 ?? '',
           addressLine2: address?.addressLine2 ?? '',
@@ -49,21 +38,14 @@ export default function AddressScreen() {
 
   async function save() {
     const required = [
-      ['Address', form.addressLine1],
-      ['City', form.city],
-      ['State', form.state],
-      ['Pincode', form.pincode],
-      ['Emergency contact name', form.emergencyName],
-      ['Relationship', form.emergencyRelationship],
-      ['Emergency phone', form.emergencyPhone],
+      ['Address', form.addressLine1], ['City', form.city], ['State', form.state], ['Pincode', form.pincode],
+      ['Emergency contact name', form.emergencyName], ['Relationship', form.emergencyRelationship], ['Emergency phone', form.emergencyPhone],
     ];
-
     const missing = required.find(([, value]) => !value.trim());
     if (missing) {
       Alert.alert('Missing information', `Please enter ${missing[0]}.`);
       return;
     }
-
     if (!/^\d{6}$/.test(form.pincode)) {
       Alert.alert('Invalid pincode', 'Please enter a valid 6-digit pincode.');
       return;
@@ -85,43 +67,29 @@ export default function AddressScreen() {
       });
 
       Alert.alert('Saved', 'Address and emergency contact have been saved.', [
-        { text: 'Continue', onPress: () => router.replace('/skills') },
+        { text: 'Continue', onPress: () => router.replace('/home') },
       ]);
     } catch (error: any) {
       const message = error?.response?.data?.message;
-      Alert.alert(
-        'Unable to save',
-        Array.isArray(message) ? message.join('\n') : message ?? 'Please try again.',
-      );
+      Alert.alert('Unable to save', Array.isArray(message) ? message.join('\n') : message ?? 'Please try again.');
     } finally {
       setSaving(false);
     }
   }
 
   if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#2563EB" />
-      </View>
-    );
+    return <View style={styles.center}><ActivityIndicator size="large" color="#2563EB" /></View>;
   }
 
   return (
     <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
       <Text style={styles.eyebrow}>STEP 2 OF ONBOARDING</Text>
       <Text style={styles.title}>Address & emergency contact</Text>
-      <Text style={styles.subtitle}>
-        Add your current address and someone we can contact in an emergency.
-      </Text>
+      <Text style={styles.subtitle}>Add your current address and someone we can contact in an emergency.</Text>
 
       <View style={styles.progressCard}>
-        <View style={styles.progressRow}>
-          <Text style={styles.progressLabel}>Profile completion</Text>
-          <Text style={styles.progressValue}>40%</Text>
-        </View>
-        <View style={styles.track}>
-          <View style={styles.fill} />
-        </View>
+        <View style={styles.progressRow}><Text style={styles.progressLabel}>Profile completion</Text><Text style={styles.progressValue}>40%</Text></View>
+        <View style={styles.track}><View style={styles.fill} /></View>
       </View>
 
       <Text style={styles.sectionTitle}>Current address</Text>
@@ -137,46 +105,16 @@ export default function AddressScreen() {
       <Field label="Relationship" value={form.emergencyRelationship} placeholder="e.g. Father, Mother, Spouse" onChangeText={(v) => setField('emergencyRelationship', v)} />
       <Field label="Phone number" value={form.emergencyPhone} placeholder="Emergency contact phone" keyboardType="phone-pad" onChangeText={(v) => setField('emergencyPhone', v)} />
 
-      <Pressable
-        style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, saving && styles.disabled]}
-        onPress={save}
-        disabled={saving}
-      >
+      <Pressable style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, saving && styles.disabled]} onPress={save} disabled={saving}>
         {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>Save & Continue</Text>}
       </Pressable>
-
-      <Pressable onPress={() => router.replace('/home')} style={styles.skipButton} disabled={saving}>
-        <Text style={styles.skipText}>Complete later</Text>
-      </Pressable>
+      <Pressable onPress={() => router.replace('/home')} style={styles.skipButton} disabled={saving}><Text style={styles.skipText}>Complete later</Text></Pressable>
     </ScrollView>
   );
 }
 
-function Field({
-  label,
-  value,
-  placeholder,
-  onChangeText,
-  keyboardType,
-}: {
-  label: string;
-  value: string;
-  placeholder: string;
-  onChangeText: (value: string) => void;
-  keyboardType?: 'default' | 'number-pad' | 'phone-pad';
-}) {
-  return (
-    <View style={styles.field}>
-      <Text style={styles.label}>{label}</Text>
-      <TextInput
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        keyboardType={keyboardType}
-        style={styles.input}
-      />
-    </View>
-  );
+function Field({ label, value, placeholder, onChangeText, keyboardType }: { label: string; value: string; placeholder: string; onChangeText: (value: string) => void; keyboardType?: 'default' | 'number-pad' | 'phone-pad' }) {
+  return <View style={styles.field}><Text style={styles.label}>{label}</Text><TextInput value={value} onChangeText={onChangeText} placeholder={placeholder} keyboardType={keyboardType} style={styles.input} /></View>;
 }
 
 const styles = StyleSheet.create({
