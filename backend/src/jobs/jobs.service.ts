@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -18,21 +19,13 @@ export class JobsService {
         profession: true,
         experienceYears: true,
         skills: {
-          select: {
-            skill: {
-              select: { name: true },
-            },
-          },
+          select: { skill: { select: { name: true } } },
         },
         addresses: {
           where: { isCurrent: true },
           orderBy: { createdAt: 'desc' },
           take: 1,
-          select: {
-            city: true,
-            district: true,
-            state: true,
-          },
+          select: { city: true, district: true, state: true },
         },
       },
     });
@@ -43,9 +36,7 @@ export class JobsService {
 
     const workerProfession = worker.profession?.trim().toLowerCase() ?? '';
     const workerCategory = worker.professionCategory?.trim().toLowerCase() ?? '';
-    const workerSkills = worker.skills.map((item) =>
-      item.skill.name.trim().toLowerCase(),
-    );
+    const workerSkills = worker.skills.map((item) => item.skill.name.trim().toLowerCase());
     const workerCity =
       city?.trim().toLowerCase() ||
       worker.addresses[0]?.city?.trim().toLowerCase() ||
@@ -53,16 +44,10 @@ export class JobsService {
 
     const jobs = await this.prisma.job.findMany({
       where: {
-        // Jobs are discoverable once they leave DRAFT.
         status: { not: 'DRAFT' as any },
         openings: { gt: 0 },
         ...(workerCity
-          ? {
-              city: {
-                contains: workerCity,
-                mode: 'insensitive',
-              },
-            }
+          ? { city: { contains: workerCity, mode: 'insensitive' } }
           : {}),
       },
       take: 100,
@@ -84,18 +69,12 @@ export class JobsService {
         status: true,
         createdAt: true,
         employer: {
-          select: {
-            id: true,
-            companyName: true,
-            status: true,
-          },
+          select: { id: true, companyName: true, status: true },
         },
         skills: {
           select: {
             required: true,
-            skill: {
-              select: { name: true },
-            },
+            skill: { select: { name: true } },
           },
         },
         applications: {
@@ -109,10 +88,7 @@ export class JobsService {
     const ranked = jobs
       .map((job) => {
         const title = job.title.toLowerCase();
-        const requiredSkills = job.skills.map((item) =>
-          item.skill.name.trim().toLowerCase(),
-        );
-
+        const requiredSkills = job.skills.map((item) => item.skill.name.trim().toLowerCase());
         const matchedSkills = requiredSkills.filter((skill) =>
           workerSkills.some(
             (workerSkill) =>
@@ -121,14 +97,9 @@ export class JobsService {
               skill.includes(workerSkill),
           ),
         ).length;
-
-        const professionMatch =
-          !!workerProfession && title.includes(workerProfession);
-        const categoryMatch =
-          !!workerCategory && title.includes(workerCategory);
-        const locationMatch =
-          !!workerCity && job.city.toLowerCase() === workerCity;
-
+        const professionMatch = !!workerProfession && title.includes(workerProfession);
+        const categoryMatch = !!workerCategory && title.includes(workerCategory);
+        const locationMatch = !!workerCity && job.city.toLowerCase() === workerCity;
         const score =
           (professionMatch ? 50 : 0) +
           (categoryMatch ? 20 : 0) +
@@ -143,16 +114,11 @@ export class JobsService {
           applicationStatus: job.applications[0]?.status ?? null,
         };
       })
-      .sort((a, b) => {
-        if (b.matchScore !== a.matchScore) {
-          return b.matchScore - a.matchScore;
-        }
-
-        return (
-          new Date(b.createdAt).getTime() -
-          new Date(a.createdAt).getTime()
-        );
-      })
+      .sort((a, b) =>
+        b.matchScore !== a.matchScore
+          ? b.matchScore - a.matchScore
+          : new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      )
       .slice(0, Math.max(1, Math.min(limit, 50)));
 
     return {
@@ -205,23 +171,13 @@ export class JobsService {
         skills: {
           select: {
             required: true,
-            skill: {
-              select: {
-                id: true,
-                name: true,
-                category: true,
-              },
-            },
+            skill: { select: { id: true, name: true, category: true } },
           },
         },
         applications: {
           where: { workerId: worker.id },
           take: 1,
-          select: {
-            id: true,
-            status: true,
-            appliedAt: true,
-          },
+          select: { id: true, status: true, appliedAt: true },
         },
       },
     });
@@ -234,6 +190,70 @@ export class JobsService {
       ...job,
       applied: job.applications.length > 0,
       application: job.applications[0] ?? null,
+    };
+  }
+
+  async applyForJob(userId: string, jobId: string) {
+    const worker = await this.prisma.worker.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+
+    if (!worker) {
+      throw new NotFoundException('Worker profile not found');
+    }
+
+    const job = await this.prisma.job.findUnique({
+      where: { id: jobId },
+      select: { id: true, status: true, openings: true },
+    });
+
+    if (!job) {
+      throw new NotFoundException('Job not found');
+    }
+
+    if (String(job.status) === 'DRAFT') {
+      throw new BadRequestException('This job is not open for applications');
+    }
+
+    if (job.openings <= 0) {
+      throw new BadRequestException('No openings are available for this job');
+    }
+
+    const existing = await this.prisma.jobApplication.findUnique({
+      where: {
+        jobId_workerId: {
+          jobId,
+          workerId: worker.id,
+        },
+      },
+      select: { id: true, status: true, appliedAt: true },
+    });
+
+    if (existing) {
+      return {
+        alreadyApplied: true,
+        application: existing,
+      };
+    }
+
+    const application = await this.prisma.jobApplication.create({
+      data: {
+        jobId,
+        workerId: worker.id,
+      },
+      select: {
+        id: true,
+        jobId: true,
+        workerId: true,
+        status: true,
+        appliedAt: true,
+      },
+    });
+
+    return {
+      alreadyApplied: false,
+      application,
     };
   }
 }
