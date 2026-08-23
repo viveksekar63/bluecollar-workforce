@@ -9,6 +9,14 @@ function getAccessToken(request: NextRequest) {
   return request.cookies.get('worktrust_access_token')?.value;
 }
 
+function getBackendPath(method: string, id: string) {
+  // Employer status changes are exposed by NestJS as PATCH /employers/:id/status.
+  // Keep GET on /employers/:id for the employer detail response.
+  return method === 'PATCH'
+    ? `${BACKEND_URL}/employers/${id}/status`
+    : `${BACKEND_URL}/employers/${id}`;
+}
+
 async function proxy(request: NextRequest, id: string) {
   const accessToken = getAccessToken(request);
 
@@ -17,7 +25,7 @@ async function proxy(request: NextRequest, id: string) {
   }
 
   try {
-    const response = await fetch(`${BACKEND_URL}/employers/${id}`, {
+    const response = await fetch(getBackendPath(request.method, id), {
       method: request.method,
       headers: {
         Authorization: `Bearer ${accessToken}`,
