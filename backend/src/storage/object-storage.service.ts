@@ -5,6 +5,7 @@ import { createHash, createHmac } from "crypto";
 @Injectable()
 export class ObjectStorageService {
   private readonly endpoint: string;
+  private readonly publicEndpoint: string;
   private readonly accessKey: string;
   private readonly secretKey: string;
   private readonly bucket: string;
@@ -12,6 +13,7 @@ export class ObjectStorageService {
 
   constructor(private readonly config: ConfigService) {
     this.endpoint = (this.config.get<string>("MINIO_ENDPOINT") || "http://minio:9000").replace(/\/$/, "");
+    this.publicEndpoint = (this.config.get<string>("MINIO_PUBLIC_ENDPOINT") || "http://localhost:9000").replace(/\/$/, "");
     this.accessKey = this.config.get<string>("MINIO_ACCESS_KEY") || "bluecollar";
     this.secretKey = this.config.get<string>("MINIO_SECRET_KEY") || "bluecollar_minio_password";
     this.bucket = this.config.get<string>("MINIO_BUCKET") || "worker-documents";
@@ -30,7 +32,7 @@ export class ObjectStorageService {
 
   async getSignedUrl(key: string, expiresInSeconds = 900) {
     const expires = Math.min(604800, Math.max(1, expiresInSeconds));
-    const url = new URL(`${this.endpoint}/${this.bucket}/${this.encodeKey(key)}`);
+    const url = new URL(`${this.publicEndpoint}/${this.bucket}/${this.encodeKey(key)}`);
     const now = new Date();
     const amzDate = this.formatAmzDate(now);
     const shortDate = amzDate.slice(0, 8);
@@ -46,15 +48,7 @@ export class ObjectStorageService {
     params.set("X-Amz-Expires", String(expires));
     params.set("X-Amz-SignedHeaders", "host");
 
-    const canonicalRequest = [
-      "GET",
-      canonicalUri,
-      this.canonicalQuery(params),
-      `host:${host}\n`,
-      "host",
-      "UNSIGNED-PAYLOAD",
-    ].join("\n");
-
+    const canonicalRequest = ["GET", canonicalUri, this.canonicalQuery(params), `host:${host}\n`, "host", "UNSIGNED-PAYLOAD"].join("\n");
     const stringToSign = ["AWS4-HMAC-SHA256", amzDate, credentialScope, this.sha256(canonicalRequest)].join("\n");
     params.set("X-Amz-Signature", this.sign(stringToSign, shortDate));
     return `${url.origin}${canonicalUri}?${this.canonicalQuery(params)}`;
@@ -93,17 +87,11 @@ export class ObjectStorageService {
       `Signature=${this.sign(stringToSign, shortDate)}`,
     ].join(", ");
 
-    const response = await fetch(url, {
-      method,
-      headers: { ...headers, authorization },
-      body: body ? new Uint8Array(body) : undefined,
-    });
-
+    const response = await fetch(url, { method, headers: { ...headers, authorization }, body: body ? new Uint8Array(body) : undefined });
     if (!response.ok && !allowErrorStatus) {
       const errorBody = await response.text().catch(() => "");
       throw new InternalServerErrorException(`Object storage request failed (${response.status})${errorBody ? `: ${errorBody.slice(0, 300)}` : ""}`);
     }
-
     return response;
   }
 
