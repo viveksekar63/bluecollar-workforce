@@ -84,7 +84,9 @@ export default function EmployerDetailsPage({ params }: { params: Promise<{ id: 
     setSaving(true);
     setError(null);
     try {
-      const response = await fetch(`/api/employers/${employer.id}/status`, {
+      // The Next.js detail proxy maps PATCH /api/employers/:id to
+      // the NestJS PATCH /api/v1/employers/:id/status endpoint.
+      const response = await fetch(`/api/employers/${employer.id}`, {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
