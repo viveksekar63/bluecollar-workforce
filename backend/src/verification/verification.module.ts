@@ -7,5 +7,6 @@ import { VerificationService } from './verification.service';
   imports: [AuthModule],
   controllers: [VerificationController],
   providers: [VerificationService],
+  exports: [VerificationService],
 })
 export class VerificationModule {}
