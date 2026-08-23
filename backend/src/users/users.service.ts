@@ -11,6 +11,7 @@ import { UpdateUserDto } from "./dto/update-user.dto";
 import { UpdateUserRolesDto } from "./dto/update-user-roles.dto";
 import { UsersQueryDto } from "./dto/users-query.dto";
 import * as bcrypt from "bcrypt";
+import { EmployerStatus } from "@prisma/client";
 
 @Injectable()
 export class UsersService {
@@ -96,7 +97,7 @@ export class UsersService {
           data: {
             userId: createdUser.id,
             companyName: `${createdUser.firstName}${createdUser.lastName ? ` ${createdUser.lastName}` : ""}`.trim(),
-            status: "PENDING",
+            status: EmployerStatus.PENDING,
           },
         });
       }
@@ -132,7 +133,10 @@ export class UsersService {
     return this.prisma.$transaction(async (tx) => {
       const result = await tx.user.update({ where: { id }, data: { status: status as any }, select: { id: true, status: true } });
       if (isEmployer && user.employer) {
-        await tx.employer.update({ where: { id: user.employer.id }, data: { status: status === "ACTIVE" ? "ACTIVE" : "SUSPENDED" } });
+        await tx.employer.update({
+          where: { id: user.employer.id },
+          data: { status: status === "ACTIVE" ? EmployerStatus.ACTIVE : EmployerStatus.SUSPENDED },
+        });
       }
       return result;
     });
@@ -148,7 +152,7 @@ export class UsersService {
       await tx.userRole.deleteMany({ where: { userId: id } });
       if (dto.roleIds.length) await tx.userRole.createMany({ data: dto.roleIds.map((roleId) => ({ userId: id, roleId })) });
       if (isEmployer && !user.employer) {
-        await tx.employer.create({ data: { userId: id, companyName: `${user.firstName}${user.lastName ? ` ${user.lastName}` : ""}`.trim(), status: user.status === "ACTIVE" ? "ACTIVE" : "PENDING" } });
+        await tx.employer.create({ data: { userId: id, companyName: `${user.firstName}${user.lastName ? ` ${user.lastName}` : ""}`.trim(), status: user.status === "ACTIVE" ? EmployerStatus.ACTIVE : EmployerStatus.PENDING } });
       } else if (!isEmployer && user.employer) {
         await tx.employer.delete({ where: { id: user.employer.id } });
       }
