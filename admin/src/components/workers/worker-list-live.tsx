@@ -5,6 +5,23 @@ import { Search, SlidersHorizontal, MoreHorizontal, Loader2 } from "lucide-react
 import { useState } from "react";
 import { useWorkers } from "@/hooks/use-workers";
 
+function verificationBadge(status: string) {
+  switch (status) {
+    case "VERIFIED":
+      return "bg-emerald-50 text-emerald-700";
+    case "PENDING":
+      return "bg-amber-50 text-amber-700";
+    case "FAILED":
+      return "bg-red-50 text-red-700";
+    case "MANUAL_REVIEW":
+      return "bg-violet-50 text-violet-700";
+    case "EXPIRED":
+      return "bg-slate-100 text-slate-600";
+    default:
+      return "bg-blue-50 text-blue-700";
+  }
+}
+
 export function WorkerListLive() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
@@ -41,7 +58,9 @@ export function WorkerListLive() {
           <option value="VERIFIED">Verified</option>
           <option value="IN_PROGRESS">In Progress</option>
           <option value="PENDING">Pending</option>
-          <option value="REJECTED">Rejected</option>
+          <option value="MANUAL_REVIEW">Manual Review</option>
+          <option value="FAILED">Failed</option>
+          <option value="EXPIRED">Expired</option>
         </select>
 
         <button className="flex items-center gap-1 rounded-lg border px-3 py-2 text-xs">
@@ -59,7 +78,7 @@ export function WorkerListLive() {
         </div>
       ) : query.isError ? (
         <div className="m-5 rounded-lg bg-red-50 p-4 text-xs text-red-700">
-          Unable to load workers. Check `NEXT_PUBLIC_API_URL` and the NestJS API.
+          Unable to load workers. {query.error instanceof Error ? query.error.message : "Please try again."}
         </div>
       ) : (
         <div className="overflow-x-auto">
@@ -76,37 +95,39 @@ export function WorkerListLive() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((worker) => (
-                <tr key={worker.id} className="border-t hover:bg-slate-50">
-                  <td className="px-5 py-3">
-                    <Link href={`/workers/${worker.id}`} className="flex items-center gap-3">
-                      <div className="h-9 w-9 overflow-hidden rounded-full bg-slate-200 text-center leading-9 font-bold">
-                        {worker.firstName[0]}{worker.lastName?.[0]}
-                      </div>
-                      <div>
-                        <b>{worker.firstName} {worker.lastName}</b>
-                        <div className="text-[10px] text-slate-400">{worker.workerCode}</div>
-                      </div>
-                    </Link>
+              {rows.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-5 py-12 text-center text-slate-500">
+                    No workers found.
                   </td>
-                  <td>{worker.primarySkill}</td>
-                  <td>{worker.city}, {worker.state}</td>
-                  <td>{worker.experienceYears} Years</td>
-                  <td><b>{worker.verificationScore}%</b></td>
-                  <td>
-                    <span className={`rounded-full px-2 py-1 text-[9px] font-bold ${
-                      worker.verificationStatus === "VERIFIED"
-                        ? "bg-emerald-50 text-emerald-700"
-                        : worker.verificationStatus === "PENDING"
-                        ? "bg-amber-50 text-amber-700"
-                        : "bg-blue-50 text-blue-700"
-                    }`}>
-                      {worker.verificationStatus.replace("_", " ")}
-                    </span>
-                  </td>
-                  <td><MoreHorizontal size={17} /></td>
                 </tr>
-              ))}
+              ) : (
+                rows.map((worker) => (
+                  <tr key={worker.id} className="border-t hover:bg-slate-50">
+                    <td className="px-5 py-3">
+                      <Link href={`/workers/${worker.id}`} className="flex items-center gap-3">
+                        <div className="h-9 w-9 overflow-hidden rounded-full bg-slate-200 text-center leading-9 font-bold">
+                          {worker.firstName[0]}{worker.lastName?.[0]}
+                        </div>
+                        <div>
+                          <b>{worker.firstName} {worker.lastName}</b>
+                          <div className="text-[10px] text-slate-400">{worker.workerCode}</div>
+                        </div>
+                      </Link>
+                    </td>
+                    <td>{worker.primarySkill}</td>
+                    <td>{worker.city}, {worker.state}</td>
+                    <td>{worker.experienceYears} Years</td>
+                    <td><b>{worker.verificationScore}%</b></td>
+                    <td>
+                      <span className={`rounded-full px-2 py-1 text-[9px] font-bold ${verificationBadge(worker.verificationStatus)}`}>
+                        {worker.verificationStatus.replace("_", " ")}
+                      </span>
+                    </td>
+                    <td><MoreHorizontal size={17} /></td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
