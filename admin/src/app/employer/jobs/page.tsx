@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { BriefcaseBusiness, ChevronRight, Plus, RefreshCw } from "lucide-react";
-import { AdminShell } from "@/components/layout/admin-shell";
+import { EmployerShell } from "@/components/layout/employer-shell";
 
 type Job = {
   id: string;
@@ -53,7 +53,7 @@ export default function EmployerJobsPage() {
   useEffect(() => { void loadJobs(); }, []);
 
   return (
-    <AdminShell>
+    <EmployerShell>
       <div className="mb-6 flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">My Jobs</h1>
@@ -106,6 +106,6 @@ export default function EmployerJobsPage() {
           ))}
         </div>
       )}
-    </AdminShell>
+    </EmployerShell>
   );
 }
