@@ -1,726 +1,140 @@
-import { useEffect, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
-
-import {
-  createMyEmploymentHistory,
-  deleteMyEmploymentHistory,
-  getMyEmploymentHistory,
-  type WorkerEmployment,
-  type WorkerEmploymentInput,
-} from '@/api/worker';
+import { createMyEmploymentHistory, getMyEmploymentHistory, type WorkerEmployment, type WorkerEmploymentInput } from '@/api/worker';
 import { BrandColors } from '@/constants/theme';
 
-const EMPLOYMENT_TYPES = [
-  { value: 'FULL_TIME', label: 'Full time' },
-  { value: 'PART_TIME', label: 'Part time' },
-  { value: 'CONTRACT', label: 'Contract' },
-  { value: 'DAILY_WAGE', label: 'Daily wage' },
-  { value: 'TEMPORARY', label: 'Temporary' },
-  { value: 'SELF_EMPLOYED', label: 'Self employed' },
+const EXPERIENCE_OPTIONS = [
+  ['No experience', 0], ['Less than 1 year', 0.5], ['1 – 3 years', 2], ['3 – 5 years', 4], ['5 – 10 years', 7], ['10+ years', 10],
 ] as const;
-
-const EMPTY_FORM: WorkerEmploymentInput = {
-  companyName: '',
-  companyAddress: '',
-  designation: '',
-  startDate: '',
-  endDate: '',
-  salary: undefined,
-  employmentType: undefined,
-  supervisorName: '',
-  supervisorPhone: '',
-  supervisorEmail: '',
-  reasonForLeaving: '',
-};
+const WORK_TYPES = ['Full time', 'Part time', 'Daily wage', 'Contract', 'Self employed'];
 
 export default function ExperienceScreen() {
   const [history, setHistory] = useState<WorkerEmployment[]>([]);
-  const [hasExperience, setHasExperience] = useState<boolean | null>(null);
-  const [form, setForm] = useState<WorkerEmploymentInput>(EMPTY_FORM);
-  const [showForm, setShowForm] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [experience, setExperience] = useState<number | null>(null);
+  const [workplace, setWorkplace] = useState('');
+  const [workType, setWorkType] = useState('');
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let mounted = true;
-
-    getMyEmploymentHistory()
-      .then((records) => {
-        if (!mounted) return;
-        setHistory(records);
-        setHasExperience(records.length > 0 ? true : null);
-      })
-      .catch(() => undefined)
-      .finally(() => {
-        if (mounted) setLoading(false);
-      });
-
-    return () => {
-      mounted = false;
-    };
+    getMyEmploymentHistory().then((items) => { if (mounted) setHistory(items); }).catch(() => undefined).finally(() => { if (mounted) setLoading(false); });
+    return () => { mounted = false; };
   }, []);
 
-  const experienceYears = useMemo(() => {
-    if (!history.length) return 0;
-
-    const now = new Date();
-    let months = 0;
-
-    for (const item of history) {
-      const start = new Date(item.startDate);
-      const end = item.endDate ? new Date(item.endDate) : now;
-      if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) continue;
-
-      months += Math.max(
-        0,
-        (end.getFullYear() - start.getFullYear()) * 12 +
-          (end.getMonth() - start.getMonth()),
-      );
-    }
-
-    return Math.floor(months / 12);
-  }, [history]);
-
-  function setField<K extends keyof WorkerEmploymentInput>(
-    key: K,
-    value: WorkerEmploymentInput[K],
-  ) {
-    setForm((current) => ({ ...current, [key]: value }));
-  }
-
-  function beginAddingExperience() {
-    setHasExperience(true);
-    setForm(EMPTY_FORM);
-    setShowForm(true);
-  }
-
-  function chooseNoExperience() {
-    setHasExperience(false);
-    setShowForm(false);
-    setForm(EMPTY_FORM);
-  }
-
-  async function saveExperience() {
-    if (!form.companyName?.trim()) {
-      Alert.alert('Company or workplace required', 'Enter the place where you worked.');
+  async function continueToVerification() {
+    if (experience === null) {
+      Alert.alert('Choose your experience', 'Tell us how much experience you have.');
       return;
     }
-
-    if (!form.designation?.trim()) {
-      Alert.alert('Work role required', 'Enter your job role or trade.');
-      return;
-    }
-
-    if (!form.startDate?.trim()) {
-      Alert.alert('Start date required', 'Use YYYY-MM-DD format.');
-      return;
-    }
-
-    const start = new Date(form.startDate);
-    const end = form.endDate?.trim() ? new Date(form.endDate) : null;
-
-    if (Number.isNaN(start.getTime())) {
-      Alert.alert('Invalid start date', 'Use YYYY-MM-DD format.');
-      return;
-    }
-
-    if (end && Number.isNaN(end.getTime())) {
-      Alert.alert('Invalid end date', 'Use YYYY-MM-DD format.');
-      return;
-    }
-
-    if (end && end < start) {
-      Alert.alert('Invalid date range', 'End date cannot be before start date.');
-      return;
-    }
-
-    if (saving) return;
+    if (experience === 0) { router.replace('/verification'); return; }
+    if (!workplace.trim()) { Alert.alert('Workplace required', 'Enter the place where you worked.'); return; }
+    if (!workType) { Alert.alert('Choose work type', 'Select how you usually work.'); return; }
 
     try {
       setSaving(true);
-
-      const payload: WorkerEmploymentInput = {
-        ...form,
-        companyName: form.companyName!.trim(),
-        companyAddress: form.companyAddress?.trim() || undefined,
-        designation: form.designation!.trim(),
-        startDate: form.startDate!.trim(),
-        endDate: form.endDate?.trim() || undefined,
-        salary:
-          form.salary !== undefined && form.salary !== null && String(form.salary).trim() !== ''
-            ? Number(form.salary)
-            : undefined,
-        employmentType: form.employmentType || undefined,
-        supervisorName: form.supervisorName?.trim() || undefined,
-        supervisorPhone: form.supervisorPhone?.trim() || undefined,
-        supervisorEmail: form.supervisorEmail?.trim() || undefined,
-        reasonForLeaving: form.reasonForLeaving?.trim() || undefined,
+      const now = new Date();
+      const start = new Date(now);
+      start.setFullYear(now.getFullYear() - Math.max(1, Math.round(experience)));
+      const input: WorkerEmploymentInput = {
+        companyName: workplace.trim(),
+        designation: 'Previous work',
+        startDate: start.toISOString().slice(0, 10),
+        employmentType: workType.toUpperCase().replace(/ /g, '_'),
       };
-
-      const created = await createMyEmploymentHistory(payload);
-
+      const created = await createMyEmploymentHistory(input);
       setHistory((current) => [created, ...current]);
-      setForm(EMPTY_FORM);
-      setShowForm(false);
+      router.replace('/verification');
     } catch (error: any) {
       const message = error?.response?.data?.message;
-      Alert.alert(
-        'Unable to save experience',
-        Array.isArray(message) ? message.join('\n') : message ?? 'Please try again.',
-      );
-    } finally {
-      setSaving(false);
-    }
+      Alert.alert('Unable to save', Array.isArray(message) ? message.join('\n') : message ?? 'Please try again.');
+    } finally { setSaving(false); }
   }
 
-  async function removeExperience(id: string) {
-    if (saving) return;
-
-    try {
-      setSaving(true);
-      await deleteMyEmploymentHistory(id);
-      setHistory((current) => current.filter((item) => item.id !== id));
-    } catch (error: any) {
-      const message = error?.response?.data?.message;
-      Alert.alert(
-        'Unable to remove experience',
-        Array.isArray(message) ? message.join('\n') : message ?? 'Please try again.',
-      );
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  function continueToVerification() {
-    router.replace('/verification');
-  }
-
-  function completeLater() {
-    router.replace('/home');
-  }
-
-  if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={BrandColors.burgundy} />
-      </View>
-    );
-  }
+  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color={BrandColors.burgundy} /></View>;
 
   return (
     <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
       <Text style={styles.eyebrow}>STEP 5 OF ONBOARDING</Text>
-      <Text style={styles.title}>Tell us about your work experience</Text>
-      <Text style={styles.subtitle}>
-        Add previous workplaces, trades or jobs. This works for both experienced workers and first-time job seekers.
-      </Text>
+      <Text style={styles.title}>Tell us about your experience</Text>
+      <Text style={styles.subtitle}>No certificates are required. Your practical work experience matters.</Text>
 
       <View style={styles.progressCard}>
-        <View style={styles.progressRow}>
-          <Text style={styles.progressLabel}>Profile completion</Text>
-          <Text style={styles.progressValue}>90%</Text>
-        </View>
-        <View style={styles.track}>
-          <View style={styles.fill} />
-        </View>
+        <View style={styles.progressRow}><Text style={styles.progressLabel}>Profile completion</Text><Text style={styles.progressValue}>90%</Text></View>
+        <View style={styles.track}><View style={styles.fill} /></View>
       </View>
 
-      <Text style={styles.sectionTitle}>Have you worked before?</Text>
-      <View style={styles.choiceRow}>
-        <Pressable
-          onPress={beginAddingExperience}
-          style={({ pressed }) => [
-            styles.choice,
-            hasExperience === true && styles.choiceSelected,
-            pressed && styles.pressed,
-          ]}
-        >
-          <Text style={styles.choiceIcon}>✓</Text>
-          <Text style={[styles.choiceText, hasExperience === true && styles.choiceTextSelected]}>
-            Yes, I have worked
-          </Text>
-        </Pressable>
-
-        <Pressable
-          onPress={chooseNoExperience}
-          style={({ pressed }) => [
-            styles.choice,
-            hasExperience === false && styles.choiceSelected,
-            pressed && styles.pressed,
-          ]}
-        >
-          <Text style={styles.choiceIcon}>○</Text>
-          <Text style={[styles.choiceText, hasExperience === false && styles.choiceTextSelected]}>
-            No, I am a fresher
-          </Text>
-        </Pressable>
+      <Text style={styles.sectionTitle}>How long have you been doing this work?</Text>
+      <Text style={styles.helper}>Choose the closest option. You don't need an exact number.</Text>
+      <View style={styles.options}>
+        {EXPERIENCE_OPTIONS.map(([label, value]) => {
+          const selected = experience === value;
+          return <Pressable key={label} onPress={() => setExperience(value)} style={({ pressed }) => [styles.option, selected && styles.optionSelected, pressed && styles.pressed]}>
+            <Text style={styles.optionIcon}>{selected ? '✓' : '○'}</Text><Text style={[styles.optionText, selected && styles.optionTextSelected]}>{label}</Text>
+          </Pressable>;
+        })}
       </View>
 
-      {history.length > 0 && (
-        <View style={styles.summaryCard}>
-          <View style={styles.summaryTopRow}>
-            <View>
-              <Text style={styles.summaryLabel}>Total recorded experience</Text>
-              <Text style={styles.summaryValue}>{experienceYears} years</Text>
-            </View>
-            <Text style={styles.summaryCount}>{history.length} workplace{history.length === 1 ? '' : 's'}</Text>
-          </View>
+      {experience !== null && experience > 0 && <>
+        <View style={styles.infoCard}><Text style={styles.infoTitle}>No exact dates needed</Text><Text style={styles.infoText}>We'll use your experience range to help employers find workers with the right experience.</Text></View>
+        <Text style={styles.sectionTitle}>Where have you worked?</Text>
+        <Text style={styles.helper}>Hotel, shop, company, workshop, house, farm or any other workplace.</Text>
+        <TextInput value={workplace} onChangeText={setWorkplace} placeholder="e.g. Sri Lakshmi Hotel" placeholderTextColor={BrandColors.muted} style={styles.input} />
+        <Text style={styles.sectionTitle}>How do you usually work?</Text>
+        <View style={styles.chipWrap}>{WORK_TYPES.map((item) => { const selected = workType === item; return <Pressable key={item} onPress={() => setWorkType(item)} style={({ pressed }) => [styles.chip, selected && styles.chipSelected, pressed && styles.pressed]}><Text style={[styles.chipText, selected && styles.chipTextSelected]}>{item}</Text></Pressable>; })}</View>
+      </>}
 
-          {history.map((item) => (
-            <View key={item.id} style={styles.historyItem}>
-              <View style={styles.historyMain}>
-                <Text style={styles.historyRole}>{item.designation}</Text>
-                <Text style={styles.historyCompany}>{item.companyName}</Text>
-                <Text style={styles.historyDates}>
-                  {item.startDate.slice(0, 10)}
-                  {'  –  '}
-                  {item.endDate ? item.endDate.slice(0, 10) : 'Present'}
-                </Text>
-              </View>
-              <Pressable
-                onPress={() => removeExperience(item.id)}
-                style={({ pressed }) => [styles.removeButton, pressed && styles.pressed]}
-              >
-                <Text style={styles.removeText}>Remove</Text>
-              </Pressable>
-            </View>
-          ))}
-        </View>
-      )}
+      {experience === 0 && <View style={styles.fresherCard}><Text style={styles.fresherIcon}>🌱</Text><View style={styles.fresherContent}><Text style={styles.fresherTitle}>Starting your first job?</Text><Text style={styles.fresherText}>That's completely okay. You can create your profile and apply for jobs that accept new workers.</Text></View></View>}
+      {history.length > 0 && <View style={styles.savedCard}><Text style={styles.savedTitle}>Experience already added</Text><Text style={styles.savedText}>{history.length} previous workplace{history.length === 1 ? '' : 's'} saved.</Text></View>}
 
-      {hasExperience === true && (
-        <View style={styles.formCard}>
-          <View style={styles.formHeader}>
-            <Text style={styles.sectionTitle}>{showForm ? 'Add workplace' : 'Work history'}</Text>
-            {!showForm ? (
-              <Pressable onPress={beginAddingExperience} style={styles.linkButton}>
-                <Text style={styles.linkText}>+ Add</Text>
-              </Pressable>
-            ) : null}
-          </View>
-
-          {showForm && (
-            <>
-              <Field label="Company / workplace" value={form.companyName ?? ''} placeholder="e.g. Hotel ABC" onChange={(value) => setField('companyName', value)} />
-              <Field label="Work role / designation" value={form.designation ?? ''} placeholder="e.g. Parota Master" onChange={(value) => setField('designation', value)} />
-              <Field label="Workplace address (optional)" value={form.companyAddress ?? ''} placeholder="City / area" onChange={(value) => setField('companyAddress', value)} />
-              <View style={styles.rowFields}>
-                <View style={styles.halfField}>
-                  <Field label="Start date" value={form.startDate ?? ''} placeholder="YYYY-MM-DD" onChange={(value) => setField('startDate', value)} />
-                </View>
-                <View style={styles.halfField}>
-                  <Field label="End date" value={form.endDate ?? ''} placeholder="YYYY-MM-DD" onChange={(value) => setField('endDate', value)} />
-                </View>
-              </View>
-
-              <Text style={styles.label}>Employment type</Text>
-              <View style={styles.options}>
-                {EMPLOYMENT_TYPES.map((type) => {
-                  const selected = form.employmentType === type.value;
-                  return (
-                    <Pressable
-                      key={type.value}
-                      onPress={() => setField('employmentType', type.value)}
-                      style={({ pressed }) => [
-                        styles.option,
-                        selected && styles.optionSelected,
-                        pressed && styles.pressed,
-                      ]}
-                    >
-                      <Text style={[styles.optionText, selected && styles.optionTextSelected]}>{type.label}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-
-              <Field label="Salary / earning (optional)" value={form.salary == null ? '' : String(form.salary)} placeholder="Amount" keyboardType="numeric" onChange={(value) => setField('salary', value ? Number(value.replace(/[^0-9.]/g, '')) : undefined)} />
-              <Field label="Supervisor / employer name (optional)" value={form.supervisorName ?? ''} placeholder="Name" onChange={(value) => setField('supervisorName', value)} />
-              <Field label="Supervisor phone (optional)" value={form.supervisorPhone ?? ''} placeholder="Phone" keyboardType="phone-pad" onChange={(value) => setField('supervisorPhone', value)} />
-              <Field label="Supervisor email (optional)" value={form.supervisorEmail ?? ''} placeholder="Email" keyboardType="email-address" onChange={(value) => setField('supervisorEmail', value)} />
-              <Field label="Reason for leaving (optional)" value={form.reasonForLeaving ?? ''} placeholder="Why did you leave?" multiline onChange={(value) => setField('reasonForLeaving', value)} />
-
-              <Pressable
-                onPress={saveExperience}
-                disabled={saving}
-                style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, saving && styles.disabled]}
-              >
-                {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>Save Workplace</Text>}
-              </Pressable>
-            </>
-          )}
-        </View>
-      )}
-
-      {hasExperience === false && (
-        <View style={styles.fresherCard}>
-          <Text style={styles.fresherTitle}>That's okay.</Text>
-          <Text style={styles.fresherText}>
-            You can continue as a fresher. Experience is not required to create your worker profile.
-          </Text>
-        </View>
-      )}
-
-      {hasExperience !== null && !showForm && (
-        <Pressable
-          onPress={continueToVerification}
-          disabled={saving}
-          style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, saving && styles.disabled]}
-        >
-          <Text style={styles.primaryText}>Continue to Verification</Text>
-        </Pressable>
-      )}
-
-      <Pressable onPress={completeLater} style={({ pressed }) => [styles.skipButton, pressed && styles.pressed]} disabled={saving}>
-        <Text style={styles.skipText}>Complete later</Text>
-      </Pressable>
+      <Pressable onPress={continueToVerification} disabled={saving} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, saving && styles.disabled]}>{saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>Continue to Verification</Text>}</Pressable>
+      <Pressable onPress={() => router.replace('/home')} disabled={saving} style={({ pressed }) => [styles.skipButton, pressed && styles.pressed]}><Text style={styles.skipText}>Complete later</Text></Pressable>
     </ScrollView>
   );
 }
 
-function Field({
-  label,
-  value,
-  placeholder,
-  onChange,
-  keyboardType,
-  multiline,
-}: {
-  label: string;
-  value: string;
-  placeholder: string;
-  onChange: (value: string) => void;
-  keyboardType?: 'default' | 'numeric' | 'phone-pad' | 'email-address';
-  multiline?: boolean;
-}) {
-  return (
-    <View style={styles.field}>
-      <Text style={styles.label}>{label}</Text>
-      <TextInput
-        value={value}
-        onChangeText={onChange}
-        placeholder={placeholder}
-        placeholderTextColor={BrandColors.muted}
-        keyboardType={keyboardType}
-        multiline={multiline}
-        style={[styles.input, multiline && styles.textArea]}
-      />
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  container: {
-    flexGrow: 1,
-    backgroundColor: BrandColors.background,
-    padding: 24,
-    paddingTop: 56,
-    paddingBottom: 40,
-  },
-  center: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: BrandColors.background,
-  },
-  eyebrow: {
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 1.5,
-    color: BrandColors.rose,
-    marginBottom: 10,
-  },
-  title: {
-    fontSize: 30,
-    lineHeight: 36,
-    fontWeight: '800',
-    color: BrandColors.text,
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: BrandColors.textSecondary,
-    marginBottom: 22,
-  },
-  progressCard: {
-    backgroundColor: BrandColors.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: BrandColors.border,
-    padding: 16,
-    marginBottom: 24,
-  },
-  progressRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  progressLabel: {
-    fontWeight: '700',
-    color: BrandColors.text,
-  },
-  progressValue: {
-    fontWeight: '800',
-    color: BrandColors.burgundy,
-  },
-  track: {
-    height: 8,
-    borderRadius: 8,
-    backgroundColor: '#EEE5E7',
-    overflow: 'hidden',
-  },
-  fill: {
-    width: '90%',
-    height: 8,
-    borderRadius: 8,
-    backgroundColor: BrandColors.burgundy,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: BrandColors.text,
-    marginBottom: 10,
-  },
-  choiceRow: {
-    gap: 12,
-    marginBottom: 22,
-  },
-  choice: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    minHeight: 60,
-    borderWidth: 1,
-    borderColor: BrandColors.border,
-    backgroundColor: BrandColors.surface,
-    borderRadius: 14,
-    paddingHorizontal: 16,
-  },
-  choiceSelected: {
-    borderColor: BrandColors.burgundy,
-    backgroundColor: BrandColors.burgundySoft,
-  },
-  choiceIcon: {
-    color: BrandColors.burgundy,
-    fontSize: 22,
-    fontWeight: '800',
-  },
-  choiceText: {
-    color: BrandColors.text,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  choiceTextSelected: {
-    color: BrandColors.burgundy,
-  },
-  summaryCard: {
-    backgroundColor: BrandColors.surface,
-    borderWidth: 1,
-    borderColor: BrandColors.border,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
-  },
-  summaryTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 14,
-  },
-  summaryLabel: {
-    fontSize: 13,
-    color: BrandColors.textSecondary,
-    fontWeight: '700',
-  },
-  summaryValue: {
-    fontSize: 22,
-    color: BrandColors.burgundy,
-    fontWeight: '800',
-    marginTop: 2,
-  },
-  summaryCount: {
-    fontSize: 12,
-    color: BrandColors.textSecondary,
-    fontWeight: '700',
-    marginTop: 4,
-  },
-  historyItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-    paddingTop: 14,
-    marginTop: 14,
-    borderTopWidth: 1,
-    borderTopColor: BrandColors.border,
-  },
-  historyMain: {
-    flex: 1,
-  },
-  historyRole: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: BrandColors.text,
-  },
-  historyCompany: {
-    fontSize: 14,
-    color: BrandColors.burgundy,
-    fontWeight: '700',
-    marginTop: 3,
-  },
-  historyDates: {
-    fontSize: 12,
-    color: BrandColors.textSecondary,
-    marginTop: 4,
-  },
-  removeButton: {
-    alignSelf: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 10,
-    backgroundColor: BrandColors.blushSoft,
-  },
-  removeText: {
-    color: BrandColors.burgundy,
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  formCard: {
-    backgroundColor: BrandColors.surface,
-    borderWidth: 1,
-    borderColor: BrandColors.border,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
-  },
-  formHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  linkButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-  },
-  linkText: {
-    color: BrandColors.burgundy,
-    fontWeight: '800',
-  },
-  field: {
-    marginBottom: 14,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: BrandColors.text,
-    marginBottom: 7,
-  },
-  input: {
-    minHeight: 52,
-    borderWidth: 1,
-    borderColor: BrandColors.border,
-    borderRadius: 14,
-    backgroundColor: BrandColors.background,
-    paddingHorizontal: 14,
-    fontSize: 15,
-    color: BrandColors.text,
-  },
-  textArea: {
-    minHeight: 100,
-    paddingTop: 14,
-    textAlignVertical: 'top',
-  },
-  rowFields: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  halfField: {
-    flex: 1,
-  },
-  options: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 14,
-  },
-  option: {
-    borderWidth: 1,
-    borderColor: BrandColors.border,
-    backgroundColor: BrandColors.surface,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  optionSelected: {
-    borderColor: BrandColors.burgundy,
-    backgroundColor: BrandColors.burgundySoft,
-  },
-  optionText: {
-    color: BrandColors.text,
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  optionTextSelected: {
-    color: BrandColors.burgundy,
-  },
-  fresherCard: {
-    backgroundColor: BrandColors.blushSoft,
-    borderWidth: 1,
-    borderColor: BrandColors.borderStrong,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
-  },
-  fresherTitle: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: BrandColors.burgundy,
-    marginBottom: 5,
-  },
-  fresherText: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: BrandColors.text,
-  },
-  primaryButton: {
-    height: 54,
-    borderRadius: 14,
-    backgroundColor: BrandColors.burgundy,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 8,
-    shadowColor: BrandColors.burgundy,
-    shadowOpacity: 0.18,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 5 },
-    elevation: 3,
-  },
-  primaryText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  skipButton: {
-    alignItems: 'center',
-    padding: 16,
-  },
-  skipText: {
-    color: BrandColors.textSecondary,
-    fontWeight: '700',
-  },
-  pressed: {
-    opacity: 0.85,
-  },
-  disabled: {
-    opacity: 0.6,
-  },
+  container: { flexGrow: 1, backgroundColor: BrandColors.background, padding: 24, paddingTop: 56, paddingBottom: 40 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: BrandColors.background },
+  eyebrow: { fontSize: 12, fontWeight: '800', letterSpacing: 1.5, color: BrandColors.rose, marginBottom: 10 },
+  title: { fontSize: 30, lineHeight: 36, fontWeight: '800', color: BrandColors.text, marginBottom: 8 },
+  subtitle: { fontSize: 15, lineHeight: 22, color: BrandColors.textSecondary, marginBottom: 22 },
+  progressCard: { backgroundColor: BrandColors.surface, borderRadius: 16, borderWidth: 1, borderColor: BrandColors.border, padding: 16, marginBottom: 24 },
+  progressRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
+  progressLabel: { fontWeight: '700', color: BrandColors.text },
+  progressValue: { fontWeight: '800', color: BrandColors.burgundy },
+  track: { height: 8, borderRadius: 8, backgroundColor: '#EEE5E7', overflow: 'hidden' },
+  fill: { width: '90%', height: 8, borderRadius: 8, backgroundColor: BrandColors.burgundy },
+  sectionTitle: { fontSize: 20, fontWeight: '800', color: BrandColors.text, marginTop: 10, marginBottom: 6 },
+  helper: { fontSize: 14, lineHeight: 20, color: BrandColors.textSecondary, marginBottom: 14 },
+  options: { gap: 10, marginBottom: 18 },
+  option: { minHeight: 58, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: BrandColors.border, backgroundColor: BrandColors.surface, borderRadius: 15, paddingHorizontal: 16 },
+  optionSelected: { borderColor: BrandColors.burgundy, backgroundColor: BrandColors.burgundySoft },
+  optionIcon: { width: 28, fontSize: 18, color: BrandColors.burgundy, fontWeight: '800' },
+  optionText: { color: BrandColors.text, fontSize: 16, fontWeight: '700' },
+  optionTextSelected: { color: BrandColors.burgundy },
+  infoCard: { backgroundColor: BrandColors.blushSoft, borderRadius: 15, borderWidth: 1, borderColor: BrandColors.borderStrong, padding: 16, marginBottom: 6 },
+  infoTitle: { color: BrandColors.burgundy, fontSize: 15, fontWeight: '800', marginBottom: 5 },
+  infoText: { color: BrandColors.textSecondary, fontSize: 13, lineHeight: 19 },
+  input: { minHeight: 54, borderWidth: 1, borderColor: BrandColors.border, borderRadius: 15, backgroundColor: BrandColors.surface, paddingHorizontal: 16, fontSize: 16, color: BrandColors.text, marginBottom: 14 },
+  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20 },
+  chip: { borderWidth: 1, borderColor: BrandColors.border, backgroundColor: BrandColors.surface, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 12 },
+  chipSelected: { backgroundColor: BrandColors.burgundySoft, borderColor: BrandColors.burgundy },
+  chipText: { color: BrandColors.text, fontWeight: '700' },
+  chipTextSelected: { color: BrandColors.burgundy },
+  fresherCard: { flexDirection: 'row', backgroundColor: BrandColors.surface, borderWidth: 1, borderColor: BrandColors.border, borderRadius: 16, padding: 18, marginBottom: 20 },
+  fresherIcon: { fontSize: 28, marginRight: 14 },
+  fresherContent: { flex: 1 },
+  fresherTitle: { fontSize: 16, fontWeight: '800', color: BrandColors.text, marginBottom: 4 },
+  fresherText: { fontSize: 14, lineHeight: 20, color: BrandColors.textSecondary },
+  savedCard: { backgroundColor: BrandColors.surface, borderWidth: 1, borderColor: BrandColors.border, borderRadius: 15, padding: 15, marginBottom: 20 },
+  savedTitle: { color: BrandColors.text, fontWeight: '800', marginBottom: 4 },
+  savedText: { color: BrandColors.textSecondary, fontSize: 13 },
+  primaryButton: { height: 54, borderRadius: 14, backgroundColor: BrandColors.burgundy, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
+  primaryText: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  skipButton: { alignItems: 'center', padding: 16 },
+  skipText: { color: BrandColors.textSecondary, fontWeight: '700' },
+  pressed: { opacity: 0.85 },
+  disabled: { opacity: 0.6 },
 });
