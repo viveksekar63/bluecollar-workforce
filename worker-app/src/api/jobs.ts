@@ -68,3 +68,15 @@ export async function getJob(jobId: string) {
   const response = await api.get<WorkerJob>(`/jobs/${jobId}`);
   return response.data;
 }
+
+export async function applyForJob(jobId: string) {
+  const response = await api.post<{
+    alreadyApplied: boolean;
+    application: JobApplication & {
+      jobId: string;
+      workerId: string;
+    };
+  }>(`/jobs/${jobId}/apply`);
+
+  return response.data;
+}
