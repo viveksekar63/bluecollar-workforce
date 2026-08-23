@@ -10,14 +10,15 @@ import {
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { WorkerRegisterDto } from './dto/worker-register.dto';
 
-@Controller('auth/admin')
+@Controller('auth')
 export class AuthController {
     constructor(
         private readonly authService: AuthService,
     ) { }
 
-    @Post('login')
+    @Post('admin/login')
     async login(
         @Body()
         body: {
@@ -27,6 +28,27 @@ export class AuthController {
     ) {
         return this.authService.adminLogin(
             body.email,
+            body.password,
+        );
+    }
+
+    @Post('worker/register')
+    async workerRegister(
+        @Body() dto: WorkerRegisterDto,
+    ) {
+        return this.authService.workerRegister(dto);
+    }
+
+    @Post('worker/login')
+    async workerLogin(
+        @Body()
+        body: {
+            identifier: string;
+            password: string;
+        },
+    ) {
+        return this.authService.workerLogin(
+            body.identifier,
             body.password,
         );
     }
@@ -50,7 +72,7 @@ export class AuthController {
     }
 
     @UseGuards(JwtAuthGuard)
-    @Get('me')
+    @Get('admin/me')
     async me(@Req() request: any) {
         return {
             user:
@@ -61,13 +83,13 @@ export class AuthController {
     }
 
     @UseGuards(JwtAuthGuard)
-    @Get('permissions')
+    @Get('admin/permissions')
     async permissions(@Req() request: any) {
-    return {
-        permissions:
-        await this.authService.getAdminPermissions(
-            request.user.userId,
-        ),
-    };
+        return {
+            permissions:
+                await this.authService.getAdminPermissions(
+                    request.user.userId,
+                ),
+        };
     }
 }
