@@ -15,6 +15,7 @@ export default function RootLayout() {
         <Stack.Screen name="skills" />
         <Stack.Screen name="profession" />
         <Stack.Screen name="experience" />
+        <Stack.Screen name="verification" />
       </Stack>
     </>
   );
