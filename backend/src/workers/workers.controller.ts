@@ -18,12 +18,14 @@ import { PermissionGuard } from "../auth/permissions/permission.guard";
 import { RequirePermissions } from "../auth/permissions/permission.decorator";
 import { PERMISSIONS } from "../auth/permissions/permissions";
 import { UpdateWorkerSkillsDto } from "./dto/update-worker-skills.dto";
+import { WorkerProfessionService, UpdateWorkerProfessionInput } from "./worker-profession.service";
 
 @Controller("workers")
 @UseGuards(JwtAuthGuard)
 export class WorkersController {
   constructor(
     private readonly workersService: WorkersService,
+    private readonly workerProfessionService: WorkerProfessionService,
   ) { }
 
   @Get()
@@ -36,6 +38,13 @@ export class WorkersController {
   @Get("me")
   async getMyProfile(@Req() request: any) {
     return this.workersService.getMyProfile(
+      request.user.userId,
+    );
+  }
+
+  @Get("me/profession")
+  async getMyProfession(@Req() request: any) {
+    return this.workerProfessionService.getMyProfession(
       request.user.userId,
     );
   }
@@ -75,6 +84,17 @@ export class WorkersController {
     @Body() dto: UpdateWorkerSkillsDto,
   ) {
     return this.workersService.updateMySkills(
+      request.user.userId,
+      dto,
+    );
+  }
+
+  @Patch("me/profession")
+  async updateMyProfession(
+    @Req() request: any,
+    @Body() dto: UpdateWorkerProfessionInput,
+  ) {
+    return this.workerProfessionService.updateMyProfession(
       request.user.userId,
       dto,
     );
