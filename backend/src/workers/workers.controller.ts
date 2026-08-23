@@ -17,13 +17,14 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { PermissionGuard } from "../auth/permissions/permission.guard";
 import { RequirePermissions } from "../auth/permissions/permission.decorator";
 import { PERMISSIONS } from "../auth/permissions/permissions";
+import { UpdateWorkerSkillsDto } from "./dto/update-worker-skills.dto";
 
 @Controller("workers")
 @UseGuards(JwtAuthGuard)
 export class WorkersController {
   constructor(
     private readonly workersService: WorkersService,
-  ) {}
+  ) { }
 
   @Get()
   @UseGuards(PermissionGuard)
@@ -63,6 +64,17 @@ export class WorkersController {
     @Body() dto: UpdateWorkerOnboardingDto,
   ) {
     return this.workersService.updateMyOnboarding(
+      request.user.userId,
+      dto,
+    );
+  }
+
+  @Patch("me/skills")
+  async updateMySkills(
+    @Req() request: any,
+    @Body() dto: UpdateWorkerSkillsDto,
+  ) {
+    return this.workersService.updateMySkills(
       request.user.userId,
       dto,
     );

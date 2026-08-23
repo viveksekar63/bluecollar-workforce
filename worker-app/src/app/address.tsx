@@ -67,7 +67,10 @@ export default function AddressScreen() {
       });
 
       Alert.alert('Saved', 'Address and emergency contact have been saved.', [
-        { text: 'Continue', onPress: () => router.replace('/home') },
+        {
+          text: 'Continue',
+          onPress: () => router.replace('/skills'),
+        }
       ]);
     } catch (error: any) {
       const message = error?.response?.data?.message;

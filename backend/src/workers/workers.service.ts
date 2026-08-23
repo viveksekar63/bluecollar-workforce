@@ -7,12 +7,13 @@ import { PrismaService } from "../prisma/prisma.service";
 import { UpdateWorkerOnboardingDto } from "./dto/update-worker-onboarding.dto";
 import { UpdateWorkerProfileDto } from "./dto/update-worker-profile.dto";
 import { WorkersQueryDto } from "./dto/workers-query.dto";
+import { UpdateWorkerSkillsDto } from "./dto/update-worker-skills.dto";
 
 @Injectable()
 export class WorkersService {
   constructor(
     private readonly prisma: PrismaService,
-  ) {}
+  ) { }
 
   async findAll(query: WorkersQueryDto) {
     const page = query.page ?? 1;
@@ -337,6 +338,138 @@ export class WorkersService {
     }
 
     return worker;
+  }
+
+  async updateMySkills(
+    userId: string,
+    dto: UpdateWorkerSkillsDto,
+  ) {
+    const worker = await this.prisma.worker.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+
+    if (!worker) {
+      throw new NotFoundException("Worker profile not found");
+    }
+
+    const skillNames = [
+      ...new Set(
+        dto.skills
+          .map((skill) => skill.trim())
+          .filter(Boolean),
+      ),
+    ];
+
+    const languageNames = [
+      ...new Set(
+        dto.languages
+          .map((language) => language.trim())
+          .filter(Boolean),
+      ),
+    ];
+
+    if (skillNames.length === 0) {
+      throw new Error("At least one skill is required");
+    }
+
+    if (languageNames.length === 0) {
+      throw new Error("At least one language is required");
+    }
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      type WorkerSkill = {
+        id: string;
+        name: string;
+        createdAt: Date;
+        category: string | null;
+      };
+
+      type WorkerLanguage = {
+        id: string;
+        name: string;
+      };
+
+      const skills: WorkerSkill[] = [];
+      const languages: WorkerLanguage[] = [];
+
+
+      for (const name of skillNames) {
+        const skill = await tx.skill.upsert({
+          where: { name },
+          update: {},
+          create: {
+            name,
+          },
+        });
+
+        skills.push(skill);
+
+        await tx.workerSkill.upsert({
+          where: {
+            workerId_skillId: {
+              workerId: worker.id,
+              skillId: skill.id,
+            },
+          },
+          update: {},
+          create: {
+            workerId: worker.id,
+            skillId: skill.id,
+          },
+        });
+      }
+
+      for (const name of languageNames) {
+        const language = await tx.language.upsert({
+          where: { name },
+          update: {},
+          create: {
+            name,
+          },
+        });
+
+        languages.push(language);
+
+        await tx.workerLanguage.upsert({
+          where: {
+            workerId_languageId: {
+              workerId: worker.id,
+              languageId: language.id,
+            },
+          },
+          update: {},
+          create: {
+            workerId: worker.id,
+            languageId: language.id,
+          },
+        });
+      }
+
+      const updatedWorker = await tx.worker.update({
+        where: {
+          id: worker.id,
+        },
+        data: {
+          profileCompletion: 80,
+        },
+        select: {
+          id: true,
+          workerCode: true,
+          profileCompletion: true,
+          verificationStatus: true,
+          availabilityStatus: true,
+        },
+      });
+
+      return {
+        worker: updatedWorker,
+        skills,
+        languages,
+      };
+    });
+
+    return result;
   }
 
   async updateMyProfile(

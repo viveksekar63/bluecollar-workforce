@@ -30,6 +30,7 @@ export interface WorkerProfile {
   profileCompletion?: number;
   verificationStatus?: string;
   availabilityStatus?: string;
+
   user?: {
     id: string;
     firstName?: string | null;
@@ -38,8 +39,35 @@ export interface WorkerProfile {
     phone?: string | null;
     profilePhotoUrl?: string | null;
   };
+
   addresses?: WorkerAddress[];
   emergencyContacts?: EmergencyContact[];
+  skills?: WorkerSkill[];
+  languages?: WorkerLanguage[];
+}
+
+export interface UpdateWorkerSkillsInput {
+  skills: string[];
+  languages: string[];
+}
+
+export async function updateMySkills(
+  input: UpdateWorkerSkillsInput,
+) {
+  const { data } = await api.patch<{
+    worker: WorkerProfile;
+    skills: Array<{
+      id: string;
+      name: string;
+      category?: string | null;
+    }>;
+    languages: Array<{
+      id: string;
+      name: string;
+    }>;
+  }>('/workers/me/skills', input);
+
+  return data;
 }
 
 export interface UpdateWorkerProfileInput {
@@ -61,6 +89,25 @@ export interface UpdateWorkerOnboardingInput {
   emergencyName: string;
   emergencyRelationship: string;
   emergencyPhone: string;
+}
+
+export interface WorkerSkill {
+  experienceYears?: number | string | null;
+  skillLevel?: string;
+  verified?: boolean;
+  skill: {
+    id: string;
+    name: string;
+    category?: string | null;
+  };
+}
+
+export interface WorkerLanguage {
+  proficiency?: string;
+  language: {
+    id: string;
+    name: string;
+  };
 }
 
 export async function getMyWorkerProfile() {
