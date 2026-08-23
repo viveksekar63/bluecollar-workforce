@@ -44,6 +44,7 @@ export interface WorkerProfile {
   emergencyContacts?: EmergencyContact[];
   skills?: WorkerSkill[];
   languages?: WorkerLanguage[];
+  employmentHistory?: WorkerEmployment[];
 }
 
 export interface UpdateWorkerSkillsInput {
@@ -94,6 +95,38 @@ export interface UpdateWorkerProfessionInput {
   profession: string;
 }
 
+export interface WorkerEmployment {
+  id: string;
+  companyName: string;
+  companyAddress?: string | null;
+  designation: string;
+  startDate: string;
+  endDate?: string | null;
+  salary?: number | string | null;
+  employmentType?: string | null;
+  supervisorName?: string | null;
+  supervisorPhone?: string | null;
+  supervisorEmail?: string | null;
+  reasonForLeaving?: string | null;
+  verificationStatus?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface WorkerEmploymentInput {
+  companyName: string;
+  companyAddress?: string;
+  designation: string;
+  startDate: string;
+  endDate?: string;
+  salary?: number;
+  employmentType?: string;
+  supervisorName?: string;
+  supervisorPhone?: string;
+  supervisorEmail?: string;
+  reasonForLeaving?: string;
+}
+
 export interface WorkerSkill {
   experienceYears?: number | string | null;
   skillLevel?: string;
@@ -132,5 +165,33 @@ export async function updateMyOnboarding(input: UpdateWorkerOnboardingInput) {
     address: WorkerAddress;
     emergencyContact: EmergencyContact;
   }>('/workers/me/onboarding', input);
+  return data;
+}
+
+export async function getMyEmploymentHistory() {
+  const { data } = await api.get<WorkerEmployment[]>('/workers/me/experience');
+  return data;
+}
+
+export async function createMyEmploymentHistory(input: WorkerEmploymentInput) {
+  const { data } = await api.post<WorkerEmployment>('/workers/me/experience', input);
+  return data;
+}
+
+export async function updateMyEmploymentHistory(
+  employmentId: string,
+  input: WorkerEmploymentInput,
+) {
+  const { data } = await api.patch<WorkerEmployment>(
+    `/workers/me/experience/${employmentId}`,
+    input,
+  );
+  return data;
+}
+
+export async function deleteMyEmploymentHistory(employmentId: string) {
+  const { data } = await api.delete<{ success: boolean }>(
+    `/workers/me/experience/${employmentId}`,
+  );
   return data;
 }
