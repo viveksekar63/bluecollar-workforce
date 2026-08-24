@@ -64,6 +64,14 @@ export class JobsController {
     return this.jobsService.getAllEmployerApplications(user.userId);
   }
 
+  @Get('employer/applications/:applicationId')
+  async applicationDetails(
+    @CurrentUser() user: { userId: string },
+    @Param('applicationId') applicationId: string,
+  ) {
+    return this.jobsService.getEmployerApplicationDetails(user.userId, applicationId);
+  }
+
   @Post('employer')
   async create(
     @CurrentUser() user: { userId: string },
