@@ -167,13 +167,21 @@ export class JobsService {
     const employer = await this.getEmployer(userId);
     const application = await this.prisma.jobApplication.findFirst({
       where: { id: applicationId, job: { employerId: employer.id } },
-      select: { id: true },
+      select: { id: true, status: true },
     });
     if (!application) throw new NotFoundException('Application not found');
 
+    if (String(application.status) === status) {
+      return this.prisma.jobApplication.findUnique({ where: { id: applicationId } });
+    }
+
     return this.prisma.jobApplication.update({
       where: { id: applicationId },
-      data: { status: status as any },
+      data: {
+        status: status as any,
+        shortlistedAt: status === 'SHORTLISTED' ? new Date() : null,
+        rejectedAt: status === 'REJECTED' ? new Date() : null,
+      },
     });
   }
 
@@ -214,20 +222,46 @@ export class JobsService {
       },
     });
 
+    const applications = jobs.length
+      ? await this.prisma.jobApplication.findMany({
+          where: {
+            workerId: worker.id,
+            jobId: { in: jobs.map((job) => job.id) },
+          },
+          select: {
+            id: true,
+            jobId: true,
+            status: true,
+            appliedAt: true,
+          },
+        })
+      : [];
+
+    const applicationByJobId = new Map(
+      applications.map((application) => [application.jobId, application]),
+    );
+
     const items = jobs
       .map((job) => {
         const matchedSkills = job.skills.filter((item) => workerSkillIds.has(item.skillId)).length;
         const matchScore = job.skills.length > 0
           ? Math.round((matchedSkills / job.skills.length) * 100)
           : 0;
+        const application = applicationByJobId.get(job.id);
 
         return {
           ...job,
           matchScore,
           matchedSkills,
-          applied: false,
-          applicationStatus: null,
-          application: null,
+          applied: Boolean(application),
+          applicationStatus: application ? String(application.status) : null,
+          application: application
+            ? {
+                id: application.id,
+                status: String(application.status),
+                appliedAt: application.appliedAt,
+              }
+            : null,
         };
       })
       .sort((a, b) => {
@@ -243,19 +277,108 @@ export class JobsService {
   }
 
   async findOneForWorker(userId: string, jobId: string) {
-    return this.prisma.job.findUnique({ where: { id: jobId }, include: { employer: true, skills: { include: { skill: true } } } });
+    const worker = await this.prisma.worker.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+    if (!worker) throw new NotFoundException('Worker profile not found');
+
+    const job = await this.prisma.job.findUnique({
+      where: { id: jobId },
+      include: {
+        employer: {
+          select: {
+            id: true,
+            companyName: true,
+            companyType: true,
+            description: true,
+            status: true,
+          },
+        },
+        skills: { include: { skill: true } },
+        applications: {
+          where: { workerId: worker.id },
+          select: {
+            id: true,
+            status: true,
+            appliedAt: true,
+          },
+          take: 1,
+        },
+      },
+    });
+
+    if (!job) throw new NotFoundException('Job not found');
+
+    const application = job.applications[0] ?? null;
+    const { applications: _applications, ...jobData } = job;
+
+    return {
+      ...jobData,
+      applied: Boolean(application),
+      applicationStatus: application ? String(application.status) : null,
+      application: application
+        ? {
+            id: application.id,
+            status: String(application.status),
+            appliedAt: application.appliedAt,
+          }
+        : null,
+    };
   }
 
   async applyForJob(userId: string, jobId: string) {
     const worker = await this.prisma.worker.findUnique({ where: { userId }, select: { id: true } });
     if (!worker) throw new NotFoundException('Worker profile not found');
-    const job = await this.prisma.job.findUnique({ where: { id: jobId }, select: { id: true, status: true } });
+
+    const job = await this.prisma.job.findUnique({
+      where: { id: jobId },
+      select: { id: true, status: true, openings: true },
+    });
     if (!job) throw new NotFoundException('Job not found');
     if (String(job.status) !== 'PUBLISHED') throw new BadRequestException('Job is not open');
-    return this.prisma.jobApplication.upsert({
+
+    const existingApplication = await this.prisma.jobApplication.findUnique({
       where: { jobId_workerId: { jobId, workerId: worker.id } },
-      update: {},
-      create: { jobId, workerId: worker.id, status: 'APPLIED' as any },
     });
+
+    if (existingApplication) {
+      return {
+        alreadyApplied: true,
+        application: {
+          id: existingApplication.id,
+          jobId: existingApplication.jobId,
+          workerId: existingApplication.workerId,
+          status: String(existingApplication.status),
+          appliedAt: existingApplication.appliedAt,
+        },
+      };
+    }
+
+    const applicationCount = await this.prisma.jobApplication.count({
+      where: { jobId },
+    });
+    if (applicationCount >= job.openings) {
+      throw new BadRequestException('All openings for this job have been filled');
+    }
+
+    const application = await this.prisma.jobApplication.create({
+      data: {
+        jobId,
+        workerId: worker.id,
+        status: 'APPLIED' as any,
+      },
+    });
+
+    return {
+      alreadyApplied: false,
+      application: {
+        id: application.id,
+        jobId: application.jobId,
+        workerId: application.workerId,
+        status: String(application.status),
+        appliedAt: application.appliedAt,
+      },
+    };
   }
 }
