@@ -163,6 +163,56 @@ export class JobsService {
     });
   }
 
+  async getAllEmployerApplications(userId: string) {
+    const employer = await this.getEmployer(userId);
+
+    return this.prisma.jobApplication.findMany({
+      where: { job: { employerId: employer.id } },
+      orderBy: { appliedAt: 'desc' },
+      include: {
+        job: {
+          select: {
+            id: true,
+            title: true,
+            city: true,
+            district: true,
+            state: true,
+            openings: true,
+            status: true,
+          },
+        },
+        worker: {
+          select: {
+            id: true,
+            workerCode: true,
+            experienceYears: true,
+            professionCategory: true,
+            profession: true,
+            verificationStatus: true,
+            verificationScore: true,
+            user: {
+              select: {
+                firstName: true,
+                lastName: true,
+                phone: true,
+                profilePhotoUrl: true,
+              },
+            },
+            skills: {
+              include: { skill: true },
+              orderBy: { skillLevel: 'desc' },
+            },
+            addresses: {
+              where: { isCurrent: true },
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+            },
+          },
+        },
+      },
+    });
+  }
+
   async updateApplicationStatus(userId: string, applicationId: string, status: 'SHORTLISTED' | 'REJECTED') {
     const employer = await this.getEmployer(userId);
     const application = await this.prisma.jobApplication.findFirst({
