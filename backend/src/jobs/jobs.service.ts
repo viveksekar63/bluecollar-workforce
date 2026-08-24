@@ -355,13 +355,6 @@ export class JobsService {
       };
     }
 
-    const applicationCount = await this.prisma.jobApplication.count({
-      where: { jobId },
-    });
-    if (applicationCount >= job.openings) {
-      throw new BadRequestException('All openings for this job have been filled');
-    }
-
     const application = await this.prisma.jobApplication.create({
       data: {
         jobId,
