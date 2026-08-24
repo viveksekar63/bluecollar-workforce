@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { BriefcaseBusiness, Home, UserRound } from "lucide-react";
+import { BriefcaseBusiness, ClipboardList, Home, UserRound } from "lucide-react";
 import type { ReactNode } from "react";
 
 interface EmployerShellProps {
@@ -15,11 +15,10 @@ type EmployerNavItem = {
   icon: typeof Home;
 };
 
-// Keep navigation limited to employer features that are currently implemented.
-// New employer modules can be added here as their pages are completed.
 const items: EmployerNavItem[] = [
   { label: "Dashboard", href: "/employer/dashboard", icon: Home },
   { label: "My Jobs", href: "/employer/jobs", icon: BriefcaseBusiness },
+  { label: "Applications", href: "/employer/applications", icon: ClipboardList },
 ];
 
 export function EmployerShell({ children }: EmployerShellProps) {
