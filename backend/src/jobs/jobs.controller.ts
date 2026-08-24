@@ -14,6 +14,7 @@ import { IsArray, IsDateString, IsInt, IsNumber, IsOptional, IsString, Min } fro
 
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { EmployerApplicationService } from './employer-application.service';
 import { JobsService } from './jobs.service';
 
 class CreateJobDto {
@@ -43,7 +44,10 @@ class UpdateJobDto extends CreateJobDto {
 @Controller('jobs')
 @UseGuards(JwtAuthGuard)
 export class JobsController {
-  constructor(private readonly jobsService: JobsService) {}
+  constructor(
+    private readonly jobsService: JobsService,
+    private readonly employerApplicationService: EmployerApplicationService,
+  ) {}
 
   @Get('recommended')
   async recommended(
@@ -69,7 +73,7 @@ export class JobsController {
     @CurrentUser() user: { userId: string },
     @Param('applicationId') applicationId: string,
   ) {
-    return this.jobsService.getEmployerApplicationDetails(user.userId, applicationId);
+    return this.employerApplicationService.getDetails(user.userId, applicationId);
   }
 
   @Post('employer')
