@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
 import { login } from '@/api/auth';
 import { setAccessToken } from '@/api/client';
 import { BrandColors } from '@/constants/theme';
+import { WORKTRUST_HERO_IMAGE } from '@/constants/worktrust-hero';
 import { useAuthStore } from '@/store/auth';
 
 type LoginRole = 'WORKER' | 'EMPLOYER';
@@ -19,101 +20,65 @@ export default function LoginScreen() {
 
   async function handleLogin() {
     if (!identifier.trim() || !password) {
-      Alert.alert('Missing information', 'Enter your phone/email and password.');
+      Alert.alert('Missing information', 'Enter your mobile/email and password.');
       return;
     }
-
     try {
       setLoading(true);
       const response = await login(identifier.trim(), password);
       setAccessToken(response.accessToken);
       setSession(response.accessToken, response.user, response.worker, response.employer);
-
       const roles = response.user.roles ?? [];
-      const canUseSelectedRole = roles.includes(selectedRole);
-
-      if (canUseSelectedRole) {
-        router.replace(selectedRole === 'EMPLOYER' ? '/employer-home' : '/home');
-      } else if (roles.includes('WORKER') && roles.includes('EMPLOYER')) {
-        router.replace('/role-select');
-      } else if (roles.includes('EMPLOYER')) {
-        router.replace('/employer-home');
-      } else if (roles.includes('WORKER')) {
-        router.replace('/home');
-      } else {
-        Alert.alert('Access unavailable', 'Your account does not have mobile worker or employer access.');
-      }
+      if (roles.includes(selectedRole)) router.replace(selectedRole === 'EMPLOYER' ? '/employer-home' : '/home');
+      else if (roles.includes('WORKER') && roles.includes('EMPLOYER')) router.replace('/role-select');
+      else if (roles.includes('EMPLOYER')) router.replace('/employer-home');
+      else if (roles.includes('WORKER')) router.replace('/home');
+      else Alert.alert('Access unavailable', 'Your account does not have worker or employer mobile access.');
     } catch (error: any) {
       Alert.alert('Login failed', error?.response?.data?.message ?? 'Unable to connect to the authentication service.');
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        <View style={styles.topRow}>
-          <Pressable onPress={() => router.back()} style={styles.backButton}><Text style={styles.backText}>‹</Text></Pressable>
-          <View>
-            <Text style={styles.brandName}>WORKTRUST</Text>
-            <Text style={styles.brandTagline}>Verified people. Trusted work.</Text>
-          </View>
+        <View style={styles.header}>
+          <Pressable onPress={() => router.back()} style={styles.back}><Text style={styles.backText}>‹</Text></Pressable>
+          <View style={styles.logo}><Text style={styles.logoText}>W</Text></View>
+          <View><Text style={styles.brand}>WorkTrust</Text><Text style={styles.tagline}>Verified people. Trusted work.</Text></View>
         </View>
 
-        <View style={styles.heroVisual}>
-          <View style={styles.skyGlow} />
-          <View style={styles.workerFigure}>
-            <View style={styles.workerHead} />
-            <View style={styles.workerBody} />
-            <View style={styles.workerArm} />
-            <View style={styles.workerTool} />
-          </View>
-          <View style={styles.employerFigure}>
-            <View style={styles.employerHead} />
-            <View style={styles.employerBody} />
-            <View style={styles.employerArm} />
-          </View>
-          <View style={styles.verifiedCard}>
-            <View style={styles.checkCircle}><Text style={styles.check}>✓</Text></View>
-            <View><Text style={styles.cardLabel}>TRUSTED ACCESS</Text><Text style={styles.cardValue}>Worker + Employer</Text></View>
-          </View>
-          <View style={styles.opportunityCard}>
-            <View style={styles.jobIcon}><Text style={styles.jobIconText}>□</Text></View>
-            <View><Text style={styles.cardLabel}>ONE LOGIN</Text><Text style={styles.cardValue}>Two ways to work</Text></View>
-          </View>
+        <View style={styles.hero}>
+          <Image source={{ uri: WORKTRUST_HERO_IMAGE }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
+          <View style={styles.heroShade} />
+          <View style={styles.heroTop}><Text style={styles.wMark}>W</Text><Text style={styles.heroBrand}>WorkTrust</Text><Text style={styles.heroTag}>Verified people. Trusted work.</Text></View>
         </View>
 
-        <View style={styles.heading}>
-          <Text style={styles.eyebrow}>WELCOME BACK</Text>
-          <Text style={styles.title}>Find work. Hire people.</Text>
-          <Text style={styles.subtitle}>Sign in once to access WorkTrust as a worker or employer.</Text>
-        </View>
+        <View style={styles.card}>
+          <Text style={styles.welcome}>Welcome back!</Text>
+          <Text style={styles.title}>Sign in to your account</Text>
+          <Text style={styles.subtitle}>Continue to access your WorkTrust dashboard.</Text>
 
-        <View style={styles.roleSection}>
+          <View style={styles.inputWrap}><Text style={styles.inputIcon}>⌕</Text><TextInput value={identifier} onChangeText={setIdentifier} placeholder="Mobile number or email" placeholderTextColor={BrandColors.muted} autoCapitalize="none" keyboardType="email-address" style={styles.input} /></View>
+          <View style={styles.inputWrap}><Text style={styles.inputIcon}>⌑</Text><TextInput value={password} onChangeText={setPassword} placeholder="Password" placeholderTextColor={BrandColors.muted} secureTextEntry style={styles.input} /></View>
+          <Pressable style={styles.forgot}><Text style={styles.forgotText}>Forgot password?</Text></Pressable>
+
           <Text style={styles.roleLabel}>Continue as</Text>
-          <View style={styles.roleSwitch}>
-            <Pressable onPress={() => setSelectedRole('WORKER')} style={[styles.roleButton, selectedRole === 'WORKER' && styles.roleButtonActive]}>
-              <Text style={styles.roleIcon}>👷</Text>
-              <View><Text style={[styles.roleTitle, selectedRole === 'WORKER' && styles.roleTitleActive]}>Worker</Text><Text style={styles.roleHint}>Find jobs & apply</Text></View>
+          <View style={styles.roles}>
+            <Pressable onPress={() => setSelectedRole('WORKER')} style={[styles.role, selectedRole === 'WORKER' && styles.roleActive]}>
+              <Text style={styles.roleIcon}>👷</Text><Text style={styles.roleTitle}>Worker</Text><Text style={styles.roleHint}>Find jobs & apply</Text>{selectedRole === 'WORKER' && <View style={styles.check}><Text>✓</Text></View>}
             </Pressable>
-            <Pressable onPress={() => setSelectedRole('EMPLOYER')} style={[styles.roleButton, selectedRole === 'EMPLOYER' && styles.roleButtonActive]}>
-              <Text style={styles.roleIcon}>💼</Text>
-              <View><Text style={[styles.roleTitle, selectedRole === 'EMPLOYER' && styles.roleTitleActive]}>Employer</Text><Text style={styles.roleHint}>Post jobs & hire</Text></View>
+            <Pressable onPress={() => setSelectedRole('EMPLOYER')} style={[styles.role, selectedRole === 'EMPLOYER' && styles.roleActive]}>
+              <Text style={styles.roleIcon}>💼</Text><Text style={styles.roleTitle}>Employer</Text><Text style={styles.roleHint}>Post jobs & hire</Text>{selectedRole === 'EMPLOYER' && <View style={styles.check}><Text>✓</Text></View>}
             </Pressable>
           </View>
-        </View>
 
-        <View style={styles.form}>
-          <Text style={styles.label}>Mobile or email</Text>
-          <TextInput value={identifier} onChangeText={setIdentifier} placeholder="9876543210 or you@example.com" placeholderTextColor={BrandColors.muted} autoCapitalize="none" keyboardType="email-address" style={styles.input} />
-          <Text style={styles.label}>Password</Text>
-          <TextInput value={password} onChangeText={setPassword} placeholder="Enter your password" placeholderTextColor={BrandColors.muted} secureTextEntry style={styles.input} />
-          <Pressable style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, loading && styles.disabled]} onPress={handleLogin} disabled={loading}>
-            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>Sign in as {selectedRole === 'WORKER' ? 'Worker' : 'Employer'}</Text>}
+          <Pressable onPress={handleLogin} disabled={loading} style={[styles.primary, loading && styles.disabled]}>
+            {loading ? <ActivityIndicator color={BrandColors.slate} /> : <><Text style={styles.primaryText}>Sign in</Text><Text style={styles.arrow}>→</Text></>}
           </Pressable>
-          <Pressable onPress={() => router.push('/register')} style={styles.secondaryButton}><Text style={styles.secondaryText}>New to WorkTrust? Create an account</Text></Pressable>
-          <Text style={styles.footer}>One app for workers and employers</Text>
+          <View style={styles.or}><View style={styles.line} /><Text style={styles.orText}>or</Text><View style={styles.line} /></View>
+          <Pressable onPress={() => router.push('/register')} style={styles.create}><Text style={styles.createText}>＋ Create an account</Text></Pressable>
+          <View style={styles.security}><Text style={styles.securityIcon}>♢</Text><View><Text style={styles.securityTitle}>Safe. Secure. Reliable.</Text><Text style={styles.securityText}>Your data is protected with industry-leading security.</Text></View></View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -122,52 +87,48 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BrandColors.background },
-  content: { paddingHorizontal: 22, paddingTop: 8, paddingBottom: 20 },
-  topRow: { flexDirection: 'row', alignItems: 'center' },
-  backButton: { width: 40, height: 40, borderRadius: 13, backgroundColor: BrandColors.surface, borderWidth: 1, borderColor: BrandColors.border, alignItems: 'center', justifyContent: 'center', marginRight: 10 },
-  backText: { fontSize: 30, lineHeight: 32, color: BrandColors.text },
-  brandName: { fontSize: 17, fontWeight: '900', color: BrandColors.text, letterSpacing: 0.8 },
-  brandTagline: { marginTop: 1, fontSize: 10, color: BrandColors.textSecondary },
-  heroVisual: { height: 255, marginTop: 20, borderRadius: 28, backgroundColor: BrandColors.burgundySoft, borderWidth: 1, borderColor: BrandColors.border, overflow: 'hidden', position: 'relative' },
-  skyGlow: { position: 'absolute', width: 205, height: 205, borderRadius: 103, backgroundColor: BrandColors.surface, opacity: 0.82, top: 28, left: 48 },
-  workerFigure: { position: 'absolute', left: 32, bottom: 4, width: 115, height: 220 },
-  workerHead: { position: 'absolute', left: 35, top: 8, width: 46, height: 46, borderRadius: 23, backgroundColor: BrandColors.burgundyDark },
-  workerBody: { position: 'absolute', left: 16, top: 52, width: 82, height: 125, borderRadius: 38, backgroundColor: BrandColors.burgundy },
-  workerArm: { position: 'absolute', left: 0, top: 82, width: 25, height: 88, borderRadius: 13, backgroundColor: BrandColors.burgundyDark, transform: [{ rotate: '22deg' }] },
-  workerTool: { position: 'absolute', left: 7, bottom: 0, width: 100, height: 17, borderRadius: 9, backgroundColor: BrandColors.rose },
-  employerFigure: { position: 'absolute', right: 28, bottom: 2, width: 115, height: 225 },
-  employerHead: { position: 'absolute', left: 35, top: 6, width: 46, height: 46, borderRadius: 23, backgroundColor: BrandColors.rose },
-  employerBody: { position: 'absolute', left: 14, top: 50, width: 84, height: 133, borderRadius: 37, backgroundColor: BrandColors.surface, borderWidth: 2, borderColor: BrandColors.border },
-  employerArm: { position: 'absolute', right: 0, top: 91, width: 25, height: 85, borderRadius: 13, backgroundColor: BrandColors.rose, transform: [{ rotate: '-22deg' }] },
-  verifiedCard: { position: 'absolute', left: 10, top: 14, flexDirection: 'row', alignItems: 'center', backgroundColor: BrandColors.surface, borderRadius: 13, padding: 8, paddingRight: 11, elevation: 3, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
-  checkCircle: { width: 28, height: 28, borderRadius: 9, backgroundColor: BrandColors.successSoft, alignItems: 'center', justifyContent: 'center', marginRight: 7 },
-  check: { color: BrandColors.success, fontSize: 15, fontWeight: '900' },
-  opportunityCard: { position: 'absolute', right: 9, top: 124, flexDirection: 'row', alignItems: 'center', backgroundColor: BrandColors.surface, borderRadius: 13, padding: 8, paddingRight: 10, elevation: 3, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
-  jobIcon: { width: 28, height: 28, borderRadius: 9, backgroundColor: BrandColors.burgundySoft, alignItems: 'center', justifyContent: 'center', marginRight: 7 },
-  jobIconText: { color: BrandColors.burgundy, fontSize: 16, fontWeight: '900' },
-  cardLabel: { fontSize: 7, fontWeight: '900', letterSpacing: 0.9, color: BrandColors.rose },
-  cardValue: { marginTop: 2, fontSize: 10, fontWeight: '800', color: BrandColors.text },
-  heading: { marginTop: 20, marginBottom: 13 },
-  eyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 1.6, color: BrandColors.rose, marginBottom: 6 },
-  title: { fontSize: 29, lineHeight: 35, fontWeight: '900', color: BrandColors.text, marginBottom: 6 },
-  subtitle: { fontSize: 14, lineHeight: 21, color: BrandColors.textSecondary },
-  roleSection: { marginBottom: 12 },
-  roleLabel: { fontSize: 13, fontWeight: '900', color: BrandColors.text, marginBottom: 8 },
-  roleSwitch: { flexDirection: 'row', gap: 8 },
-  roleButton: { flex: 1, minHeight: 64, flexDirection: 'row', alignItems: 'center', backgroundColor: BrandColors.surface, borderWidth: 1, borderColor: BrandColors.border, borderRadius: 14, paddingHorizontal: 10 },
-  roleButtonActive: { borderColor: BrandColors.burgundy, backgroundColor: BrandColors.burgundySoft },
-  roleIcon: { fontSize: 22, marginRight: 8 },
-  roleTitle: { fontSize: 14, fontWeight: '900', color: BrandColors.text },
-  roleTitleActive: { color: BrandColors.burgundy },
-  roleHint: { marginTop: 2, fontSize: 9, color: BrandColors.textSecondary },
-  form: { gap: 9 },
-  label: { fontSize: 13, fontWeight: '800', color: BrandColors.text, marginTop: 2 },
-  input: { height: 51, borderWidth: 1, borderColor: BrandColors.border, borderRadius: 14, backgroundColor: BrandColors.surface, paddingHorizontal: 15, fontSize: 15, color: BrandColors.text },
-  primaryButton: { height: 54, borderRadius: 15, backgroundColor: BrandColors.burgundy, alignItems: 'center', justifyContent: 'center', marginTop: 4, shadowColor: BrandColors.burgundy, shadowOpacity: 0.18, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 3 },
-  primaryText: { color: '#fff', fontSize: 16, fontWeight: '900' },
-  secondaryButton: { alignItems: 'center', paddingVertical: 9 },
-  secondaryText: { color: BrandColors.burgundy, fontSize: 13, fontWeight: '800' },
-  footer: { textAlign: 'center', fontSize: 11, color: BrandColors.muted, marginTop: 1 },
-  pressed: { opacity: 0.84 },
-  disabled: { opacity: 0.6 },
+  content: { paddingHorizontal: 18, paddingTop: 8, paddingBottom: 24 },
+  header: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  back: { width: 40, height: 40, borderRadius: 13, backgroundColor: BrandColors.slateSoft, borderWidth: 1, borderColor: BrandColors.slateBorder, alignItems: 'center', justifyContent: 'center', marginRight: 9 },
+  backText: { color: BrandColors.gold, fontSize: 30, lineHeight: 32 },
+  logo: { width: 42, height: 42, borderRadius: 13, backgroundColor: BrandColors.gold, alignItems: 'center', justifyContent: 'center', marginRight: 9 },
+  logoText: { color: BrandColors.slate, fontSize: 24, fontWeight: '900' },
+  brand: { color: BrandColors.text, fontSize: 18, fontWeight: '900' },
+  tagline: { color: BrandColors.muted, fontSize: 10, marginTop: 1 },
+  hero: { height: 255, borderRadius: 27, overflow: 'hidden', position: 'relative', borderWidth: 1, borderColor: BrandColors.slateBorder },
+  heroShade: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(7,12,16,.52)' },
+  heroTop: { alignItems: 'center', paddingTop: 24 },
+  wMark: { color: BrandColors.gold, fontSize: 48, lineHeight: 48, fontWeight: '900' },
+  heroBrand: { color: '#fff', fontSize: 27, fontWeight: '900', marginTop: 1 },
+  heroTag: { color: '#E1E6EA', fontSize: 11, marginTop: 3 },
+  card: { backgroundColor: BrandColors.slateSoft, borderRadius: 27, borderWidth: 1, borderColor: BrandColors.slateBorder, padding: 20, marginTop: -12, zIndex: 2 },
+  welcome: { color: BrandColors.gold, fontSize: 13, fontWeight: '800' },
+  title: { color: BrandColors.text, fontSize: 27, lineHeight: 32, fontWeight: '900', marginTop: 4 },
+  subtitle: { color: BrandColors.textSecondary, fontSize: 13, lineHeight: 19, marginTop: 5, marginBottom: 15 },
+  inputWrap: { height: 54, borderWidth: 1, borderColor: BrandColors.slateBorder, borderRadius: 14, backgroundColor: BrandColors.slate, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 13, marginBottom: 9 },
+  inputIcon: { color: BrandColors.gold, fontSize: 21, width: 26 },
+  input: { flex: 1, color: BrandColors.text, fontSize: 15 },
+  forgot: { alignItems: 'flex-end', marginBottom: 16 },
+  forgotText: { color: BrandColors.gold, fontSize: 12, fontWeight: '800' },
+  roleLabel: { color: BrandColors.text, fontSize: 14, fontWeight: '900', marginBottom: 9 },
+  roles: { flexDirection: 'row', gap: 9, marginBottom: 14 },
+  role: { flex: 1, minHeight: 125, borderWidth: 1, borderColor: BrandColors.slateBorder, borderRadius: 16, backgroundColor: BrandColors.slate, padding: 12, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  roleActive: { borderColor: BrandColors.gold, backgroundColor: BrandColors.goldSoft },
+  roleIcon: { fontSize: 28, marginBottom: 5 },
+  roleTitle: { color: BrandColors.gold, fontSize: 15, fontWeight: '900' },
+  roleHint: { color: BrandColors.textSecondary, fontSize: 10, marginTop: 3, textAlign: 'center' },
+  check: { position: 'absolute', right: 8, top: 8, width: 22, height: 22, borderRadius: 11, backgroundColor: BrandColors.gold, alignItems: 'center', justifyContent: 'center' },
+  primary: { height: 56, borderRadius: 15, backgroundColor: BrandColors.gold, alignItems: 'center', justifyContent: 'center', flexDirection: 'row' },
+  primaryText: { color: BrandColors.slate, fontSize: 17, fontWeight: '900' },
+  arrow: { color: BrandColors.slate, position: 'absolute', right: 20, fontSize: 27 },
+  disabled: { opacity: .6 },
+  or: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 14 },
+  line: { flex: 1, height: 1, backgroundColor: BrandColors.slateBorder },
+  orText: { color: BrandColors.muted, fontSize: 11 },
+  create: { height: 52, borderWidth: 1, borderColor: BrandColors.gold, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  createText: { color: BrandColors.gold, fontSize: 14, fontWeight: '900' },
+  security: { flexDirection: 'row', alignItems: 'center', marginTop: 17, paddingTop: 15, borderTopWidth: 1, borderTopColor: BrandColors.slateBorder },
+  securityIcon: { width: 38, height: 38, borderRadius: 19, backgroundColor: BrandColors.goldSoft, color: BrandColors.gold, textAlign: 'center', lineHeight: 38, fontSize: 21, marginRight: 10 },
+  securityTitle: { color: BrandColors.text, fontSize: 12, fontWeight: '900' },
+  securityText: { color: BrandColors.muted, fontSize: 9, marginTop: 3 },
 });
