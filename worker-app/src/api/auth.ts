@@ -1,12 +1,14 @@
 import { api, setAccessToken } from './client';
 
-export interface WorkerUser {
+export type AppRole = 'WORKER' | 'EMPLOYER' | 'SUPERADMIN' | 'ADMIN' | string;
+
+export interface AuthUser {
   id: string;
-  email: string;
+  email?: string | null;
   firstName?: string | null;
   lastName?: string | null;
   phone?: string | null;
-  roles?: string[];
+  roles?: AppRole[];
 }
 
 export interface WorkerSummary {
@@ -14,13 +16,21 @@ export interface WorkerSummary {
   workerCode?: string;
   profileCompletion?: number;
   verificationStatus?: string;
+  verificationScore?: number | null;
+}
+
+export interface EmployerSummary {
+  id: string;
+  companyName?: string | null;
+  status?: string;
 }
 
 export interface AuthResponse {
   accessToken: string;
   refreshToken?: string;
-  user: WorkerUser;
+  user: AuthUser;
   worker?: WorkerSummary;
+  employer?: EmployerSummary;
 }
 
 export interface RegisterInput {
@@ -31,19 +41,22 @@ export interface RegisterInput {
   password: string;
 }
 
+/** Unified mobile login. The backend returns every role available to the user. */
+export async function login(identifier: string, password: string) {
+  const { data } = await api.post<AuthResponse>('/auth/login', { identifier, password });
+  setAccessToken(data.accessToken);
+  return data;
+}
+
 export async function registerWorker(input: RegisterInput) {
   const { data } = await api.post<AuthResponse>('/auth/worker/register', input);
   setAccessToken(data.accessToken);
   return data;
 }
 
+/** Kept for compatibility with older worker-only screens. */
 export async function loginWorker(identifier: string, password: string) {
-  const { data } = await api.post<AuthResponse>('/auth/worker/login', {
-    identifier,
-    password,
-  });
-  setAccessToken(data.accessToken);
-  return data;
+  return login(identifier, password);
 }
 
 export function logoutWorker() {
