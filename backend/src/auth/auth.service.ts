@@ -57,6 +57,24 @@ export class AuthService {
     if (String(user.employer.status) !== 'ACTIVE') throw new UnauthorizedException('Employer account is awaiting approval');
     return { ...(await this.generateAuthTokens(user.id, user.email || user.phone, roles)), employer: { id: user.employer.id, companyName: user.employer.companyName, status: user.employer.status } };
   }
+  async mobileLogin(identifier: string, password: string) {
+    const normalizedIdentifier = identifier.trim().toLowerCase();
+    const user = await this.prisma.user.findFirst({ where: { OR: [{ email: normalizedIdentifier }, { phone: identifier.trim() }] }, include: { roles: { include: { role: true } }, worker: true, employer: true } });
+    if (!user || !user.passwordHash) throw new UnauthorizedException('Invalid email/phone or password');
+    if (!(await bcrypt.compare(password, user.passwordHash))) throw new UnauthorizedException('Invalid email/phone or password');
+    if (user.status !== 'ACTIVE') throw new UnauthorizedException('User account is not active');
+    const roles = user.roles.map((userRole) => userRole.role.name);
+    const hasWorker = roles.includes('WORKER') && !!user.worker;
+    const hasEmployer = roles.includes('EMPLOYER') && !!user.employer && String(user.employer.status) === 'ACTIVE';
+    if (!hasWorker && !hasEmployer) {
+      if (roles.includes('EMPLOYER') && user.employer && String(user.employer.status) !== 'ACTIVE') throw new UnauthorizedException('Employer account is awaiting approval');
+      throw new UnauthorizedException('User does not have an active mobile role');
+    }
+    const response: any = { ...(await this.generateAuthTokens(user.id, user.email || user.phone, roles)), worker: undefined, employer: undefined };
+    if (hasWorker) response.worker = { id: user.worker!.id, workerCode: user.worker!.workerCode, profileCompletion: user.worker!.profileCompletion, verificationStatus: user.worker!.verificationStatus, verificationScore: user.worker!.verificationScore };
+    if (hasEmployer) response.employer = { id: user.employer!.id, companyName: user.employer!.companyName, status: user.employer!.status };
+    return response;
+  }
   async getAdminPermissions(userId: string) { return this.permissionService.getUserPermissions(userId); }
   private async generateWorkerCode(tx: any) {
     for (let attempt = 0; attempt < 5; attempt += 1) { const workerCode = `WRK${Date.now().toString().slice(-8)}${Math.floor(Math.random() * 100).toString().padStart(2, '0')}`; if (!(await tx.worker.findUnique({ where: { workerCode }, select: { id: true } }))) return workerCode; }
