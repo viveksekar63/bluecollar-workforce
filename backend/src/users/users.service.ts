@@ -15,7 +15,7 @@ import { EmployerStatus } from "@prisma/client";
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async findAll(query: UsersQueryDto) {
     const page = query.page ?? 1;
@@ -135,7 +135,12 @@ export class UsersService {
       if (isEmployer && user.employer) {
         await tx.employer.update({
           where: { id: user.employer.id },
-          data: { status: status === "ACTIVE" ? EmployerStatus.ACTIVE : EmployerStatus.SUSPENDED },
+          data: {
+            status:
+              status === "ACTIVE"
+                ? EmployerStatus.VERIFIED
+                : EmployerStatus.SUSPENDED,
+          }
         });
       }
       return result;
@@ -152,7 +157,14 @@ export class UsersService {
       await tx.userRole.deleteMany({ where: { userId: id } });
       if (dto.roleIds.length) await tx.userRole.createMany({ data: dto.roleIds.map((roleId) => ({ userId: id, roleId })) });
       if (isEmployer && !user.employer) {
-        await tx.employer.create({ data: { userId: id, companyName: `${user.firstName}${user.lastName ? ` ${user.lastName}` : ""}`.trim(), status: user.status === "ACTIVE" ? EmployerStatus.ACTIVE : EmployerStatus.PENDING } });
+        await tx.employer.create({
+          data: {
+            userId: id, companyName: `${user.firstName}${user.lastName ? ` ${user.lastName}` : ""}`.trim(), status:
+              user.status === "ACTIVE"
+                ? EmployerStatus.VERIFIED
+                : EmployerStatus.PENDING
+          }
+        });
       } else if (!isEmployer && user.employer) {
         await tx.employer.delete({ where: { id: user.employer.id } });
       }

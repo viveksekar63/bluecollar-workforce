@@ -347,13 +347,16 @@ export default function EmployersPage() {
                       <th className="px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Jobs</th>
                       <th className="px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Status</th>
                       <th className="px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Created</th>
+                      <th className="px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                        Actions
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {loading ? (
-                      <tr><td colSpan={6} className="px-5 py-16 text-center text-sm text-slate-500"><span className="inline-flex items-center gap-2"><Loader2 size={16} className="animate-spin" /> Loading employers...</span></td></tr>
+                      <tr><td colSpan={7} className="px-5 py-16 text-center text-sm text-slate-500"><span className="inline-flex items-center gap-2"><Loader2 size={16} className="animate-spin" /> Loading employers...</span></td></tr>
                     ) : employers.length === 0 ? (
-                      <tr><td colSpan={6} className="px-5 py-16 text-center"><div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400"><Building2 size={22} /></div><p className="mt-3 text-sm font-semibold text-slate-900">No employers found</p><p className="mt-1 text-xs text-slate-500">Create your first employer using the Add Employer button.</p></td></tr>
+                      <tr><td colSpan={7} className="px-5 py-16 text-center"><div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400"><Building2 size={22} /></div><p className="mt-3 text-sm font-semibold text-slate-900">No employers found</p><p className="mt-1 text-xs text-slate-500">Create your first employer using the Add Employer button.</p></td></tr>
                     ) : (
                       employers.map((employer) => (
                         <tr key={employer.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/70">
@@ -368,6 +371,14 @@ export default function EmployersPage() {
                           <td className="px-5 py-4 text-sm font-semibold text-slate-800">{employer._count?.jobs ?? 0}</td>
                           <td className="px-5 py-4"><StatusBadge status={employer.status} /></td>
                           <td className="px-5 py-4 text-xs text-slate-500">{formatDate(employer.createdAt)}</td>
+                          <td className="px-5 py-4">
+                            <a
+                              href={`/employers/${employer.id}`}
+                              className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                            >
+                              View
+                            </a>
+                          </td>
                         </tr>
                       ))
                     )}

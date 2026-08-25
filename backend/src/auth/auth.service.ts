@@ -7,6 +7,7 @@ import { PERMISSIONS } from './permissions/permissions';
 import { generateRefreshToken, hashRefreshToken } from './utils/token.utils';
 import { PermissionService } from './permissions/permission.service';
 import { WorkerRegisterDto } from './dto/worker-register.dto';
+import { EmployerStatus } from '@prisma/client';
 
 @Injectable()
 export class AuthService {
@@ -67,7 +68,7 @@ export class AuthService {
     const hasWorker = roles.includes('WORKER') && !!user.worker;
     const hasEmployer = roles.includes('EMPLOYER') && !!user.employer && String(user.employer.status) === 'ACTIVE';
     if (!hasWorker && !hasEmployer) {
-      if (roles.includes('EMPLOYER') && user.employer && String(user.employer.status) !== 'ACTIVE') throw new UnauthorizedException('Employer account is awaiting approval');
+      if (roles.includes('EMPLOYER') && user.employer && String(user.employer.status) !== EmployerStatus.VERIFIED) throw new UnauthorizedException('Employer account is awaiting approval');
       throw new UnauthorizedException('User does not have an active mobile role');
     }
     const response: any = { ...(await this.generateAuthTokens(user.id, user.email || user.phone, roles)), worker: undefined, employer: undefined };
