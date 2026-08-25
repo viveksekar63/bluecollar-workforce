@@ -7,17 +7,17 @@
   --font-rounded: 'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif;
   --font-serif: Georgia, 'Times New Roman', serif;
 
-  /* WorkTrust brand palette */
-  --brand-blush: #E18C88;
-  --brand-rose: #B86F77;
-  --brand-burgundy: #713442;
-  --brand-burgundy-dark: #5D2938;
-  --brand-burgundy-soft: #F6E7E8;
-  --brand-blush-soft: #FBEFEE;
-  --brand-text: #18233D;
-  --brand-text-secondary: #6F6870;
-  --brand-background: #FAF8F8;
-  --brand-surface: #FFFFFF;
-  --brand-border: #E8DADC;
-  --brand-success: #20A77A;
+  /* WorkTrust dark slate + gold brand palette */
+  --brand-slate: #0D141A;
+  --brand-slate-soft: #151E26;
+  --brand-slate-elevated: #1B2731;
+  --brand-gold: #F4B93F;
+  --brand-gold-bright: #FFC95A;
+  --brand-gold-soft: #2C2414;
+  --brand-text: #FFFFFF;
+  --brand-text-secondary: #C2CBD2;
+  --brand-background: #0D141A;
+  --brand-surface: #151E26;
+  --brand-border: #34424D;
+  --brand-success: #39C58A;
 }
