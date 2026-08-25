@@ -1,22 +1,37 @@
 import { create } from 'zustand';
 
-import { WorkerSummary, WorkerUser, logoutWorker } from '@/api/auth';
+import { AuthUser, EmployerSummary, WorkerSummary, logoutWorker } from '@/api/auth';
+
+export type MobileRole = 'WORKER' | 'EMPLOYER';
 
 interface AuthState {
   accessToken: string | null;
-  user: WorkerUser | null;
+  user: AuthUser | null;
   worker: WorkerSummary | null;
-  setSession: (accessToken: string, user: WorkerUser, worker?: WorkerSummary) => void;
+  employer: EmployerSummary | null;
+  activeRole: MobileRole | null;
+  setSession: (accessToken: string, user: AuthUser, worker?: WorkerSummary, employer?: EmployerSummary) => void;
+  setActiveRole: (role: MobileRole) => void;
   clearSession: () => void;
+}
+
+function availableRoles(user: AuthUser): MobileRole[] {
+  return (user.roles ?? []).filter((role): role is MobileRole => role === 'WORKER' || role === 'EMPLOYER');
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
   accessToken: null,
   user: null,
   worker: null,
-  setSession: (accessToken, user, worker) => set({ accessToken, user, worker: worker ?? null }),
+  employer: null,
+  activeRole: null,
+  setSession: (accessToken, user, worker, employer) => {
+    const roles = availableRoles(user);
+    set({ accessToken, user, worker: worker ?? null, employer: employer ?? null, activeRole: roles.length === 1 ? roles[0] : null });
+  },
+  setActiveRole: (activeRole) => set({ activeRole }),
   clearSession: () => {
     logoutWorker();
-    set({ accessToken: null, user: null, worker: null });
+    set({ accessToken: null, user: null, worker: null, employer: null, activeRole: null });
   },
 }));
