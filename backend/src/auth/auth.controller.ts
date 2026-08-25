@@ -9,24 +9,19 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('admin/login')
-  async login(@Body() body: { email: string; password: string }) {
-    return this.authService.adminLogin(body.email, body.password);
-  }
+  async login(@Body() body: { email: string; password: string }) { return this.authService.adminLogin(body.email, body.password); }
+
+  @Post('login')
+  async mobileLogin(@Body() body: { identifier: string; password: string }) { return this.authService.mobileLogin(body.identifier, body.password); }
 
   @Post('worker/register')
-  async workerRegister(@Body() dto: WorkerRegisterDto) {
-    return this.authService.workerRegister(dto);
-  }
+  async workerRegister(@Body() dto: WorkerRegisterDto) { return this.authService.workerRegister(dto); }
 
   @Post('worker/login')
-  async workerLogin(@Body() body: { identifier: string; password: string }) {
-    return this.authService.workerLogin(body.identifier, body.password);
-  }
+  async workerLogin(@Body() body: { identifier: string; password: string }) { return this.authService.workerLogin(body.identifier, body.password); }
 
   @Post('employer/login')
-  async employerLogin(@Body() body: { identifier: string; password: string }) {
-    return this.authService.employerLogin(body.identifier, body.password);
-  }
+  async employerLogin(@Body() body: { identifier: string; password: string }) { return this.authService.employerLogin(body.identifier, body.password); }
 
   @Post('refresh')
   async refresh(@Body() dto: RefreshTokenDto) { return this.authService.refreshToken(dto.refreshToken); }
