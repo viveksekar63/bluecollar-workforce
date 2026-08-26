@@ -9,6 +9,7 @@ export default function RootLayout() {
         <Stack.Screen name="index" />
         <Stack.Screen name="login" />
         <Stack.Screen name="register" />
+        <Stack.Screen name="register-otp" />
         <Stack.Screen name="role-select" />
         <Stack.Screen name="employer-home" />
         <Stack.Screen name="employer-jobs" />
