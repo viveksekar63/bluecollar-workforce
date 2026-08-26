@@ -157,7 +157,6 @@ export class EmployerPaymentService {
           currency: 'INR',
           receipt: `job_${job.id}_${Date.now()}`.slice(0, 40),
           notes: { jobId: job.id, employerId },
-          capture: 'automatic',
         },
         { auth: { username: keyId, password: keySecret } },
       );
