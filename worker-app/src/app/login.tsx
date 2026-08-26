@@ -14,6 +14,7 @@ type LoginRole = 'WORKER' | 'EMPLOYER';
 export default function LoginScreen() {
   const { height } = useWindowDimensions();
   const setSession = useAuthStore((state) => state.setSession);
+  const setActiveRole = useAuthStore((state) => state.setActiveRole);
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [selectedRole, setSelectedRole] = useState<LoginRole>('WORKER');
@@ -26,15 +27,22 @@ export default function LoginScreen() {
     }
     try {
       setLoading(true);
-      const response = await login(identifier.trim(), password);
+      const response = await login(identifier.trim(), password, selectedRole);
       setAccessToken(response.accessToken);
       setSession(response.accessToken, response.user, response.worker, response.employer);
-      const roles = response.user.roles ?? [];
-      if (roles.includes(selectedRole)) router.replace(selectedRole === 'EMPLOYER' ? '/employer-home' : '/home');
-      else if (roles.includes('WORKER') && roles.includes('EMPLOYER')) router.replace('/role-select');
-      else if (roles.includes('EMPLOYER')) router.replace('/employer-home');
-      else if (roles.includes('WORKER')) router.replace('/home');
-      else Alert.alert('Access unavailable', 'Your account does not have worker or employer mobile access.');
+
+      // The backend validates the selected role against the authenticated account
+      // and returns the role that should be active for this session.
+      const activeRole = response.activeRole;
+      if (activeRole) setActiveRole(activeRole);
+
+      if (activeRole === 'EMPLOYER') {
+        router.replace('/employer-home');
+      } else if (activeRole === 'WORKER') {
+        router.replace('/home');
+      } else {
+        Alert.alert('Access unavailable', 'Your account does not have worker or employer mobile access.');
+      }
     } catch (error: any) {
       Alert.alert('Login failed', error?.response?.data?.message ?? 'Unable to connect to the authentication service.');
     } finally {

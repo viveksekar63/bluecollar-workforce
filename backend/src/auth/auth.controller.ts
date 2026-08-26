@@ -12,7 +12,9 @@ export class AuthController {
   async login(@Body() body: { email: string; password: string }) { return this.authService.adminLogin(body.email, body.password); }
 
   @Post('login')
-  async mobileLogin(@Body() body: { identifier: string; password: string }) { return this.authService.mobileLogin(body.identifier, body.password); }
+  async mobileLogin(@Body() body: { identifier: string; password: string; role?: 'WORKER' | 'EMPLOYER' }) {
+    return this.authService.mobileLogin(body.identifier, body.password, body.role);
+  }
 
   @Post('worker/register')
   async workerRegister(@Body() dto: WorkerRegisterDto) { return this.authService.workerRegister(dto); }
