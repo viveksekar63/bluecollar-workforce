@@ -36,11 +36,29 @@ export interface AuthResponse {
 }
 
 export interface RegisterInput {
+  role: MobileRole;
   firstName: string;
   lastName: string;
   phone: string;
   email: string;
   password: string;
+  companyName?: string;
+}
+
+export interface RegistrationOtpResponse {
+  message: string;
+  phone: string;
+  expiresInSeconds: number;
+  devOtp?: string;
+}
+
+export interface RegistrationVerifyResponse {
+  success: boolean;
+  role: MobileRole;
+  requiresApproval: boolean;
+  message: string;
+  user: AuthUser;
+  roles: AppRole[];
 }
 
 /** Unified mobile login. The selected role is validated by the backend and returned as activeRole. */
@@ -50,7 +68,17 @@ export async function login(identifier: string, password: string, role: MobileRo
   return data;
 }
 
-export async function registerWorker(input: RegisterInput) {
+export async function requestRegistrationOtp(input: RegisterInput) {
+  const { data } = await api.post<RegistrationOtpResponse>('/auth/register/request-otp', input);
+  return data;
+}
+
+export async function verifyRegistrationOtp(phone: string, otp: string) {
+  const { data } = await api.post<RegistrationVerifyResponse>('/auth/register/verify-otp', { phone, otp });
+  return data;
+}
+
+export async function registerWorker(input: Omit<RegisterInput, 'role' | 'companyName'>) {
   const { data } = await api.post<AuthResponse>('/auth/worker/register', input);
   setAccessToken(data.accessToken);
   return data;
