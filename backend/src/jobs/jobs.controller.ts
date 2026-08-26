@@ -52,6 +52,12 @@ class CreatePaymentMethodDto {
   @IsOptional() @IsString() upiId?: string;
 }
 
+class VerifyJobPaymentDto {
+  @IsString() razorpayOrderId!: string;
+  @IsString() razorpayPaymentId!: string;
+  @IsString() razorpaySignature!: string;
+}
+
 @Controller('jobs')
 @UseGuards(JwtAuthGuard)
 export class JobsController {
@@ -99,6 +105,24 @@ export class JobsController {
     @Body() dto: CreatePaymentMethodDto,
   ) {
     return this.employerPaymentService.create(user.userId, dto);
+  }
+
+  @Post('employer/:id/payment/order')
+  async createJobPaymentOrder(
+    @CurrentUser() user: { userId: string },
+    @Param('id') jobId: string,
+  ) {
+    return this.employerPaymentService.createJobPublishOrder(user.userId, jobId);
+  }
+
+  @Post('employer/:id/payment/verify')
+  async verifyJobPayment(
+    @CurrentUser() user: { userId: string },
+    @Param('id') jobId: string,
+    @Body() dto: VerifyJobPaymentDto,
+  ) {
+    await this.employerPaymentService.verifyJobPublishPayment(user.userId, jobId, dto);
+    return this.jobsService.publishEmployerJob(user.userId, jobId);
   }
 
   @Post('employer')
