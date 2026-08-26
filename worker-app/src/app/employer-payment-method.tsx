@@ -1,123 +1,173 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
-  createEmployerPaymentMethod,
-  EmployerPaymentMethod,
-  getEmployerPaymentMethods,
-  publishEmployerJob,
+  createJobPublishPaymentOrder,
+  verifyJobPublishPayment,
+  EmployerJobPaymentOrder,
 } from '@/api/employer-jobs';
 import { BrandColors } from '@/constants/theme';
 
-const TYPES: Array<{ key: EmployerPaymentMethod['type']; title: string; hint: string }> = [
-  { key: 'UPI', title: 'UPI', hint: 'Recommended for quick payments' },
-  { key: 'CARD', title: 'Card', hint: 'Credit or debit card' },
-  { key: 'BANK_ACCOUNT', title: 'Bank', hint: 'Business bank account' },
-];
+declare global {
+  interface Window {
+    Razorpay?: any;
+  }
+}
+
+async function loadRazorpayWebCheckout() {
+  if (typeof window === 'undefined') throw new Error('Web payment is unavailable here.');
+  if (window.Razorpay) return window.Razorpay;
+
+  await new Promise<void>((resolve, reject) => {
+    const existing = document.querySelector('script[data-razorpay-checkout]');
+    if (existing) {
+      existing.addEventListener('load', () => resolve(), { once: true });
+      existing.addEventListener('error', () => reject(new Error('Unable to load Razorpay checkout.')), { once: true });
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    script.dataset.razorpayCheckout = 'true';
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Unable to load Razorpay checkout.'));
+    document.body.appendChild(script);
+  });
+
+  if (!window.Razorpay) throw new Error('Razorpay checkout is unavailable.');
+  return window.Razorpay;
+}
 
 export default function EmployerPaymentMethodScreen() {
   const { jobId } = useLocalSearchParams<{ jobId?: string }>();
-  const [methods, setMethods] = useState<EmployerPaymentMethod[]>([]);
-  const [type, setType] = useState<EmployerPaymentMethod['type']>('UPI');
-  const [label, setLabel] = useState('Primary payment method');
-  const [last4, setLast4] = useState('');
-  const [upiId, setUpiId] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(true);
+  const [order, setOrder] = useState<EmployerJobPaymentOrder | null>(null);
 
   const load = useCallback(async () => {
-    try {
-      setMethods(await getEmployerPaymentMethods());
-    } catch (e: any) {
-      Alert.alert('Unable to load payment methods', e?.response?.data?.message ?? 'Please try again.');
-    } finally {
-      setLoading(false);
+    if (!jobId) {
+      setChecking(false);
+      return;
     }
-  }, []);
+
+    try {
+      const created = await createJobPublishPaymentOrder(String(jobId));
+      setOrder(created);
+    } catch (e: any) {
+      Alert.alert('Unable to start payment', e?.response?.data?.message ?? 'Please try again.');
+    } finally {
+      setChecking(false);
+    }
+  }, [jobId]);
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
-  async function save() {
-    try {
-      setSaving(true);
-      await createEmployerPaymentMethod({
-        type,
-        label: label.trim(),
-        provider: 'WorkTrust',
-        last4: type === 'UPI' ? undefined : last4.trim(),
-        upiId: type === 'UPI' ? upiId.trim() : undefined,
-      });
+  async function completePayment(result: { razorpayOrderId: string; razorpayPaymentId: string; razorpaySignature: string }) {
+    if (!jobId) return;
+    await verifyJobPublishPayment(String(jobId), result);
+    Alert.alert('Payment successful', 'Payment verified and your job is now published.', [
+      { text: 'View job', onPress: () => router.replace({ pathname: '/employer-job-details', params: { id: String(jobId) } }) },
+    ]);
+  }
 
-      if (jobId) {
-        await publishEmployerJob(String(jobId));
-        Alert.alert('Job published', 'Your payment method is ready and the job is now open to workers.', [
-          { text: 'View job', onPress: () => router.replace({ pathname: '/employer-job-details', params: { id: String(jobId) } }) },
-        ]);
+  async function pay() {
+    if (!jobId || !order || loading) return;
+
+    try {
+      setLoading(true);
+
+      if (Platform.OS === 'web') {
+        const Razorpay = await loadRazorpayWebCheckout();
+        const checkout = new Razorpay({
+          key: order.keyId,
+          amount: String(order.amount),
+          currency: order.currency,
+          name: 'WorkTrust',
+          description: `Publish job: ${order.jobTitle}`,
+          order_id: order.orderId,
+          theme: { color: '#F7B93E' },
+          modal: { confirm_close: true, escape: true },
+          handler: async (response: any) => {
+            try {
+              await completePayment({
+                razorpayOrderId: response.razorpay_order_id,
+                razorpayPaymentId: response.razorpay_payment_id,
+                razorpaySignature: response.razorpay_signature,
+              });
+            } catch (e: any) {
+              Alert.alert('Payment verification failed', e?.response?.data?.message ?? 'Please contact support if money was deducted.');
+            } finally {
+              setLoading(false);
+            }
+          },
+        });
+        checkout.open();
         return;
       }
 
-      setLast4('');
-      setUpiId('');
-      await load();
-      Alert.alert('Payment method added', 'Your payment method is ready for job publishing.');
+      // Native Android/iOS uses Razorpay's official React Native SDK.
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const RazorpayCheckout = require('react-native-razorpay').default;
+      const response = await RazorpayCheckout.open({
+        description: `Publish job: ${order.jobTitle}`,
+        currency: order.currency,
+        key: order.keyId,
+        amount: String(order.amount),
+        name: 'WorkTrust',
+        order_id: order.orderId,
+        theme: { color: '#F7B93E' },
+      });
+
+      await completePayment({
+        razorpayOrderId: response.razorpay_order_id,
+        razorpayPaymentId: response.razorpay_payment_id,
+        razorpaySignature: response.razorpay_signature,
+      });
     } catch (e: any) {
-      Alert.alert('Unable to continue', e?.response?.data?.message ?? 'Please check the details and try again.');
+      if (e?.code === 2 || e?.description === 'Payment cancelled') {
+        Alert.alert('Payment cancelled', 'Your job remains in draft.');
+      } else {
+        Alert.alert('Payment failed', e?.response?.data?.message ?? e?.description ?? e?.message ?? 'Please try again.');
+      }
     } finally {
-      setSaving(false);
+      setLoading(false);
     }
   }
 
   return <SafeAreaView style={styles.container}>
-    <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.header}>
         <Pressable onPress={() => router.back()}><Text style={styles.back}>‹</Text></Pressable>
         <View style={styles.headerCopy}>
           <Text style={styles.eyebrow}>EMPLOYER</Text>
-          <Text style={styles.title}>Payment method</Text>
-          <Text style={styles.subtitle}>Add a secure payment method before publishing a job.</Text>
+          <Text style={styles.title}>Payment to publish</Text>
+          <Text style={styles.subtitle}>Complete the secure payment to make your job visible to workers.</Text>
         </View>
       </View>
 
-      {loading ? <ActivityIndicator color={BrandColors.gold} /> : <>
-        {methods.length > 0 && <View style={styles.savedCard}>
-          <Text style={styles.sectionTitle}>Saved methods</Text>
-          {methods.map((method) => <View key={method.id} style={styles.methodRow}>
-            <View style={styles.methodIcon}><Text style={styles.methodIconText}>{method.type === 'UPI' ? '₹' : method.type === 'CARD' ? '▣' : '⌂'}</Text></View>
-            <View style={styles.methodCopy}>
-              <Text style={styles.methodLabel}>{method.label}</Text>
-              <Text style={styles.methodMeta}>{method.type === 'UPI' ? method.upiId : `•••• ${method.last4}`}</Text>
-            </View>
-            {method.isDefault && <Text style={styles.default}>DEFAULT</Text>}
-          </View>)}
-        </View>}
+      {checking ? <View style={styles.loading}><ActivityIndicator color={BrandColors.gold} /><Text style={styles.loadingText}>Preparing secure checkout…</Text></View> : !jobId ? <View style={styles.card}><Text style={styles.sectionTitle}>No job selected</Text><Text style={styles.note}>Return to a draft job and choose Publish Job again.</Text></View> : order ? <>
+        <View style={styles.summary}>
+          <Text style={styles.summaryLabel}>JOB PUBLISHING FEE</Text>
+          <Text style={styles.amount}>₹{order.amountInr.toLocaleString('en-IN')}</Text>
+          <Text style={styles.jobTitle}>{order.jobTitle}</Text>
+          <Text style={styles.note}>Payment is processed securely by Razorpay. WorkTrust does not store card numbers, CVV or UPI credentials.</Text>
+        </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Add payment method</Text>
-          <Text style={styles.note}>For security, WorkTrust does not store full card numbers or CVV.</Text>
-
-          <View style={styles.typeRow}>
-            {TYPES.map((item) => <Pressable key={item.key} onPress={() => setType(item.key)} style={[styles.typeButton, type === item.key && styles.typeButtonActive]}>
-              <Text style={[styles.typeTitle, type === item.key && styles.typeTitleActive]}>{item.title}</Text>
-              <Text style={styles.typeHint}>{item.hint}</Text>
-            </Pressable>)}
-          </View>
-
-          <Field label="Payment method name" value={label} onChangeText={setLabel} placeholder="Primary payment method" />
-          {type === 'UPI' ? <Field label="UPI ID" value={upiId} onChangeText={setUpiId} placeholder="business@upi" autoCapitalize="none" /> : <Field label={type === 'CARD' ? 'Last 4 digits' : 'Account last 4 digits'} value={last4} onChangeText={setLast4} placeholder="1234" keyboardType="number-pad" maxLength={4} />}
-
-          <Pressable disabled={saving} style={styles.primary} onPress={save}>
-            <Text style={styles.primaryText}>{saving ? 'Saving...' : jobId ? 'Save & Publish Job' : 'Save payment method'}</Text>
+          <Text style={styles.sectionTitle}>Secure payment</Text>
+          <Text style={styles.note}>Choose UPI, card, net banking or another method available in your Razorpay checkout.</Text>
+          <Pressable disabled={loading} onPress={pay} style={[styles.primary, loading && styles.disabled]}>
+            {loading ? <ActivityIndicator color={BrandColors.slate} /> : <Text style={styles.primaryText}>Pay ₹{order.amountInr.toLocaleString('en-IN')} & Publish</Text>}
           </Pressable>
         </View>
-      </>}
+      </> : null}
+
+      <Text style={styles.security}>Safe. Secure. Verified payment.</Text>
     </ScrollView>
   </SafeAreaView>;
-}
-
-function Field({ label, ...props }: any) {
-  return <View style={styles.field}><Text style={styles.label}>{label}</Text><TextInput {...props} placeholderTextColor={BrandColors.muted} style={styles.input} /></View>;
 }
 
 const styles = StyleSheet.create({
@@ -129,26 +179,17 @@ const styles = StyleSheet.create({
   eyebrow: { color: BrandColors.gold, fontSize: 11, fontWeight: '900', letterSpacing: 1.4 },
   title: { color: BrandColors.text, fontSize: 27, fontWeight: '900', marginTop: 3 },
   subtitle: { color: BrandColors.textSecondary, fontSize: 13, lineHeight: 19, marginTop: 5 },
-  savedCard: { backgroundColor: BrandColors.slateSoft, borderColor: BrandColors.slateBorder, borderWidth: 1, borderRadius: 18, padding: 15, marginBottom: 14 },
-  card: { backgroundColor: BrandColors.slateSoft, borderColor: BrandColors.slateBorder, borderWidth: 1, borderRadius: 18, padding: 15 },
+  loading: { alignItems: 'center', paddingVertical: 40 },
+  loadingText: { color: BrandColors.textSecondary, marginTop: 10, fontSize: 12 },
+  summary: { backgroundColor: BrandColors.slateSoft, borderColor: BrandColors.gold, borderWidth: 1, borderRadius: 20, padding: 18, marginBottom: 14 },
+  summaryLabel: { color: BrandColors.gold, fontSize: 10, fontWeight: '900', letterSpacing: 1.2 },
+  amount: { color: BrandColors.text, fontSize: 32, fontWeight: '900', marginTop: 7 },
+  jobTitle: { color: BrandColors.text, fontSize: 15, fontWeight: '800', marginTop: 5 },
+  card: { backgroundColor: BrandColors.slateSoft, borderColor: BrandColors.slateBorder, borderWidth: 1, borderRadius: 18, padding: 16 },
   sectionTitle: { color: BrandColors.text, fontSize: 16, fontWeight: '900' },
-  note: { color: BrandColors.textSecondary, fontSize: 11, lineHeight: 17, marginTop: 6 },
-  methodRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: BrandColors.slateBorder },
-  methodIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: '#2A2416', alignItems: 'center', justifyContent: 'center' },
-  methodIconText: { color: BrandColors.gold, fontWeight: '900', fontSize: 16 },
-  methodCopy: { flex: 1, marginLeft: 10 },
-  methodLabel: { color: BrandColors.text, fontWeight: '800', fontSize: 13 },
-  methodMeta: { color: BrandColors.textSecondary, fontSize: 11, marginTop: 3 },
-  default: { color: BrandColors.gold, fontSize: 9, fontWeight: '900' },
-  typeRow: { flexDirection: 'row', gap: 8, marginTop: 14 },
-  typeButton: { flex: 1, minHeight: 70, borderRadius: 13, borderWidth: 1, borderColor: BrandColors.slateBorder, padding: 10 },
-  typeButtonActive: { borderColor: BrandColors.gold, backgroundColor: '#2A2416' },
-  typeTitle: { color: BrandColors.text, fontWeight: '900', fontSize: 13 },
-  typeTitleActive: { color: BrandColors.gold },
-  typeHint: { color: BrandColors.textSecondary, fontSize: 9, lineHeight: 13, marginTop: 4 },
-  field: { marginTop: 14 },
-  label: { color: BrandColors.text, fontSize: 12, fontWeight: '800', marginBottom: 6 },
-  input: { minHeight: 50, borderRadius: 13, borderWidth: 1, borderColor: BrandColors.slateBorder, backgroundColor: BrandColors.slate, paddingHorizontal: 12, color: BrandColors.text, fontSize: 14 },
-  primary: { marginTop: 18, height: 54, borderRadius: 14, backgroundColor: BrandColors.gold, alignItems: 'center', justifyContent: 'center' },
+  note: { color: BrandColors.textSecondary, fontSize: 11, lineHeight: 17, marginTop: 7 },
+  primary: { marginTop: 18, minHeight: 54, borderRadius: 14, backgroundColor: BrandColors.gold, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14 },
   primaryText: { color: BrandColors.slate, fontWeight: '900', fontSize: 15 },
+  disabled: { opacity: 0.55 },
+  security: { color: BrandColors.muted, textAlign: 'center', fontSize: 10, marginTop: 18 },
 });
