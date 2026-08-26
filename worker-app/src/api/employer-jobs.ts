@@ -37,6 +37,19 @@ export type EmployerApplication = {
   job?: { id: string; title: string; city?: string; state?: string };
 };
 
+export type EmployerPaymentMethod = {
+  id: string;
+  type: 'CARD' | 'UPI' | 'BANK_ACCOUNT';
+  label: string;
+  provider?: string | null;
+  providerPaymentMethodId?: string | null;
+  last4?: string | null;
+  upiId?: string | null;
+  isDefault: boolean;
+  status: string;
+  createdAt: string;
+};
+
 export async function getEmployerJobs() {
   const response = await api.get<EmployerJob[]>('/jobs/employer/my');
   return response.data;
@@ -57,8 +70,30 @@ export async function createEmployerJob(input: Record<string, unknown>) {
   return response.data;
 }
 
+export async function updateEmployerJob(jobId: string, input: Record<string, unknown>) {
+  const response = await api.put<EmployerJob>(`/jobs/employer/${jobId}`, input);
+  return response.data;
+}
+
 export async function publishEmployerJob(jobId: string) {
   const response = await api.post<EmployerJob>(`/jobs/employer/${jobId}/publish`);
+  return response.data;
+}
+
+export async function getEmployerPaymentMethods() {
+  const response = await api.get<EmployerPaymentMethod[]>('/jobs/employer/payment-methods');
+  return response.data;
+}
+
+export async function createEmployerPaymentMethod(input: {
+  type: EmployerPaymentMethod['type'];
+  label: string;
+  provider?: string;
+  providerPaymentMethodId?: string;
+  last4?: string;
+  upiId?: string;
+}) {
+  const response = await api.post<EmployerPaymentMethod>('/jobs/employer/payment-methods', input);
   return response.data;
 }
 
