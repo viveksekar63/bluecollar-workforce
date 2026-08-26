@@ -33,7 +33,7 @@ export class AuthService {
       if (!role) throw new ConflictException('WORKER role is not configured');
       const user = await tx.user.create({ data: { phone, email, passwordHash, firstName: dto.firstName.trim(), lastName: dto.lastName?.trim() || null, status: 'ACTIVE' } });
       const workerCode = await this.generateWorkerCode(tx);
-      const worker = await tx.worker.create({ data: { userId: user.id, workerCode, profileCompletion: 20, verificationStatus: 'PENDING', availabilityStatus: 'AVAILABLE' }, select: { id: true, workerCode: true, profileCompletion: true, verificationStatus: true } });
+      const worker = await tx.worker.create({ data: { userId: user.id, workerCode, profileCompletion: 20, verificationStatus: 'VERIFIED', availabilityStatus: 'AVAILABLE' }, select: { id: true, workerCode: true, profileCompletion: true, verificationStatus: true } });
       await tx.userRole.create({ data: { userId: user.id, roleId: role.id } });
       return { user: { id: user.id, firstName: user.firstName, lastName: user.lastName, email: user.email, phone: user.phone }, worker };
     });
@@ -73,9 +73,7 @@ export class AuthService {
       if (roles.includes('EMPLOYER') && user.employer && user.employer.status !== EmployerStatus.VERIFIED) throw new UnauthorizedException('Employer account is awaiting approval');
       throw new UnauthorizedException('User does not have an active mobile role');
     }
-    if (requestedRole === 'WORKER' && !hasWorker) {
-      throw new UnauthorizedException('This account does not have worker access');
-    }
+    if (requestedRole === 'WORKER' && !hasWorker) throw new UnauthorizedException('This account does not have worker access');
     if (requestedRole === 'EMPLOYER' && !hasEmployer) {
       if (roles.includes('EMPLOYER') && user.employer && user.employer.status !== EmployerStatus.VERIFIED) throw new UnauthorizedException('Employer account is awaiting approval');
       throw new UnauthorizedException('This account does not have employer access');
@@ -91,7 +89,7 @@ export class AuthService {
     for (let attempt = 0; attempt < 5; attempt += 1) { const workerCode = `WRK${Date.now().toString().slice(-8)}${Math.floor(Math.random() * 100).toString().padStart(2, '0')}`; if (!(await tx.worker.findUnique({ where: { workerCode }, select: { id: true } }))) return workerCode; }
     throw new ConflictException('Unable to generate worker code');
   }
-  private async generateAuthTokens(userId: string, email: string, roles: string[]) {
+  async generateAuthTokens(userId: string, email: string, roles: string[]) {
     const accessToken = await this.jwtService.signAsync({ sub: userId, email, roles });
     const refreshToken = generateRefreshToken(); const expiresAt = new Date(); expiresAt.setDate(expiresAt.getDate() + 7);
     await this.prisma.refreshToken.create({ data: { userId, tokenHash: hashRefreshToken(refreshToken), expiresAt } });
