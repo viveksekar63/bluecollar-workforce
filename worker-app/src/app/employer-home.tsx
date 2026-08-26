@@ -14,16 +14,17 @@ export default function EmployerHomeScreen() {
     <Text style={styles.title}>Welcome, {user?.firstName || employer?.companyName || 'Employer'}</Text>
     <Text style={styles.subtitle}>Manage your jobs and find the right workers.</Text>
     <View style={styles.grid}>
-      <Pressable style={styles.card} onPress={() => {}}><Text style={styles.icon}>📋</Text><Text style={styles.cardTitle}>My Jobs</Text><Text style={styles.cardText}>Create and manage jobs</Text></Pressable>
-      <Pressable style={styles.card} onPress={() => router.push('/employer/applications')}><Text style={styles.icon}>👷</Text><Text style={styles.cardTitle}>Applications</Text><Text style={styles.cardText}>Review applicants</Text></Pressable>
+      <Pressable style={styles.card} onPress={() => router.push('/employer-jobs')}><Text style={styles.icon}>📋</Text><Text style={styles.cardTitle}>My Jobs</Text><Text style={styles.cardText}>Create and manage jobs</Text></Pressable>
+      <Pressable style={styles.card} onPress={() => router.push('/employer-applications')}><Text style={styles.icon}>👷</Text><Text style={styles.cardTitle}>Applications</Text><Text style={styles.cardText}>Review applicants</Text></Pressable>
     </View>
+    <Pressable style={styles.create} onPress={() => router.push('/employer-job-create')}><Text style={styles.createText}>+ Create New Job</Text></Pressable>
     <Pressable style={styles.switch} onPress={() => { setActiveRole('WORKER'); router.replace('/home'); }}><Text style={styles.switchText}>Switch to Worker</Text></Pressable>
   </View>;
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BrandColors.background, padding: 24, paddingTop: 60 },
-  eyebrow: { fontSize: 12, fontWeight: '800', letterSpacing: 2, color: BrandColors.rose },
+  eyebrow: { fontSize: 12, fontWeight: '800', letterSpacing: 2, color: BrandColors.gold },
   title: { marginTop: 10, fontSize: 30, fontWeight: '800', color: BrandColors.text },
   subtitle: { marginTop: 8, fontSize: 15, lineHeight: 22, color: BrandColors.textSecondary },
   grid: { flexDirection: 'row', gap: 12, marginTop: 28 },
@@ -31,6 +32,8 @@ const styles = StyleSheet.create({
   icon: { fontSize: 25, marginBottom: 12 },
   cardTitle: { fontSize: 16, fontWeight: '800', color: BrandColors.text },
   cardText: { marginTop: 5, fontSize: 12, lineHeight: 18, color: BrandColors.textSecondary },
-  switch: { marginTop: 24, height: 52, borderRadius: 14, borderWidth: 1, borderColor: BrandColors.burgundy, alignItems: 'center', justifyContent: 'center' },
-  switchText: { color: BrandColors.burgundy, fontSize: 15, fontWeight: '800' },
+  create: { marginTop: 16, height: 52, borderRadius: 14, backgroundColor: BrandColors.gold, alignItems: 'center', justifyContent: 'center' },
+  createText: { color: BrandColors.slate, fontSize: 15, fontWeight: '900' },
+  switch: { marginTop: 14, height: 52, borderRadius: 14, borderWidth: 1, borderColor: BrandColors.gold, alignItems: 'center', justifyContent: 'center' },
+  switchText: { color: BrandColors.gold, fontSize: 15, fontWeight: '800' },
 });
