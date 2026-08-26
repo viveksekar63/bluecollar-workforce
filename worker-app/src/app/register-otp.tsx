@@ -2,17 +2,19 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 
-import { requestRegistrationOtp, verifyRegistrationOtp, MobileRole } from '@/api/auth';
+import { verifyRegistrationOtp } from '@/api/auth';
 import { BrandColors } from '@/constants/theme';
+import { useAuthStore } from '@/store/auth';
 
 export default function RegisterOtpScreen() {
   const params = useLocalSearchParams<{ phone?: string; role?: string; devOtp?: string }>();
   const phone = String(params.phone ?? '');
-  const role: MobileRole = params.role === 'EMPLOYER' ? 'EMPLOYER' : 'WORKER';
-  const devOtp = String(params.devOtp ?? '');
-  const [otp, setOtp] = useState(devOtp);
+  const role = params.role === 'EMPLOYER' ? 'EMPLOYER' : 'WORKER';
+  const [otp, setOtp] = useState(String(params.devOtp ?? ''));
   const [loading, setLoading] = useState(false);
   const [seconds, setSeconds] = useState(300);
+  const setSession = useAuthStore((state) => state.setSession);
+  const setActiveRole = useAuthStore((state) => state.setActiveRole);
 
   useEffect(() => {
     const timer = setInterval(() => setSeconds((value) => (value > 0 ? value - 1 : 0)), 1000);
@@ -28,10 +30,13 @@ export default function RegisterOtpScreen() {
     try {
       setLoading(true);
       const response = await verifyRegistrationOtp(phone, otp.trim());
+      setSession(response.accessToken, response.user, response.worker, response.employer);
+      setActiveRole(response.activeRole ?? role);
+
       Alert.alert(
-        'Mobile verified',
-        response.message,
-        [{ text: 'Continue to sign in', onPress: () => router.replace({ pathname: '/login', params: { role } }) }],
+        'Registration successful',
+        role === 'EMPLOYER' ? 'Your employer account is active.' : 'Your worker account is active.',
+        [{ text: 'Continue', onPress: () => router.replace(role === 'EMPLOYER' ? '/employer-home' : '/home') }],
       );
     } catch (error: any) {
       const message = error?.response?.data?.message;
@@ -39,11 +44,6 @@ export default function RegisterOtpScreen() {
     } finally {
       setLoading(false);
     }
-  }
-
-  async function handleResend() {
-    Alert.alert('Resend OTP', 'Return to registration to review your details and request a new OTP.');
-    router.replace('/register');
   }
 
   const minutes = Math.floor(seconds / 60).toString().padStart(2, '0');
@@ -71,15 +71,21 @@ export default function RegisterOtpScreen() {
         autoFocus
       />
 
-      {devOtp && <Text style={styles.devOtp}>Development OTP: {devOtp}</Text>}
-
+      {params.devOtp ? <Text style={styles.devOtp}>Development OTP: {params.devOtp}</Text> : null}
       <Text style={styles.timer}>{seconds > 0 ? `Code expires in ${minutes}:${remaining}` : 'Code expired'}</Text>
 
       <Pressable onPress={handleVerify} disabled={loading} style={[styles.primary, loading && styles.disabled]}>
-        {loading ? <ActivityIndicator color={BrandColors.slate} /> : <Text style={styles.primaryText}>Verify & continue</Text>}
+        {loading ? <ActivityIndicator color={BrandColors.slate} /> : <><Text style={styles.primaryText}>Verify & continue</Text><Text style={styles.arrow}>→</Text></>}
       </Pressable>
 
-      <Pressable onPress={handleResend} style={styles.resend}><Text style={styles.resendText}>Didn't receive the code? Request again</Text></Pressable>
+      <Text style={styles.resend}>Didn't receive the code? Request again</Text>
+      <View style={styles.info}>
+        <Text style={styles.infoIcon}>✓</Text>
+        <View style={styles.infoCopy}>
+          <Text style={styles.infoTitle}>Instant account activation</Text>
+          <Text style={styles.infoText}>After successful OTP verification, WorkTrust signs you in automatically and opens your selected dashboard.</Text>
+        </View>
+      </View>
     </View>
   );
 }
@@ -98,9 +104,14 @@ const styles = StyleSheet.create({
   otpInput: { height: 64, borderWidth: 1, borderColor: BrandColors.gold, borderRadius: 16, backgroundColor: BrandColors.slate, color: BrandColors.text, fontSize: 28, fontWeight: '900', letterSpacing: 10 },
   devOtp: { color: BrandColors.gold, fontSize: 12, fontWeight: '800', textAlign: 'center', marginTop: 10 },
   timer: { color: BrandColors.muted, fontSize: 12, textAlign: 'center', marginVertical: 18 },
-  primary: { height: 56, borderRadius: 15, backgroundColor: BrandColors.gold, alignItems: 'center', justifyContent: 'center' },
+  primary: { height: 56, borderRadius: 15, backgroundColor: BrandColors.gold, alignItems: 'center', justifyContent: 'center', flexDirection: 'row' },
   primaryText: { color: BrandColors.slate, fontSize: 16, fontWeight: '900' },
-  resend: { alignItems: 'center', paddingVertical: 20 },
-  resendText: { color: BrandColors.gold, fontSize: 13, fontWeight: '800' },
+  arrow: { color: BrandColors.slate, position: 'absolute', right: 20, fontSize: 26 },
+  resend: { color: BrandColors.gold, textAlign: 'center', fontSize: 13, fontWeight: '800', marginTop: 20 },
+  info: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: BrandColors.slateBorder, marginTop: 26, paddingTop: 18 },
+  infoIcon: { width: 38, height: 38, borderRadius: 19, backgroundColor: BrandColors.goldSoft, color: BrandColors.gold, textAlign: 'center', lineHeight: 38, fontWeight: '900', marginRight: 10 },
+  infoCopy: { flex: 1 },
+  infoTitle: { color: BrandColors.text, fontSize: 12, fontWeight: '900' },
+  infoText: { color: BrandColors.muted, fontSize: 10, lineHeight: 15, marginTop: 3 },
   disabled: { opacity: 0.6 },
 });
