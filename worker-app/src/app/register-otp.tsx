@@ -33,11 +33,8 @@ export default function RegisterOtpScreen() {
       setSession(response.accessToken, response.user, response.worker, response.employer);
       setActiveRole(response.activeRole ?? role);
 
-      Alert.alert(
-        'Registration successful',
-        role === 'EMPLOYER' ? 'Your employer account is active.' : 'Your worker account is active.',
-        [{ text: 'Continue', onPress: () => router.replace(role === 'EMPLOYER' ? '/employer-home' : '/home') }],
-      );
+      // Registration is complete: keep the verified session and open the selected dashboard immediately.
+      router.replace(role === 'EMPLOYER' ? '/employer-home' : '/home');
     } catch (error: any) {
       const message = error?.response?.data?.message;
       Alert.alert('Verification failed', Array.isArray(message) ? message.join('\n') : message ?? 'Unable to verify OTP.');
