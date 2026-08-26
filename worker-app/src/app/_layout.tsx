@@ -11,6 +11,11 @@ export default function RootLayout() {
         <Stack.Screen name="register" />
         <Stack.Screen name="role-select" />
         <Stack.Screen name="employer-home" />
+        <Stack.Screen name="employer-jobs" />
+        <Stack.Screen name="employer-job-create" />
+        <Stack.Screen name="employer-job-details" />
+        <Stack.Screen name="employer-applications" />
+        <Stack.Screen name="employer-application-details" />
         <Stack.Screen name="profile" />
         <Stack.Screen name="address" />
         <Stack.Screen name="home" />
