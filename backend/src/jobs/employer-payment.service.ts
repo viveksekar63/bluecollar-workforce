@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { randomUUID } from 'crypto';
+import axios from 'axios';
+import { createHmac, randomUUID, timingSafeEqual } from 'crypto';
 
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -119,5 +120,113 @@ export class EmployerPaymentService {
 
       return rows[0];
     });
+  }
+
+  private razorpayConfig() {
+    const keyId = process.env.RAZORPAY_KEY_ID?.trim();
+    const keySecret = process.env.RAZORPAY_KEY_SECRET?.trim();
+    const feeInr = Number(process.env.EMPLOYER_JOB_PUBLISH_FEE_INR ?? '99');
+
+    if (!keyId || !keySecret) {
+      throw new BadRequestException('Razorpay is not configured. Add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET.');
+    }
+    if (!Number.isFinite(feeInr) || feeInr <= 0) {
+      throw new BadRequestException('EMPLOYER_JOB_PUBLISH_FEE_INR must be greater than zero');
+    }
+
+    return { keyId, keySecret, feeInr };
+  }
+
+  async createJobPublishOrder(userId: string, jobId: string) {
+    const employerId = await this.getEmployerId(userId);
+    const job = await this.prisma.job.findFirst({
+      where: { id: jobId, employerId },
+      select: { id: true, title: true, status: true },
+    });
+    if (!job) throw new NotFoundException('Job not found');
+    if (String(job.status) !== 'DRAFT') throw new BadRequestException('Only draft jobs can be published');
+
+    const { keyId, keySecret, feeInr } = this.razorpayConfig();
+    const amount = Math.round(feeInr * 100);
+
+    try {
+      const response = await axios.post(
+        'https://api.razorpay.com/v1/orders',
+        {
+          amount,
+          currency: 'INR',
+          receipt: `job_${job.id}_${Date.now()}`.slice(0, 40),
+          notes: { jobId: job.id, employerId },
+          capture: 'automatic',
+        },
+        { auth: { username: keyId, password: keySecret } },
+      );
+
+      return {
+        keyId,
+        orderId: response.data.id as string,
+        amount,
+        amountInr: feeInr,
+        currency: 'INR',
+        jobId: job.id,
+        jobTitle: job.title,
+      };
+    } catch (error: any) {
+      const message = error?.response?.data?.error?.description || 'Unable to create Razorpay order';
+      throw new BadRequestException(message);
+    }
+  }
+
+  async verifyJobPublishPayment(
+    userId: string,
+    jobId: string,
+    input: { razorpayOrderId: string; razorpayPaymentId: string; razorpaySignature: string },
+  ) {
+    const employerId = await this.getEmployerId(userId);
+    const job = await this.prisma.job.findFirst({
+      where: { id: jobId, employerId },
+      select: { id: true, status: true },
+    });
+    if (!job) throw new NotFoundException('Job not found');
+    if (String(job.status) !== 'DRAFT') throw new BadRequestException('Job is already published or closed');
+
+    const { keySecret } = this.razorpayConfig();
+    const orderId = input.razorpayOrderId?.trim();
+    const paymentId = input.razorpayPaymentId?.trim();
+    const signature = input.razorpaySignature?.trim();
+    if (!orderId || !paymentId || !signature) throw new BadRequestException('Incomplete payment response');
+
+    const expected = createHmac('sha256', keySecret).update(`${orderId}|${paymentId}`).digest('hex');
+    const expectedBuffer = Buffer.from(expected, 'utf8');
+    const receivedBuffer = Buffer.from(signature, 'utf8');
+    if (expectedBuffer.length !== receivedBuffer.length || !timingSafeEqual(expectedBuffer, receivedBuffer)) {
+      throw new BadRequestException('Payment signature verification failed');
+    }
+
+    try {
+      const paymentResponse = await axios.get(`https://api.razorpay.com/v1/payments/${paymentId}`, {
+        auth: { username: process.env.RAZORPAY_KEY_ID!.trim(), password: keySecret },
+      });
+      const payment = paymentResponse.data;
+
+      if (payment.order_id !== orderId) throw new BadRequestException('Payment order mismatch');
+      if (!['captured', 'authorized'].includes(String(payment.status))) {
+        throw new BadRequestException(`Payment is not successful: ${payment.status}`);
+      }
+
+      if (String(payment.status) === 'authorized') {
+        await axios.post(
+          `https://api.razorpay.com/v1/payments/${paymentId}/capture`,
+          { amount: payment.amount, currency: payment.currency },
+          { auth: { username: process.env.RAZORPAY_KEY_ID!.trim(), password: keySecret } },
+        );
+      }
+    } catch (error: any) {
+      if (error instanceof BadRequestException) throw error;
+      const message = error?.response?.data?.error?.description || 'Unable to verify payment with Razorpay';
+      throw new BadRequestException(message);
+    }
+
+    return { paid: true, jobId: job.id };
   }
 }
