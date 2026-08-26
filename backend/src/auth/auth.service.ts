@@ -55,7 +55,7 @@ export class AuthService {
     if (user.status !== 'ACTIVE') throw new UnauthorizedException('User account is not active');
     const roles = user.roles.map((userRole) => userRole.role.name);
     if (!roles.includes('EMPLOYER')) throw new UnauthorizedException('User is not registered as an employer');
-    if (String(user.employer.status) !== 'ACTIVE') throw new UnauthorizedException('Employer account is awaiting approval');
+    if (user.employer.status !== EmployerStatus.VERIFIED) throw new UnauthorizedException('Employer account is awaiting approval');
     return { ...(await this.generateAuthTokens(user.id, user.email || user.phone, roles)), employer: { id: user.employer.id, companyName: user.employer.companyName, status: user.employer.status } };
   }
   async mobileLogin(identifier: string, password: string) {
@@ -66,9 +66,9 @@ export class AuthService {
     if (user.status !== 'ACTIVE') throw new UnauthorizedException('User account is not active');
     const roles = user.roles.map((userRole) => userRole.role.name);
     const hasWorker = roles.includes('WORKER') && !!user.worker;
-    const hasEmployer = roles.includes('EMPLOYER') && !!user.employer && String(user.employer.status) === 'ACTIVE';
+    const hasEmployer = roles.includes('EMPLOYER') && !!user.employer && user.employer.status === EmployerStatus.VERIFIED;
     if (!hasWorker && !hasEmployer) {
-      if (roles.includes('EMPLOYER') && user.employer && String(user.employer.status) !== EmployerStatus.VERIFIED) throw new UnauthorizedException('Employer account is awaiting approval');
+      if (roles.includes('EMPLOYER') && user.employer && user.employer.status !== EmployerStatus.VERIFIED) throw new UnauthorizedException('Employer account is awaiting approval');
       throw new UnauthorizedException('User does not have an active mobile role');
     }
     const response: any = { ...(await this.generateAuthTokens(user.id, user.email || user.phone, roles)), worker: undefined, employer: undefined };
