@@ -10,8 +10,8 @@ CREATE TABLE "employer_job_payment_transactions" (
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updatedAt" TIMESTAMP(3) NOT NULL,
   CONSTRAINT "employer_job_payment_transactions_pkey" PRIMARY KEY ("id"),
-  CONSTRAINT "employer_job_payment_transactions_employerId_fkey" FOREIGN KEY ("employerId") REFERENCES "employers"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT "employer_job_payment_transactions_jobId_fkey" FOREIGN KEY ("jobId") REFERENCES "jobs"("id") ON DELETE CASCADE ON UPDATE CASCADE
+  CONSTRAINT "employer_job_payment_transactions_employerId_fkey" FOREIGN KEY ("employerId") REFERENCES "Employer"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "employer_job_payment_transactions_jobId_fkey" FOREIGN KEY ("jobId") REFERENCES "Job"("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 CREATE UNIQUE INDEX "employer_job_payment_transactions_razorpayOrderId_key" ON "employer_job_payment_transactions"("razorpayOrderId");
