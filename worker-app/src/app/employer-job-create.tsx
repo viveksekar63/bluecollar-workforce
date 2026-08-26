@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -23,11 +23,6 @@ export default function EmployerJobCreateScreen() {
     () => getSmartSkillSuggestions(title, description, skillNames),
     [title, description, skillNames],
   );
-
-  useEffect(() => {
-    if (!title.trim() && !description.trim()) return;
-    // Keep the suggestions reactive as the employer writes the title/description.
-  }, [title, description]);
 
   function selectSkill(skill: string) {
     setSkillNames((current) => addSkillToCsv(current, skill));
@@ -58,7 +53,6 @@ export default function EmployerJobCreateScreen() {
         skillNames: skillNames.split(',').map((skill) => skill.trim()).filter(Boolean),
       });
 
-      // A successful create always returns the employer to the jobs list.
       router.replace('/employer-jobs');
     } catch (e: any) {
       Alert.alert('Unable to create job', e?.response?.data?.message ?? 'Please try again.');
