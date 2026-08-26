@@ -50,6 +50,16 @@ export type EmployerPaymentMethod = {
   createdAt: string;
 };
 
+export type EmployerJobPaymentOrder = {
+  keyId: string;
+  orderId: string;
+  amount: number;
+  amountInr: number;
+  currency: string;
+  jobId: string;
+  jobTitle: string;
+};
+
 export async function getEmployerJobs() {
   const response = await api.get<EmployerJob[]>('/jobs/employer/my');
   return response.data;
@@ -77,6 +87,20 @@ export async function updateEmployerJob(jobId: string, input: Record<string, unk
 
 export async function publishEmployerJob(jobId: string) {
   const response = await api.post<EmployerJob>(`/jobs/employer/${jobId}/publish`);
+  return response.data;
+}
+
+export async function createJobPublishPaymentOrder(jobId: string) {
+  const response = await api.post<EmployerJobPaymentOrder>(`/jobs/employer/${jobId}/payment/order`);
+  return response.data;
+}
+
+export async function verifyJobPublishPayment(jobId: string, input: {
+  razorpayOrderId: string;
+  razorpayPaymentId: string;
+  razorpaySignature: string;
+}) {
+  const response = await api.post<EmployerJob>(`/jobs/employer/${jobId}/payment/verify`, input);
   return response.data;
 }
 
