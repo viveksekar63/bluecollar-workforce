@@ -5,12 +5,14 @@ import * as bcrypt from 'bcrypt';
 import { RegistrationRequestOtpDto } from './dto/registration-request-otp.dto';
 import { RegistrationVerifyOtpDto } from './dto/registration-verify-otp.dto';
 import { EmployerStatus } from '@prisma/client';
+import { AuthService } from './auth.service';
 
 @Injectable()
 export class RegistrationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
+    private readonly authService: AuthService,
   ) {}
 
   async requestOtp(dto: RegistrationRequestOtpDto) {
@@ -23,9 +25,7 @@ export class RegistrationService {
 
     if (email) {
       const emailOwner = await this.prisma.user.findUnique({ where: { email }, select: { id: true, phone: true } });
-      if (emailOwner && emailOwner.phone !== phone) {
-        throw new ConflictException('A user with this email already exists');
-      }
+      if (emailOwner && emailOwner.phone !== phone) throw new ConflictException('A user with this email already exists');
     }
 
     const existing = await this.prisma.user.findUnique({
@@ -33,15 +33,11 @@ export class RegistrationService {
       include: { worker: true, employer: true, roles: { include: { role: true } } },
     });
 
-    if (existing?.status === 'ACTIVE') {
-      throw new ConflictException('A user with this mobile number already exists. Please sign in.');
-    }
+    if (existing?.status === 'ACTIVE') throw new ConflictException('A user with this mobile number already exists. Please sign in.');
 
     if (existing?.roles.length) {
       const existingRoleNames = existing.roles.map((item) => item.role.name);
-      if (!existingRoleNames.includes(dto.role)) {
-        throw new ConflictException('This mobile number already has a pending registration for another role');
-      }
+      if (!existingRoleNames.includes(dto.role)) throw new ConflictException('This mobile number already has a pending registration for another role');
     }
 
     const recentOtp = existing
@@ -91,9 +87,7 @@ export class RegistrationService {
       if (!role) throw new ConflictException(`${dto.role} role is not configured`);
 
       const hasRole = user.roles.some((item) => item.role.name === dto.role);
-      if (!hasRole) {
-        await tx.userRole.create({ data: { userId: user.id, roleId: role.id } });
-      }
+      if (!hasRole) await tx.userRole.create({ data: { userId: user.id, roleId: role.id } });
 
       if (dto.role === 'WORKER' && !user.worker) {
         await tx.worker.create({
@@ -101,7 +95,7 @@ export class RegistrationService {
             userId: user.id,
             workerCode: await this.generateWorkerCode(tx),
             profileCompletion: 20,
-            verificationStatus: 'PENDING',
+            verificationStatus: 'VERIFIED',
             availabilityStatus: 'AVAILABLE',
           },
         });
@@ -112,13 +106,13 @@ export class RegistrationService {
           data: {
             userId: user.id,
             companyName: dto.companyName!.trim(),
-            status: EmployerStatus.PENDING,
+            status: EmployerStatus.VERIFIED,
           },
         });
       } else if (dto.role === 'EMPLOYER' && user.employer) {
         await tx.employer.update({
           where: { id: user.employer.id },
-          data: { companyName: dto.companyName!.trim(), status: EmployerStatus.PENDING },
+          data: { companyName: dto.companyName!.trim(), status: EmployerStatus.VERIFIED },
         });
       }
 
@@ -127,9 +121,7 @@ export class RegistrationService {
         data: { expiresAt: new Date() },
       });
 
-      await tx.otpRequest.create({
-        data: { userId: user.id, phone, otpHash, expiresAt },
-      });
+      await tx.otpRequest.create({ data: { userId: user.id, phone, otpHash, expiresAt } });
     });
 
     await this.sendOtp(phone, otp);
@@ -140,10 +132,7 @@ export class RegistrationService {
       expiresInSeconds: 300,
     };
 
-    if ((this.configService.get<string>('OTP_SMS_PROVIDER') || 'console').toLowerCase() === 'console') {
-      response.devOtp = otp;
-    }
-
+    if ((this.configService.get<string>('OTP_SMS_PROVIDER') || 'console').toLowerCase() === 'console') response.devOtp = otp;
     return response;
   }
 
@@ -165,32 +154,28 @@ export class RegistrationService {
       throw new UnauthorizedException('Invalid OTP');
     }
 
-    await this.prisma.$transaction([
-      this.prisma.otpRequest.update({ where: { id: request.id }, data: { verifiedAt: new Date() } }),
-      this.prisma.user.update({ where: { id: request.user.id }, data: { status: 'ACTIVE' } }),
-    ]);
+    const user = await this.prisma.user.update({ where: { id: request.user.id }, data: { status: 'ACTIVE' }, include: { worker: true, employer: true, roles: { include: { role: true } } } });
+    await this.prisma.otpRequest.update({ where: { id: request.id }, data: { verifiedAt: new Date() } });
 
-    const roleNames = request.user.roles.map((item) => item.role.name).filter((name) => name === 'WORKER' || name === 'EMPLOYER');
-    const role = request.user.worker ? 'WORKER' : 'EMPLOYER';
-
-    if (role === 'EMPLOYER') {
-      return {
-        success: true,
-        role,
-        requiresApproval: request.user.employer?.status !== EmployerStatus.VERIFIED,
-        message: 'Mobile number verified. Your employer account is submitted for approval.',
-        user: { id: request.user.id, firstName: request.user.firstName, lastName: request.user.lastName, phone: request.user.phone, email: request.user.email },
-        roles: roleNames,
-      };
-    }
+    const roleNames = user.roles.map((item) => item.role.name).filter((name) => name === 'WORKER' || name === 'EMPLOYER');
+    const role = user.worker ? 'WORKER' : 'EMPLOYER';
+    const tokens = await this.authService.generateAuthTokens(user.id, user.email || user.phone, roleNames);
 
     return {
+      ...tokens,
       success: true,
       role,
+      activeRole: role,
       requiresApproval: false,
-      message: 'Mobile number verified. Your worker account has been created.',
-      user: { id: request.user.id, firstName: request.user.firstName, lastName: request.user.lastName, phone: request.user.phone, email: request.user.email },
-      roles: roleNames,
+      message: role === 'EMPLOYER'
+        ? 'Mobile number verified. Your employer account is active.'
+        : 'Mobile number verified. Your worker account is active.',
+      worker: user.worker
+        ? { id: user.worker.id, workerCode: user.worker.workerCode, profileCompletion: user.worker.profileCompletion, verificationStatus: user.worker.verificationStatus, verificationScore: user.worker.verificationScore }
+        : undefined,
+      employer: user.employer
+        ? { id: user.employer.id, companyName: user.employer.companyName, status: user.employer.status }
+        : undefined,
     };
   }
 
@@ -201,9 +186,7 @@ export class RegistrationService {
     throw new ConflictException('Enter a valid mobile number');
   }
 
-  private generateOtp() {
-    return Math.floor(100000 + Math.random() * 900000).toString();
-  }
+  private generateOtp() { return Math.floor(100000 + Math.random() * 900000).toString(); }
 
   private async generateWorkerCode(tx: any) {
     for (let attempt = 0; attempt < 5; attempt += 1) {
@@ -215,28 +198,23 @@ export class RegistrationService {
 
   private async sendOtp(phone: string, otp: string) {
     const provider = (this.configService.get<string>('OTP_SMS_PROVIDER') || 'console').toLowerCase();
-
     if (provider === 'console') {
       console.log(`[WorkTrust OTP] ${phone}: ${otp}`);
       return;
     }
-
     if (provider === 'msg91') {
       const authKey = this.configService.get<string>('MSG91_AUTH_KEY');
       const templateId = this.configService.get<string>('MSG91_TEMPLATE_ID');
       if (!authKey || !templateId) throw new ConflictException('MSG91 OTP configuration is missing');
-
       const mobile = phone.length === 10 ? `91${phone}` : phone;
       const response = await fetch('https://control.msg91.com/api/v5/otp', {
         method: 'POST',
         headers: { authkey: authKey, 'Content-Type': 'application/json' },
         body: JSON.stringify({ template_id: templateId, mobile, otp, otp_length: 6 }),
       });
-
       if (!response.ok) throw new ConflictException('Unable to send OTP. Please try again.');
       return;
     }
-
     throw new ConflictException(`Unsupported OTP SMS provider: ${provider}`);
   }
 }
