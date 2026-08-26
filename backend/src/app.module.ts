@@ -19,6 +19,7 @@ import { DocumentsModule } from "./documents/documents.module";
 import { VerificationModule } from "./verification/verification.module";
 import { SkillsModule } from "./skills/skills.module";
 import { JobsModule } from "./jobs/jobs.module";
+import { SubscriptionsModule } from "./subscriptions/subscriptions.module";
 import { ApplicationsModule } from "./applications/applications.module";
 import { AttendanceModule } from "./attendance/attendance.module";
 import { PaymentsModule } from "./payments/payments.module";
@@ -29,21 +30,11 @@ import { AuditModule } from "./audit/audit.module";
 
 @Module({
   imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-    }),
-
-    // Core
+    ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
     StorageModule,
-
-    // Authentication & Authorization
     AuthModule,
-
-    // Admin Dashboard
     DashboardModule,
-
-    // Admin / Workforce Modules
     UsersModule,
     RolesModule,
     WorkersModule,
@@ -53,6 +44,7 @@ import { AuditModule } from "./audit/audit.module";
     VerificationModule,
     SkillsModule,
     JobsModule,
+    SubscriptionsModule,
     ApplicationsModule,
     AttendanceModule,
     PaymentsModule,
@@ -61,7 +53,6 @@ import { AuditModule } from "./audit/audit.module";
     ComplaintsModule,
     AuditModule,
   ],
-
   controllers: [AppController],
   providers: [AppService],
 })
