@@ -1,15 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useCallback } from 'react';
 import {
   EmployerApplication,
   EmployerJob,
   getEmployerJobs,
   getEmployerJobApplications,
-  getEmployerPaymentMethods,
-  publishEmployerJob,
   updateEmployerJob,
 } from '@/api/employer-jobs';
 import { BrandColors } from '@/constants/theme';
@@ -60,9 +57,6 @@ export default function EmployerJobDetailsScreen() {
     try {
       setSavingSkills(true);
       const updated = await updateEmployerJob(String(id), { skillNames: names });
-      // The update response may not contain the relation on older backend builds,
-      // so build the local relation immediately as well. This fixes the publish
-      // button without requiring a second navigation/refresh.
       const localSkills = names.map((name) => ({
         required: true,
         skill: { id: `local-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`, name },
@@ -75,8 +69,8 @@ export default function EmployerJobDetailsScreen() {
     } finally { setSavingSkills(false); }
   }
 
-  async function publish() {
-    if (!id) return;
+  function publish() {
+    if (!id || publishing) return;
     const names = skillNames.split(',').map((skill) => skill.trim()).filter(Boolean);
     const hasSkills = names.length > 0 || Boolean(job?.skills?.some((skill) => skill.required));
     if (!hasSkills) {
@@ -84,25 +78,11 @@ export default function EmployerJobDetailsScreen() {
       return;
     }
 
-    try {
-      setPublishing(true);
-      const paymentMethods = await getEmployerPaymentMethods();
-      if (paymentMethods.length === 0) {
-        router.push({ pathname: '/employer-payment-method', params: { jobId: String(id) } });
-        return;
-      }
-
-      await publishEmployerJob(String(id));
-      Alert.alert('Published', 'Your job is now open to workers.');
-      await load();
-    } catch (e: any) {
-      const message = e?.response?.data?.message ?? 'Please complete all required job details.';
-      if (message.toLowerCase().includes('payment method')) {
-        router.push({ pathname: '/employer-payment-method', params: { jobId: String(id) } });
-      } else {
-        Alert.alert('Unable to publish', message);
-      }
-    } finally { setPublishing(false); }
+    // Never publish directly from the job screen. A real Razorpay checkout
+    // must complete and be verified server-side before the job is published.
+    setPublishing(true);
+    router.push({ pathname: '/employer-payment-method', params: { jobId: String(id) } });
+    setTimeout(() => setPublishing(false), 300);
   }
 
   if (loading) return <SafeAreaView style={styles.container}><View style={styles.center}><ActivityIndicator size="large" color={BrandColors.gold} /></View></SafeAreaView>;
@@ -137,7 +117,7 @@ export default function EmployerJobDetailsScreen() {
     </View>}
 
     {job.status === 'DRAFT' && !canPublish && <View style={styles.warning}><Text style={styles.warningText}>Add at least one required skill to enable publishing.</Text></View>}
-    {job.status === 'DRAFT' && <Pressable disabled={publishing || !canPublish} onPress={publish} style={[styles.primary, !canPublish && styles.disabled]}><Text style={styles.primaryText}>{publishing ? 'Checking...' : 'Publish Job'}</Text></Pressable>}
+    {job.status === 'DRAFT' && <Pressable disabled={publishing || !canPublish} onPress={publish} style={[styles.primary, !canPublish && styles.disabled]}><Text style={styles.primaryText}>{publishing ? 'Opening payment...' : 'Publish Job'}</Text></Pressable>}
 
     <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>Applicants ({applications.length})</Text><Pressable onPress={() => router.push({ pathname: '/employer-applications', params: { jobId: job.id } })}><Text style={styles.link}>View all</Text></Pressable></View>
     {applications.slice(0, 5).map((item) => <Pressable key={item.id} style={styles.application} onPress={() => router.push({ pathname: '/employer-application-details', params: { id: item.id } })}><Text style={styles.name}>{`${item.worker?.user?.firstName ?? 'Worker'} ${item.worker?.user?.lastName ?? ''}`.trim()}</Text><Text style={styles.appMeta}>{item.worker?.profession || 'Blue-collar worker'} • {item.status}</Text><Text style={styles.link}>Review ›</Text></Pressable>)}
