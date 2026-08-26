@@ -8,7 +8,14 @@
     "scheme": "workerapp",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "infoPlist": {
+        "LSApplicationQueriesSchemes": [
+          "tez",
+          "phonepe",
+          "paytmmp"
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
