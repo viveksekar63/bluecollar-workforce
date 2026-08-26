@@ -67,10 +67,12 @@ export default function EmployerPaymentMethodScreen() {
 
   async function completePayment(result: { razorpayOrderId: string; razorpayPaymentId: string; razorpaySignature: string }) {
     if (!jobId) return;
+
+    // The backend verifies the Razorpay signature/payment and publishes the
+    // draft job in the same request. Do not leave the employer on the payment
+    // screen after a successful response; navigate immediately to the job.
     await verifyJobPublishPayment(String(jobId), result);
-    Alert.alert('Payment successful', 'Payment verified and your job is now published.', [
-      { text: 'View job', onPress: () => router.replace({ pathname: '/employer-job-details', params: { id: String(jobId) } }) },
-    ]);
+    router.replace({ pathname: '/employer-job-details', params: { id: String(jobId), published: '1' } });
   }
 
   async function pay() {
@@ -99,7 +101,6 @@ export default function EmployerPaymentMethodScreen() {
               });
             } catch (e: any) {
               Alert.alert('Payment verification failed', e?.response?.data?.message ?? 'Please contact support if money was deducted.');
-            } finally {
               setLoading(false);
             }
           },
