@@ -162,6 +162,14 @@ export class EmployerPaymentService {
         { auth: { username: keyId, password: keySecret } },
       );
 
+      await this.prisma.$executeRaw`
+        INSERT INTO "employer_job_payment_transactions"
+          ("id", "employerId", "jobId", "razorpayOrderId", "amount", "currency", "status", "updatedAt")
+        VALUES
+          (${randomUUID()}, ${employerId}, ${job.id}, ${response.data.id}, ${amount}, 'INR', 'PENDING', CURRENT_TIMESTAMP)
+        ON CONFLICT ("razorpayOrderId") DO NOTHING
+      `;
+
       return {
         keyId,
         orderId: response.data.id as string,
@@ -190,7 +198,7 @@ export class EmployerPaymentService {
     if (!job) throw new NotFoundException('Job not found');
     if (String(job.status) !== 'DRAFT') throw new BadRequestException('Job is already published or closed');
 
-    const { keySecret } = this.razorpayConfig();
+    const { keyId, keySecret } = this.razorpayConfig();
     const orderId = input.razorpayOrderId?.trim();
     const paymentId = input.razorpayPaymentId?.trim();
     const signature = input.razorpaySignature?.trim();
@@ -203,11 +211,17 @@ export class EmployerPaymentService {
       throw new BadRequestException('Payment signature verification failed');
     }
 
+    let paymentStatus = 'PENDING';
+    let paymentAmount = 0;
+    let paymentCurrency = 'INR';
+
     try {
       const paymentResponse = await axios.get(`https://api.razorpay.com/v1/payments/${paymentId}`, {
-        auth: { username: process.env.RAZORPAY_KEY_ID!.trim(), password: keySecret },
+        auth: { username: keyId, password: keySecret },
       });
       const payment = paymentResponse.data;
+      paymentAmount = Number(payment.amount ?? 0);
+      paymentCurrency = String(payment.currency ?? 'INR');
 
       if (payment.order_id !== orderId) throw new BadRequestException('Payment order mismatch');
       if (!['captured', 'authorized'].includes(String(payment.status))) {
@@ -218,15 +232,39 @@ export class EmployerPaymentService {
         await axios.post(
           `https://api.razorpay.com/v1/payments/${paymentId}/capture`,
           { amount: payment.amount, currency: payment.currency },
-          { auth: { username: process.env.RAZORPAY_KEY_ID!.trim(), password: keySecret } },
+          { auth: { username: keyId, password: keySecret } },
         );
       }
+
+      paymentStatus = 'CAPTURED';
+      await this.prisma.$executeRaw`
+        UPDATE "employer_job_payment_transactions"
+        SET "razorpayPaymentId" = ${paymentId},
+            "amount" = ${paymentAmount},
+            "currency" = ${paymentCurrency},
+            "status" = ${paymentStatus},
+            "updatedAt" = CURRENT_TIMESTAMP
+        WHERE "razorpayOrderId" = ${orderId}
+          AND "employerId" = ${employerId}
+          AND "jobId" = ${jobId}
+      `;
     } catch (error: any) {
+      await this.prisma.$executeRaw`
+        UPDATE "employer_job_payment_transactions"
+        SET "razorpayPaymentId" = ${paymentId},
+            "status" = 'FAILED',
+            "updatedAt" = CURRENT_TIMESTAMP
+        WHERE "razorpayOrderId" = ${orderId}
+          AND "employerId" = ${employerId}
+          AND "jobId" = ${jobId}
+      `;
+
       if (error instanceof BadRequestException) throw error;
       const message = error?.response?.data?.error?.description || 'Unable to verify payment with Razorpay';
       throw new BadRequestException(message);
     }
 
-    return { paid: true, jobId: job.id };
+    if (paymentStatus !== 'CAPTURED') throw new BadRequestException('Payment was not captured');
+    return { paid: true, jobId: job.id, amount: paymentAmount, currency: paymentCurrency };
   }
 }
