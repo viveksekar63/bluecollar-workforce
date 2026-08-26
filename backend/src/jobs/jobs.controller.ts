@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   DefaultValuePipe,
@@ -10,11 +11,12 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { IsArray, IsDateString, IsInt, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { IsArray, IsDateString, IsIn, IsInt, IsNumber, IsOptional, IsString, Matches, Min } from 'class-validator';
 
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { EmployerApplicationService } from './employer-application.service';
+import { EmployerPaymentService } from './employer-payment.service';
 import { JobsService } from './jobs.service';
 
 class CreateJobDto {
@@ -41,12 +43,22 @@ class UpdateJobDto extends CreateJobDto {
   @IsOptional() declare salaryType: string;
 }
 
+class CreatePaymentMethodDto {
+  @IsIn(['CARD', 'UPI', 'BANK_ACCOUNT']) type!: 'CARD' | 'UPI' | 'BANK_ACCOUNT';
+  @IsString() label!: string;
+  @IsOptional() @IsString() provider?: string;
+  @IsOptional() @IsString() providerPaymentMethodId?: string;
+  @IsOptional() @Matches(/^\d{4}$/) last4?: string;
+  @IsOptional() @IsString() upiId?: string;
+}
+
 @Controller('jobs')
 @UseGuards(JwtAuthGuard)
 export class JobsController {
   constructor(
     private readonly jobsService: JobsService,
     private readonly employerApplicationService: EmployerApplicationService,
+    private readonly employerPaymentService: EmployerPaymentService,
   ) {}
 
   @Get('recommended')
@@ -76,6 +88,19 @@ export class JobsController {
     return this.employerApplicationService.getDetails(user.userId, applicationId);
   }
 
+  @Get('employer/payment-methods')
+  async paymentMethods(@CurrentUser() user: { userId: string }) {
+    return this.employerPaymentService.list(user.userId);
+  }
+
+  @Post('employer/payment-methods')
+  async createPaymentMethod(
+    @CurrentUser() user: { userId: string },
+    @Body() dto: CreatePaymentMethodDto,
+  ) {
+    return this.employerPaymentService.create(user.userId, dto);
+  }
+
   @Post('employer')
   async create(
     @CurrentUser() user: { userId: string },
@@ -98,6 +123,10 @@ export class JobsController {
     @CurrentUser() user: { userId: string },
     @Param('id') jobId: string,
   ) {
+    const hasPaymentMethod = await this.employerPaymentService.hasActiveMethod(user.userId);
+    if (!hasPaymentMethod) {
+      throw new BadRequestException('Add a payment method before publishing this job');
+    }
     return this.jobsService.publishEmployerJob(user.userId, jobId);
   }
 
