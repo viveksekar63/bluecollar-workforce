@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { login } from '@/api/auth';
 import { setAccessToken } from '@/api/client';
@@ -13,11 +13,13 @@ type LoginRole = 'WORKER' | 'EMPLOYER';
 
 export default function LoginScreen() {
   const { height } = useWindowDimensions();
+  const params = useLocalSearchParams<{ role?: string }>();
+  const initialRole: LoginRole = params.role === 'EMPLOYER' ? 'EMPLOYER' : 'WORKER';
   const setSession = useAuthStore((state) => state.setSession);
   const setActiveRole = useAuthStore((state) => state.setActiveRole);
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
-  const [selectedRole, setSelectedRole] = useState<LoginRole>('WORKER');
+  const [selectedRole, setSelectedRole] = useState<LoginRole>(initialRole);
   const [loading, setLoading] = useState(false);
 
   async function handleLogin() {
@@ -31,8 +33,6 @@ export default function LoginScreen() {
       setAccessToken(response.accessToken);
       setSession(response.accessToken, response.user, response.worker, response.employer);
 
-      // The backend validates the selected role against the authenticated account
-      // and returns the role that should be active for this session.
       const activeRole = response.activeRole;
       if (activeRole) setActiveRole(activeRole);
 
@@ -54,19 +54,9 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-        bounces={false}
-      >
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} bounces={false}>
         <View style={[styles.hero, { height: heroHeight }]}>
-          <Image
-            source={WORKTRUST_HERO_IMAGE}
-            style={StyleSheet.absoluteFillObject}
-            contentFit="cover"
-            transition={150}
-          />
+          <Image source={WORKTRUST_HERO_IMAGE} style={StyleSheet.absoluteFillObject} contentFit="cover" transition={150} />
           <View style={styles.heroShade} />
           <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={styles.backHitArea} />
         </View>
@@ -78,56 +68,22 @@ export default function LoginScreen() {
 
           <View style={styles.inputWrap}>
             <Text style={styles.inputIcon}>⌕</Text>
-            <TextInput
-              value={identifier}
-              onChangeText={setIdentifier}
-              placeholder="Mobile number or email"
-              placeholderTextColor={BrandColors.muted}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              style={styles.input}
-            />
+            <TextInput value={identifier} onChangeText={setIdentifier} placeholder="Mobile number or email" placeholderTextColor={BrandColors.muted} autoCapitalize="none" keyboardType="email-address" style={styles.input} />
           </View>
-
           <View style={styles.inputWrap}>
             <Text style={styles.inputIcon}>⌑</Text>
-            <TextInput
-              value={password}
-              onChangeText={setPassword}
-              placeholder="Password"
-              placeholderTextColor={BrandColors.muted}
-              secureTextEntry
-              style={styles.input}
-            />
+            <TextInput value={password} onChangeText={setPassword} placeholder="Password" placeholderTextColor={BrandColors.muted} secureTextEntry style={styles.input} />
           </View>
 
-          <Pressable style={styles.forgot} onPress={() => Alert.alert('Forgot password', 'Password recovery will be available here.')}> 
-            <Text style={styles.forgotText}>Forgot password?</Text>
-          </Pressable>
-
+          <Pressable style={styles.forgot} onPress={() => Alert.alert('Forgot password', 'Password recovery will be available here.')}><Text style={styles.forgotText}>Forgot password?</Text></Pressable>
           <Text style={styles.roleLabel}>Continue as</Text>
           <View style={styles.roles}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ selected: selectedRole === 'WORKER' }}
-              onPress={() => setSelectedRole('WORKER')}
-              style={[styles.role, selectedRole === 'WORKER' && styles.roleActive]}
-            >
-              <Text style={styles.roleIcon}>👷</Text>
-              <Text style={styles.roleTitle}>Worker</Text>
-              <Text style={styles.roleHint}>Find jobs & apply</Text>
+            <Pressable accessibilityRole="button" accessibilityState={{ selected: selectedRole === 'WORKER' }} onPress={() => setSelectedRole('WORKER')} style={[styles.role, selectedRole === 'WORKER' && styles.roleActive]}>
+              <Text style={styles.roleIcon}>👷</Text><Text style={styles.roleTitle}>Worker</Text><Text style={styles.roleHint}>Find jobs & apply</Text>
               {selectedRole === 'WORKER' && <View style={styles.check}><Text style={styles.checkText}>✓</Text></View>}
             </Pressable>
-
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ selected: selectedRole === 'EMPLOYER' }}
-              onPress={() => setSelectedRole('EMPLOYER')}
-              style={[styles.role, selectedRole === 'EMPLOYER' && styles.roleActive]}
-            >
-              <Text style={styles.roleIcon}>💼</Text>
-              <Text style={styles.roleTitle}>Employer</Text>
-              <Text style={styles.roleHint}>Post jobs & hire</Text>
+            <Pressable accessibilityRole="button" accessibilityState={{ selected: selectedRole === 'EMPLOYER' }} onPress={() => setSelectedRole('EMPLOYER')} style={[styles.role, selectedRole === 'EMPLOYER' && styles.roleActive]}>
+              <Text style={styles.roleIcon}>💼</Text><Text style={styles.roleTitle}>Employer</Text><Text style={styles.roleHint}>Post jobs & hire</Text>
               {selectedRole === 'EMPLOYER' && <View style={styles.check}><Text style={styles.checkText}>✓</Text></View>}
             </Pressable>
           </View>
@@ -135,24 +91,9 @@ export default function LoginScreen() {
           <Pressable onPress={handleLogin} disabled={loading} style={[styles.primary, loading && styles.disabled]}>
             {loading ? <ActivityIndicator color={BrandColors.slate} /> : <><Text style={styles.primaryText}>Sign in</Text><Text style={styles.arrow}>→</Text></>}
           </Pressable>
-
-          <View style={styles.or}>
-            <View style={styles.line} />
-            <Text style={styles.orText}>or</Text>
-            <View style={styles.line} />
-          </View>
-
-          <Pressable onPress={() => router.push('/register')} style={styles.create}>
-            <Text style={styles.createText}>＋ Create an account</Text>
-          </Pressable>
-
-          <View style={styles.security}>
-            <Text style={styles.securityIcon}>♢</Text>
-            <View style={styles.securityCopy}>
-              <Text style={styles.securityTitle}>Safe. Secure. Reliable.</Text>
-              <Text style={styles.securityText}>Your data is protected with industry-leading security.</Text>
-            </View>
-          </View>
+          <View style={styles.or}><View style={styles.line} /><Text style={styles.orText}>or</Text><View style={styles.line} /></View>
+          <Pressable onPress={() => router.push('/register')} style={styles.create}><Text style={styles.createText}>＋ Create an account</Text></Pressable>
+          <View style={styles.security}><Text style={styles.securityIcon}>♢</Text><View style={styles.securityCopy}><Text style={styles.securityTitle}>Safe. Secure. Reliable.</Text><Text style={styles.securityText}>Your data is protected with industry-leading security.</Text></View></View>
         </View>
       </ScrollView>
     </SafeAreaView>
