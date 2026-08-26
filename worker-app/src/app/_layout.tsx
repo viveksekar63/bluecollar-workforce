@@ -14,6 +14,7 @@ export default function RootLayout() {
         <Stack.Screen name="employer-jobs" />
         <Stack.Screen name="employer-job-create" />
         <Stack.Screen name="employer-job-details" />
+        <Stack.Screen name="employer-payment-method" />
         <Stack.Screen name="employer-applications" />
         <Stack.Screen name="employer-application-details" />
         <Stack.Screen name="profile" />
