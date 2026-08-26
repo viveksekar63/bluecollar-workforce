@@ -18,6 +18,7 @@ export default function EmployerHomeScreen() {
       <Pressable style={styles.card} onPress={() => router.push('/employer-applications')}><Text style={styles.icon}>👷</Text><Text style={styles.cardTitle}>Applications</Text><Text style={styles.cardText}>Review applicants</Text></Pressable>
     </View>
     <Pressable style={styles.create} onPress={() => router.push('/employer-job-create')}><Text style={styles.createText}>+ Create New Job</Text></Pressable>
+    <Pressable style={styles.subscription} onPress={() => router.push('/employer-subscription')}><Text style={styles.subscriptionTitle}>💳 Job Posting Subscription</Text><Text style={styles.subscriptionText}>Choose a monthly plan and publish jobs without paying for each job.</Text></Pressable>
     <Pressable style={styles.switch} onPress={() => { setActiveRole('WORKER'); router.replace('/home'); }}><Text style={styles.switchText}>Switch to Worker</Text></Pressable>
   </View>;
 }
@@ -34,6 +35,9 @@ const styles = StyleSheet.create({
   cardText: { marginTop: 5, fontSize: 12, lineHeight: 18, color: BrandColors.textSecondary },
   create: { marginTop: 16, height: 52, borderRadius: 14, backgroundColor: BrandColors.gold, alignItems: 'center', justifyContent: 'center' },
   createText: { color: BrandColors.slate, fontSize: 15, fontWeight: '900' },
+  subscription: { marginTop: 12, padding: 14, borderRadius: 14, backgroundColor: BrandColors.slateSoft, borderWidth: 1, borderColor: BrandColors.gold },
+  subscriptionTitle: { color: BrandColors.gold, fontSize: 14, fontWeight: '900' },
+  subscriptionText: { color: BrandColors.textSecondary, fontSize: 11, lineHeight: 17, marginTop: 5 },
   switch: { marginTop: 14, height: 52, borderRadius: 14, borderWidth: 1, borderColor: BrandColors.gold, alignItems: 'center', justifyContent: 'center' },
   switchText: { color: BrandColors.gold, fontSize: 15, fontWeight: '800' },
 });
