@@ -4,6 +4,7 @@ import { ConfigModule, ConfigService } from "@nestjs/config";
 
 import { AuthController } from "./auth.controller";
 import { AuthService } from "./auth.service";
+import { RegistrationService } from "./registration.service";
 
 import { JwtStrategy } from "./strategies/jwt.strategy";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard";
@@ -44,6 +45,7 @@ import { PermissionGuard } from "./permissions/permission.guard";
 
   providers: [
     AuthService,
+    RegistrationService,
     JwtStrategy,
     JwtAuthGuard,
 
