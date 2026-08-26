@@ -37,12 +37,28 @@ export class RegistrationService {
       throw new ConflictException('A user with this mobile number already exists. Please sign in.');
     }
 
+    if (existing?.roles.length) {
+      const existingRoleNames = existing.roles.map((item) => item.role.name);
+      if (!existingRoleNames.includes(dto.role)) {
+        throw new ConflictException('This mobile number already has a pending registration for another role');
+      }
+    }
+
+    const recentOtp = existing
+      ? await this.prisma.otpRequest.findFirst({
+          where: { userId: existing.id, verifiedAt: null, createdAt: { gt: new Date(Date.now() - 60 * 1000) } },
+          select: { id: true },
+        })
+      : null;
+
+    if (recentOtp) throw new ConflictException('Please wait before requesting another OTP');
+
     const passwordHash = await bcrypt.hash(dto.password, 12);
     const otp = this.generateOtp();
     const otpHash = await bcrypt.hash(otp, 10);
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
-    const result = await this.prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async (tx) => {
       let user = existing;
 
       if (!user) {
@@ -114,8 +130,6 @@ export class RegistrationService {
       await tx.otpRequest.create({
         data: { userId: user.id, phone, otpHash, expiresAt },
       });
-
-      return { userId: user.id };
     });
 
     await this.sendOtp(phone, otp);
@@ -157,7 +171,7 @@ export class RegistrationService {
     ]);
 
     const roleNames = request.user.roles.map((item) => item.role.name).filter((name) => name === 'WORKER' || name === 'EMPLOYER');
-    const role = request.user.employer ? 'EMPLOYER' : 'WORKER';
+    const role = request.user.worker ? 'WORKER' : 'EMPLOYER';
 
     if (role === 'EMPLOYER') {
       return {
