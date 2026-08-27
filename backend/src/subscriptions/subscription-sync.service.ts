@@ -3,7 +3,7 @@ import axios from 'axios';
 
 import { PrismaService } from '../prisma/prisma.service';
 
-const TERMINAL_STATUSES = ['cancelled', 'completed', 'expired', 'halted'];
+const TERMINAL_STATUSES = ['cancelled', 'completed', 'expired', 'halted', 'failed'];
 
 @Injectable()
 export class SubscriptionSyncService {
@@ -69,7 +69,7 @@ export class SubscriptionSyncService {
             "currentPeriodEnd" = ${currentEnd},
             "endedAt" = ${endedAt},
             "cancelAtPeriodEnd" = CASE
-              WHEN ${nextStatus} IN ('cancelled', 'completed', 'expired', 'halted') THEN false
+              WHEN ${nextStatus} IN ('cancelled', 'completed', 'expired', 'halted', 'failed') THEN false
               ELSE "cancelAtPeriodEnd"
             END,
             "updatedAt" = CURRENT_TIMESTAMP
