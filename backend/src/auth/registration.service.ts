@@ -6,6 +6,7 @@ import { RegistrationRequestOtpDto } from './dto/registration-request-otp.dto';
 import { RegistrationVerifyOtpDto } from './dto/registration-verify-otp.dto';
 import { EmployerStatus } from '@prisma/client';
 import { AuthService } from './auth.service';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class RegistrationService {
@@ -102,18 +103,20 @@ export class RegistrationService {
       }
 
       if (dto.role === 'EMPLOYER' && !user.employer) {
-        await tx.employer.create({
+        const employer = await tx.employer.create({
           data: {
             userId: user.id,
             companyName: dto.companyName!.trim(),
             status: EmployerStatus.VERIFIED,
           },
         });
+        await this.assignFreeEmployerPlan(tx, employer.id);
       } else if (dto.role === 'EMPLOYER' && user.employer) {
         await tx.employer.update({
           where: { id: user.employer.id },
           data: { companyName: dto.companyName!.trim(), status: EmployerStatus.VERIFIED },
         });
+        await this.assignFreeEmployerPlan(tx, user.employer.id);
       }
 
       await tx.otpRequest.updateMany({
@@ -177,6 +180,12 @@ export class RegistrationService {
         ? { id: user.employer.id, companyName: user.employer.companyName, status: user.employer.status }
         : undefined,
     };
+  }
+
+  private async assignFreeEmployerPlan(tx: any, employerId: string) {
+    const plan = await tx.$queryRaw<Array<{ id: string; jobLimit: number }>>`SELECT "id", "jobLimit" FROM "employer_subscription_plans" WHERE "code" = 'FREE' AND "isActive" = true LIMIT 1`;
+    if (!plan[0]) throw new ConflictException('FREE employer subscription plan is not configured');
+    await tx.$executeRaw`INSERT INTO "employer_subscriptions" ("id", "employerId", "planId", "razorpaySubscriptionId", "status", "currentPeriodStart", "currentPeriodEnd", "jobsUsed", "jobLimit", "cancelAtPeriodEnd", "updatedAt") SELECT ${randomUUID()}, ${employerId}, ${plan[0].id}, NULL, 'active', NULL, NULL, 0, ${plan[0].jobLimit}, false, CURRENT_TIMESTAMP WHERE NOT EXISTS (SELECT 1 FROM "employer_subscriptions" WHERE "employerId" = ${employerId})`;
   }
 
   private normalizePhone(value: string) {
