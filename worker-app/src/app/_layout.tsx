@@ -1,11 +1,16 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
+import EmployerNavigation from '@/components/employer-navigation';
+import { useAuthStore } from '@/store/auth';
+
 export default function RootLayout() {
+  const activeRole = useAuthStore((state) => state.activeRole);
+
   return (
     <>
       <StatusBar style="light" />
-      <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right', contentStyle: { backgroundColor: '#0D141A' } }}>
+      <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right', contentStyle: { backgroundColor: '#0D141A' }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="login" />
         <Stack.Screen name="register" />
@@ -19,6 +24,8 @@ export default function RootLayout() {
         <Stack.Screen name="employer-payment-method" />
         <Stack.Screen name="employer-applications" />
         <Stack.Screen name="employer-application-details" />
+        <Stack.Screen name="employer-profile" />
+        <Stack.Screen name="employer-settings" />
         <Stack.Screen name="profile" />
         <Stack.Screen name="address" />
         <Stack.Screen name="home" />
@@ -30,6 +37,7 @@ export default function RootLayout() {
         <Stack.Screen name="explore" />
         <Stack.Screen name="job-details" />
       </Stack>
+      {activeRole === 'EMPLOYER' && <EmployerNavigation />}
     </>
   );
 }
