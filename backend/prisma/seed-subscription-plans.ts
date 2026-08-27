@@ -1,6 +1,15 @@
 import { randomUUID } from 'crypto';
 
-const plans = [
+type SubscriptionPlanSeed = {
+  code: string;
+  name: string;
+  description: string;
+  priceInr: number;
+  jobLimit: number;
+  envKey?: string;
+};
+
+const plans: SubscriptionPlanSeed[] = [
   {
     code: 'FREE',
     name: 'Free',
@@ -32,7 +41,7 @@ const plans = [
     jobLimit: 50,
     envKey: 'RAZORPAY_PLAN_BUSINESS_ID',
   },
-] as const;
+];
 
 export async function seedSubscriptionPlans(prisma: any) {
   console.log('\nCreating employer subscription plans...');
