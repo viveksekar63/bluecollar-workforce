@@ -192,8 +192,6 @@ export class SubscriptionsService {
       };
     }
 
-    // A pending Razorpay subscription never replaces the FREE entitlement.
-    // FREE remains the active plan until the paid subscription is confirmed.
     const free = await this.ensureFreeSubscription(employer.id);
     const pending = await this.getPendingForEmployer(employer.id);
 
@@ -253,7 +251,6 @@ export class SubscriptionsService {
       };
     }
 
-
     if (!plan.razorpayPlanId) {
       throw new BadRequestException('This subscription plan is not configured with Razorpay yet');
     }
@@ -273,31 +270,30 @@ export class SubscriptionsService {
           `https://api.razorpay.com/v1/subscriptions/${pending.razorpaySubscriptionId}`,
           { auth: { username: keyId, password: keySecret } },
         );
-        await this.syncRazorpaySubscription(response.data);
-        const refreshed = await this.getPendingForEmployer(employer.id);
-        if (refreshed?.status === 'active') {
-          const current = await this.getActiveForEmployer(employer.id);
-          return {
-            keyId,
-            subscriptionId: refreshed.razorpaySubscriptionId,
-            shortUrl: response.data.short_url ?? null,
-            status: 'active',
-            active: true,
-            plan,
-            subscription: current,
-          };
+        const remoteStatus = String(response.data.status ?? 'created');
+
+        // Never activate here. This path can be reached simply by opening the
+        // plan screen again. Only a verified checkout signature or a verified
+        // Razorpay webhook is allowed to grant paid entitlement.
+        if (TERMINAL_STATUSES.includes(remoteStatus)) {
+          await this.prisma.$executeRaw`
+            UPDATE "employer_subscriptions"
+            SET "status" = ${remoteStatus},
+                "endedAt" = ${response.data.ended_at ? new Date(Number(response.data.ended_at) * 1000) : null},
+                "updatedAt" = CURRENT_TIMESTAMP
+            WHERE "id" = ${pending.id}
+          `;
         }
-        if (['created', 'authenticated', 'pending'].includes(String(response.data.status))) {
-          return {
-            keyId,
-            subscriptionId: pending.razorpaySubscriptionId,
-            shortUrl: response.data.short_url ?? null,
-            status: String(response.data.status),
-            active: false,
-            plan,
-            subscription: pending,
-          };
-        }
+
+        return {
+          keyId,
+          subscriptionId: pending.razorpaySubscriptionId,
+          shortUrl: response.data.short_url ?? null,
+          status: remoteStatus,
+          active: false,
+          plan,
+          subscription: pending,
+        };
       } catch (error: any) {
         throw new BadRequestException(
           error?.response?.data?.error?.description || 'Unable to resume Razorpay subscription',
@@ -321,7 +317,6 @@ export class SubscriptionsService {
 
       const razorpaySubscription = response.data;
 
-      // IMPORTANT: do not consume the FREE plan until the paid plan is active.
       await this.prisma.$executeRaw`
         INSERT INTO "employer_subscriptions"
           ("id", "employerId", "planId", "razorpaySubscriptionId", "status",
@@ -345,7 +340,7 @@ export class SubscriptionsService {
         subscriptionId: razorpaySubscription.id as string,
         shortUrl: razorpaySubscription.short_url as string | null,
         status: String(razorpaySubscription.status ?? 'created'),
-        active: String(razorpaySubscription.status ?? 'created') === 'active',
+        active: false,
         plan: {
           code: plan.code,
           name: plan.name,
@@ -403,13 +398,24 @@ export class SubscriptionsService {
         `https://api.razorpay.com/v1/subscriptions/${subscriptionId}`,
         { auth: { username: keyId, password: keySecret } },
       );
+      const status = String(response.data.status ?? 'created');
+      if (!ACTIVE_STATUSES.includes(status)) {
+        return {
+          verified: true,
+          razorpayPaymentId: paymentId,
+          subscriptionId,
+          status,
+          active: false,
+        };
+      }
+
       await this.syncRazorpaySubscription(response.data);
       return {
         verified: true,
         razorpayPaymentId: paymentId,
         subscriptionId,
-        status: String(response.data.status),
-        active: String(response.data.status) === 'active',
+        status,
+        active: true,
       };
     } catch (error: any) {
       throw new BadRequestException(
