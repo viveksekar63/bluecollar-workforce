@@ -3,6 +3,8 @@ import axios from 'axios';
 
 import { PrismaService } from '../prisma/prisma.service';
 
+const TERMINAL_STATUSES = ['cancelled', 'completed', 'expired', 'halted'];
+
 @Injectable()
 export class SubscriptionSyncService {
   constructor(private readonly prisma: PrismaService) {}
@@ -17,8 +19,8 @@ export class SubscriptionSyncService {
       throw new BadRequestException('Employer account is not verified');
     }
 
-    const rows = await this.prisma.$queryRaw<Array<{ id: string; razorpaySubscriptionId: string }>>`
-      SELECT "id", "razorpaySubscriptionId"
+    const rows = await this.prisma.$queryRaw<Array<{ id: string; razorpaySubscriptionId: string; status: string }>>`
+      SELECT "id", "razorpaySubscriptionId", "status"
       FROM "employer_subscriptions"
       WHERE "employerId" = ${employer.id}
         AND "razorpaySubscriptionId" IS NOT NULL
@@ -38,7 +40,7 @@ export class SubscriptionSyncService {
         { auth: { username: keyId, password: keySecret } },
       );
       const subscription = response.data;
-      const status = String(subscription.status ?? 'created');
+      const razorpayStatus = String(subscription.status ?? 'created');
       const currentStart = subscription.current_start
         ? new Date(Number(subscription.current_start) * 1000)
         : null;
@@ -49,25 +51,29 @@ export class SubscriptionSyncService {
         ? new Date(Number(subscription.ended_at) * 1000)
         : null;
 
-      // This endpoint is reconciliation only. It must never turn a pending
-      // Razorpay subscription into a paid entitlement. Activation is reserved
-      // for a verified checkout or a verified Razorpay webhook event.
+      // Reconciliation must never grant a paid entitlement. A pending local
+      // record can only move to a terminal Razorpay state here. Promotion to
+      // ACTIVE is reserved for verifyCheckout() or a verified webhook event.
+      const localStatus = rows[0].status;
+      const nextStatus =
+        localStatus === 'active'
+          ? razorpayStatus
+          : TERMINAL_STATUSES.includes(razorpayStatus)
+            ? razorpayStatus
+            : localStatus;
+
       await this.prisma.$executeRaw`
         UPDATE "employer_subscriptions"
-        SET "status" = ${status},
+        SET "status" = ${nextStatus},
             "currentPeriodStart" = ${currentStart},
             "currentPeriodEnd" = ${currentEnd},
             "endedAt" = ${endedAt},
             "cancelAtPeriodEnd" = CASE
-              WHEN ${status} IN ('cancelled', 'completed', 'expired', 'halted') THEN false
+              WHEN ${nextStatus} IN ('cancelled', 'completed', 'expired', 'halted') THEN false
               ELSE "cancelAtPeriodEnd"
             END,
             "updatedAt" = CURRENT_TIMESTAMP
         WHERE "id" = ${rows[0].id}
-          AND (
-            "status" <> 'active'
-            OR ${status} = 'active'
-          )
       `;
 
       return {
@@ -75,7 +81,8 @@ export class SubscriptionSyncService {
         subscription: {
           id: rows[0].id,
           razorpaySubscriptionId: rows[0].razorpaySubscriptionId,
-          status,
+          status: nextStatus,
+          razorpayStatus,
           currentPeriodStart: currentStart,
           currentPeriodEnd: currentEnd,
         },
