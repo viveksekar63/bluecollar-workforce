@@ -19,13 +19,19 @@ export class SubscriptionSyncService {
       throw new BadRequestException('Employer account is not verified');
     }
 
-    const rows = await this.prisma.$queryRaw<Array<{ id: string; razorpaySubscriptionId: string; status: string }>>`
-      SELECT "id", "razorpaySubscriptionId", "status"
-      FROM "employer_subscriptions"
-      WHERE "employerId" = ${employer.id}
-        AND "razorpaySubscriptionId" IS NOT NULL
-        AND "status" IN ('created', 'authenticated', 'active', 'pending', 'halted')
-      ORDER BY "createdAt" DESC
+    const rows = await this.prisma.$queryRaw<Array<{
+      id: string;
+      razorpaySubscriptionId: string;
+      status: string;
+      razorpayPlanId: string | null;
+    }>>`
+      SELECT s."id", s."razorpaySubscriptionId", s."status", p."razorpayPlanId"
+      FROM "employer_subscriptions" s
+      INNER JOIN "employer_subscription_plans" p ON p."id" = s."planId"
+      WHERE s."employerId" = ${employer.id}
+        AND s."razorpaySubscriptionId" IS NOT NULL
+        AND s."status" IN ('created', 'authenticated', 'active', 'pending', 'halted')
+      ORDER BY s."createdAt" DESC
       LIMIT 1
     `;
     if (!rows[0]) return { synced: false, subscription: null };
@@ -41,6 +47,14 @@ export class SubscriptionSyncService {
       );
       const subscription = response.data;
       const razorpayStatus = String(subscription.status ?? 'created');
+      const remotePlanId = String(subscription.plan_id ?? '');
+
+      // Never grant a paid entitlement when the Razorpay subscription belongs
+      // to a different plan. This protects against stale/old subscriptions.
+      if (rows[0].razorpayPlanId && remotePlanId !== rows[0].razorpayPlanId) {
+        throw new BadRequestException('Razorpay subscription plan does not match the local subscription plan');
+      }
+
       const currentStart = subscription.current_start
         ? new Date(Number(subscription.current_start) * 1000)
         : null;
@@ -51,16 +65,16 @@ export class SubscriptionSyncService {
         ? new Date(Number(subscription.ended_at) * 1000)
         : null;
 
-      // Reconciliation must never grant a paid entitlement. A pending local
-      // record can only move to a terminal Razorpay state here. Promotion to
-      // ACTIVE is reserved for verifyCheckout() or a verified webhook event.
+      // Razorpay's authenticated state means the customer completed the
+      // authorisation transaction, but the subscription is not yet active.
+      // Once Razorpay reports ACTIVE through the authenticated API call, it is
+      // safe to reconcile the local entitlement even if the webhook is delayed.
       const localStatus = rows[0].status;
-      const nextStatus =
-        localStatus === 'active'
-          ? razorpayStatus
-          : TERMINAL_STATUSES.includes(razorpayStatus)
-            ? razorpayStatus
-            : localStatus;
+      const nextStatus = TERMINAL_STATUSES.includes(razorpayStatus)
+        ? razorpayStatus
+        : razorpayStatus === 'active'
+          ? 'active'
+          : localStatus;
 
       await this.prisma.$executeRaw`
         UPDATE "employer_subscriptions"
@@ -68,6 +82,10 @@ export class SubscriptionSyncService {
             "currentPeriodStart" = ${currentStart},
             "currentPeriodEnd" = ${currentEnd},
             "endedAt" = ${endedAt},
+            "jobsUsed" = CASE
+              WHEN ${nextStatus} = 'active' AND ${localStatus} <> 'active' THEN 0
+              ELSE "jobsUsed"
+            END,
             "cancelAtPeriodEnd" = CASE
               WHEN ${nextStatus} IN ('cancelled', 'completed', 'expired', 'halted', 'failed') THEN false
               ELSE "cancelAtPeriodEnd"
@@ -75,6 +93,20 @@ export class SubscriptionSyncService {
             "updatedAt" = CURRENT_TIMESTAMP
         WHERE "id" = ${rows[0].id}
       `;
+
+      if (nextStatus === 'active') {
+        await this.prisma.$executeRaw`
+          UPDATE "employer_subscriptions" s
+          SET "status" = 'completed',
+              "endedAt" = COALESCE("endedAt", CURRENT_TIMESTAMP),
+              "updatedAt" = CURRENT_TIMESTAMP
+          FROM "employer_subscription_plans" p
+          WHERE s."employerId" = ${employer.id}
+            AND s."planId" = p."id"
+            AND p."code" = 'FREE'
+            AND s."status" = 'active'
+        `;
+      }
 
       return {
         synced: true,
@@ -88,6 +120,7 @@ export class SubscriptionSyncService {
         },
       };
     } catch (error: any) {
+      if (error instanceof BadRequestException) throw error;
       throw new BadRequestException(
         error?.response?.data?.error?.description || 'Unable to sync subscription status with Razorpay',
       );
