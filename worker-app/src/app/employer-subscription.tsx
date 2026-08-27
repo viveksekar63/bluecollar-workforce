@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Pressable, RefreshControl, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { cancelEmployerSubscription, createEmployerSubscription, EmployerSubscription, EmployerSubscriptionPlan, getCurrentSubscription, getSubscriptionPlans } from '@/api/subscriptions';
 import { BrandColors } from '@/constants/theme';
