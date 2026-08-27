@@ -12,7 +12,7 @@ type CheckoutInput = {
 };
 
 export async function openRazorpaySubscriptionCheckout(input: CheckoutInput) {
-  const paymentMethod = input.paymentMethod ?? 'upi';
+  const paymentMethod = input.paymentMethod;
 
   return RazorpayCheckout.open({
     key: input.keyId,
@@ -21,7 +21,7 @@ export async function openRazorpaySubscriptionCheckout(input: CheckoutInput) {
     description: input.description,
     prefill: input.prefill,
     subscription_card_change: true,
-    ...(paymentMethod === 'upi' ? { method: { upi: true } } : { method: { card: true } }),
+    ...(paymentMethod ? { method: paymentMethod } : {}),
     theme: { color: '#FBBE3F' },
   });
 }
