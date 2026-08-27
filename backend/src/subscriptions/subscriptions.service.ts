@@ -53,9 +53,6 @@ export class SubscriptionsService {
 
   async current(userId: string) {
     const employer = await this.getEmployer(userId);
-    // Every verified employer starts with one free job posting. Initialize the
-    // free subscription lazily so the billing screen and publish flow see the
-    // same entitlement even if the employer was created before subscriptions.
     const subscription = await this.ensureFreeSubscription(employer.id);
     if (!subscription) return { active: false, subscription: null };
     const active = subscription.status === 'active' && (!subscription.currentPeriodEnd || subscription.currentPeriodEnd.getTime() > Date.now());
@@ -78,19 +75,27 @@ export class SubscriptionsService {
     }
 
     if (!plan.razorpayPlanId) throw new BadRequestException('This subscription plan is not configured with Razorpay yet');
-    if (current && current.planCode !== 'FREE') throw new BadRequestException('You already have an employer subscription. Manage the current subscription before starting another one.');
+
+    // If the previous checkout was cancelled before authorisation, reuse the
+    // still-created Razorpay subscription instead of creating another one.
+    if (current && current.planCode !== 'FREE') {
+      if (current.status === 'created' && current.razorpaySubscriptionId) {
+        const { keyId } = this.razorpayConfig();
+        return { keyId, subscriptionId: current.razorpaySubscriptionId, shortUrl: null, status: current.status, active: false, plan: { code: plan.code, name: plan.name, priceInr: plan.priceInr, currency: plan.currency, billingInterval: plan.billingInterval, jobLimit: plan.jobLimit } };
+      }
+      throw new BadRequestException('You already have an employer subscription. Manage the current subscription before starting another one.');
+    }
 
     const { keyId, keySecret, totalCount } = this.razorpayConfig();
     try {
       const response = await axios.post('https://api.razorpay.com/v1/subscriptions', { plan_id: plan.razorpayPlanId, total_count: totalCount, quantity: 1, customer_notify: true, notes: { employerId: employer.id, planCode: plan.code } }, { auth: { username: keyId, password: keySecret } });
       const razorpaySubscription = response.data;
 
-      if (current?.planCode === 'FREE') {
-        await this.prisma.$executeRaw`UPDATE "employer_subscriptions" SET "status" = 'completed', "endedAt" = CURRENT_TIMESTAMP, "updatedAt" = CURRENT_TIMESTAMP WHERE "id" = ${current.id}`;
-      }
-
+      // Keep the FREE entitlement intact until the paid subscription has been
+      // authenticated successfully. This prevents a cancelled/failed checkout
+      // from consuming the employer's free posting.
       await this.prisma.$executeRaw`INSERT INTO "employer_subscriptions" ("id", "employerId", "planId", "razorpaySubscriptionId", "status", "currentPeriodStart", "currentPeriodEnd", "jobsUsed", "jobLimit", "updatedAt") VALUES (${randomUUID()}, ${employer.id}, ${plan.id}, ${razorpaySubscription.id}, ${String(razorpaySubscription.status ?? 'created')}, ${razorpaySubscription.current_start ? new Date(Number(razorpaySubscription.current_start) * 1000) : null}, ${razorpaySubscription.current_end ? new Date(Number(razorpaySubscription.current_end) * 1000) : null}, 0, ${plan.jobLimit}, CURRENT_TIMESTAMP) ON CONFLICT ("razorpaySubscriptionId") DO UPDATE SET "status" = EXCLUDED."status", "currentPeriodStart" = EXCLUDED."currentPeriodStart", "currentPeriodEnd" = EXCLUDED."currentPeriodEnd", "updatedAt" = CURRENT_TIMESTAMP`;
-      return { keyId, subscriptionId: razorpaySubscription.id as string, shortUrl: razorpaySubscription.short_url as string | null, status: String(razorpaySubscription.status ?? 'created'), active: String(razorpaySubscription.status ?? 'created') === 'active', plan: { code: plan.code, name: plan.name, priceInr: plan.priceInr, currency: plan.currency, billingInterval: plan.billingInterval, jobLimit: plan.jobLimit } };
+      return { keyId, subscriptionId: razorpaySubscription.id as string, shortUrl: null, status: String(razorpaySubscription.status ?? 'created'), active: String(razorpaySubscription.status ?? 'created') === 'active', plan: { code: plan.code, name: plan.name, priceInr: plan.priceInr, currency: plan.currency, billingInterval: plan.billingInterval, jobLimit: plan.jobLimit } };
     } catch (error: any) { throw new BadRequestException(error?.response?.data?.error?.description || 'Unable to create Razorpay subscription'); }
   }
 
@@ -101,8 +106,19 @@ export class SubscriptionsService {
     if (eb.length !== rb.length || !timingSafeEqual(eb, rb)) throw new BadRequestException('Subscription payment signature verification failed');
     const owned = await this.prisma.$queryRaw<Array<{ id: string }>>`SELECT "id" FROM "employer_subscriptions" WHERE "employerId" = ${employer.id} AND "razorpaySubscriptionId" = ${subscriptionId} LIMIT 1`;
     if (!owned[0]) throw new NotFoundException('Subscription not found for this employer');
-    try { const response = await axios.get(`https://api.razorpay.com/v1/subscriptions/${subscriptionId}`, { auth: { username: keyId, password: keySecret } }); await this.syncRazorpaySubscription(response.data); return { verified: true, razorpayPaymentId: paymentId, subscriptionId, status: String(response.data.status), active: String(response.data.status) === 'active' }; }
-    catch (error: any) { throw new BadRequestException(error?.response?.data?.error?.description || 'Unable to verify subscription with Razorpay'); }
+    try {
+      const response = await axios.get(`https://api.razorpay.com/v1/subscriptions/${subscriptionId}`, { auth: { username: keyId, password: keySecret } });
+      const status = String(response.data.status);
+      await this.syncRazorpaySubscription(response.data);
+
+      // The free plan is retired only after Razorpay has accepted the paid
+      // subscription authentication. A cancelled/failed checkout keeps FREE.
+      if (status === 'authenticated' || status === 'active') {
+        await this.prisma.$executeRaw`UPDATE "employer_subscriptions" SET "status" = 'completed', "endedAt" = CURRENT_TIMESTAMP, "updatedAt" = CURRENT_TIMESTAMP WHERE "employerId" = ${employer.id} AND "razorpaySubscriptionId" IS NULL AND "status" = 'active'`;
+      }
+
+      return { verified: true, razorpayPaymentId: paymentId, subscriptionId, status, active: status === 'active' || status === 'authenticated' };
+    } catch (error: any) { throw new BadRequestException(error?.response?.data?.error?.description || 'Unable to verify subscription with Razorpay'); }
   }
 
   private async syncRazorpaySubscription(subscription: any) {
@@ -121,6 +137,9 @@ export class SubscriptionsService {
       if (subscription?.id) {
         const status = String(subscription.status ?? 'created'); const currentStart = subscription.current_start ? new Date(Number(subscription.current_start) * 1000) : null; const currentEnd = subscription.current_end ? new Date(Number(subscription.current_end) * 1000) : null; const endedAt = subscription.ended_at ? new Date(Number(subscription.ended_at) * 1000) : null; const resetUsage = eventName === 'subscription.activated' || eventName === 'subscription.charged';
         await tx.$executeRaw`UPDATE "employer_subscriptions" SET "status" = ${status}, "currentPeriodStart" = ${currentStart}, "currentPeriodEnd" = ${currentEnd}, "endedAt" = ${endedAt}, "jobsUsed" = CASE WHEN ${resetUsage} THEN 0 ELSE "jobsUsed" END, "cancelAtPeriodEnd" = CASE WHEN ${status} IN ('cancelled', 'completed', 'expired') THEN false ELSE "cancelAtPeriodEnd" END, "updatedAt" = CURRENT_TIMESTAMP WHERE "razorpaySubscriptionId" = ${String(subscription.id)}`;
+        if (status === 'authenticated' || status === 'active') {
+          await tx.$executeRaw`UPDATE "employer_subscriptions" SET "status" = 'completed', "endedAt" = CURRENT_TIMESTAMP, "updatedAt" = CURRENT_TIMESTAMP WHERE "employerId" = (SELECT "employerId" FROM "employer_subscriptions" WHERE "razorpaySubscriptionId" = ${String(subscription.id)} LIMIT 1) AND "razorpaySubscriptionId" IS NULL AND "status" = 'active'`;
+        }
       }
       await tx.$executeRaw`UPDATE "employer_subscription_webhook_events" SET "processedAt" = CURRENT_TIMESTAMP WHERE "eventId" = ${eventId}`;
       return { received: true, event: eventName };
