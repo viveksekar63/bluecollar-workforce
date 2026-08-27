@@ -126,6 +126,26 @@ export class JobsController {
     }
   }
 
+  @Post('employer/:id/pause')
+  async pause(@CurrentUser() user: { userId: string }, @Param('id') jobId: string) {
+    return this.jobsService.updateEmployerJobStatus(user.userId, jobId, 'PAUSE');
+  }
+
+  @Post('employer/:id/resume')
+  async resume(@CurrentUser() user: { userId: string }, @Param('id') jobId: string) {
+    return this.jobsService.updateEmployerJobStatus(user.userId, jobId, 'RESUME');
+  }
+
+  @Post('employer/:id/close')
+  async close(@CurrentUser() user: { userId: string }, @Param('id') jobId: string) {
+    return this.jobsService.updateEmployerJobStatus(user.userId, jobId, 'CLOSE');
+  }
+
+  @Post('employer/:id/reopen')
+  async reopen(@CurrentUser() user: { userId: string }, @Param('id') jobId: string) {
+    return this.jobsService.updateEmployerJobStatus(user.userId, jobId, 'REOPEN');
+  }
+
   @Get('employer/:id/applications')
   async applications(@CurrentUser() user: { userId: string }, @Param('id') jobId: string) {
     return this.jobsService.getEmployerApplications(user.userId, jobId);
