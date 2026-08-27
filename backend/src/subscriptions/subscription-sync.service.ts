@@ -16,6 +16,7 @@ export class SubscriptionSyncService {
       SELECT "id", "razorpaySubscriptionId"
       FROM "employer_subscriptions"
       WHERE "employerId" = ${employer.id}
+        AND "razorpaySubscriptionId" IS NOT NULL
         AND "status" IN ('created', 'authenticated', 'active', 'pending', 'halted')
       ORDER BY "createdAt" DESC
       LIMIT 1
