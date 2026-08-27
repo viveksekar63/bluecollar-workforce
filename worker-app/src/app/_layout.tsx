@@ -1,8 +1,32 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { Alert, Platform } from 'react-native';
 
 import EmployerNavigation from '@/components/employer-navigation';
 import { useAuthStore } from '@/store/auth';
+
+// React Native's multi-button Alert API is not reliable on react-native-web.
+// Use the browser confirmation dialog on web so destructive lifecycle actions
+// (pause/close/resume/reopen) actually invoke their onPress callbacks.
+if (Platform.OS === 'web') {
+  const nativeAlert = Alert.alert;
+  Alert.alert = ((title, message, buttons) => {
+    if (!buttons?.length) {
+      window.alert([title, message].filter(Boolean).join('\n'));
+      return;
+    }
+
+    const confirmed = window.confirm([title, message].filter(Boolean).join('\n'));
+    const cancelButton = buttons.find((button) => button.style === 'cancel');
+    const confirmButton = buttons.find((button) => button.style !== 'cancel') ?? buttons[buttons.length - 1];
+
+    if (confirmed) {
+      confirmButton?.onPress?.();
+    } else {
+      cancelButton?.onPress?.();
+    }
+  }) as typeof nativeAlert;
+}
 
 export default function RootLayout() {
   const activeRole = useAuthStore((state) => state.activeRole);
