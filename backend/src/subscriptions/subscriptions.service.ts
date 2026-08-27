@@ -52,7 +52,11 @@ export class SubscriptionsService {
   }
 
   async current(userId: string) {
-    const employer = await this.getEmployer(userId); const subscription = await this.getCurrentForEmployer(employer.id);
+    const employer = await this.getEmployer(userId);
+    // Every verified employer starts with one free job posting. Initialize the
+    // free subscription lazily so the billing screen and publish flow see the
+    // same entitlement even if the employer was created before subscriptions.
+    const subscription = await this.ensureFreeSubscription(employer.id);
     if (!subscription) return { active: false, subscription: null };
     const active = subscription.status === 'active' && (!subscription.currentPeriodEnd || subscription.currentPeriodEnd.getTime() > Date.now());
     return { active, subscription };
@@ -143,8 +147,20 @@ export class SubscriptionsService {
   async releaseJobPublishSlot(employerId: string) { await this.prisma.$executeRaw`UPDATE "employer_subscriptions" SET "jobsUsed" = GREATEST("jobsUsed" - 1, 0), "updatedAt" = CURRENT_TIMESTAMP WHERE "id" = (SELECT "id" FROM "employer_subscriptions" WHERE "employerId" = ${employerId} AND "status" = 'active' ORDER BY "createdAt" DESC LIMIT 1)`; }
 
   async cancelAtPeriodEnd(userId: string) {
-    const employer = await this.getEmployer(userId); const current = await this.getCurrentForEmployer(employer.id); if (!current) throw new NotFoundException('No active subscription found'); if (current.planCode === 'FREE') throw new BadRequestException('The FREE plan does not require cancellation.'); if (!current.razorpaySubscriptionId) throw new BadRequestException('Razorpay subscription is not available'); const { keyId, keySecret } = this.razorpayConfig();
-    try { const response = await axios.post(`https://api.razorpay.com/v1/subscriptions/${current.razorpaySubscriptionId}/cancel`, { cancel_at_cycle_end: true }, { auth: { username: keyId, password: keySecret } }); await this.syncRazorpaySubscription(response.data); await this.prisma.$executeRaw`UPDATE "employer_subscriptions" SET "cancelAtPeriodEnd" = true, "updatedAt" = CURRENT_TIMESTAMP WHERE "id" = ${current.id}`; return { success: true, subscriptionId: current.razorpaySubscriptionId, cancelAtPeriodEnd: true }; }
+    const employer = await this.getEmployer(userId); const current = await this.getCurrentForEmployer(employer.id);
+    if (!current || current.planCode === 'FREE' || !current.razorpaySubscriptionId) throw new BadRequestException('No paid employer subscription to cancel');
+    const { keyId, keySecret } = this.razorpayConfig();
+    try { await axios.post(`https://api.razorpay.com/v1/subscriptions/${current.razorpaySubscriptionId}/cancel`, { cancel_at_cycle_end: 1 }, { auth: { username: keyId, password: keySecret } }); }
     catch (error: any) { throw new BadRequestException(error?.response?.data?.error?.description || 'Unable to cancel subscription'); }
+    await this.prisma.$executeRaw`UPDATE "employer_subscriptions" SET "cancelAtPeriodEnd" = true, "updatedAt" = CURRENT_TIMESTAMP WHERE "id" = ${current.id}`;
+    return { success: true, subscriptionId: current.razorpaySubscriptionId, cancelAtPeriodEnd: true };
+  }
+
+  async syncCurrent(userId: string) {
+    const employer = await this.getEmployer(userId); const current = await this.getCurrentForEmployer(employer.id);
+    if (!current?.razorpaySubscriptionId) return { synced: false, subscription: current ? { status: current.status } : null };
+    const { keyId, keySecret } = this.razorpayConfig();
+    try { const response = await axios.get(`https://api.razorpay.com/v1/subscriptions/${current.razorpaySubscriptionId}`, { auth: { username: keyId, password: keySecret } }); await this.syncRazorpaySubscription(response.data); return { synced: true, subscription: { status: String(response.data.status) } }; }
+    catch (error: any) { throw new BadRequestException(error?.response?.data?.error?.description || 'Unable to sync subscription'); }
   }
 }
