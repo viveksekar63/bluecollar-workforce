@@ -47,7 +47,6 @@ export async function seedSubscriptionPlans(prisma: any) {
         "name" = EXCLUDED."name",
         "description" = EXCLUDED."description",
         "priceInr" = EXCLUDED."priceInr",
-        "priceInr" = EXCLUDED."priceInr",
         "billingInterval" = EXCLUDED."billingInterval",
         "jobLimit" = EXCLUDED."jobLimit",
         "razorpayPlanId" = EXCLUDED."razorpayPlanId",
