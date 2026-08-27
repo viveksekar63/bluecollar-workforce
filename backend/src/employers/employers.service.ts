@@ -8,6 +8,7 @@ import * as bcrypt from 'bcrypt';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateEmployerDto } from './dto/create-employer.dto';
+import { UpdateEmployerProfileDto } from './dto/update-employer-profile.dto';
 
 interface EmployerListQuery {
   search?: string;
@@ -38,6 +39,7 @@ export class EmployersService {
         phone: true,
         email: true,
         status: true,
+        profilePhotoUrl: true,
       },
     },
     _count: {
@@ -49,7 +51,6 @@ export class EmployersService {
     const page = Math.max(query.page ?? 1, 1);
     const limit = Math.min(Math.max(query.limit ?? 20, 1), 100);
     const skip = (page - 1) * limit;
-
     const where: any = {};
 
     if (query.status && Object.values(EmployerStatus).includes(query.status as EmployerStatus)) {
@@ -80,54 +81,75 @@ export class EmployersService {
       this.prisma.employer.count({ where }),
     ]);
 
-    return {
-      data,
-      meta: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
+    return { data, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
 
   async findOne(id: string) {
+    const employer = await this.prisma.employer.findUnique({ where: { id }, select: this.employerSelect });
+    if (!employer) throw new NotFoundException('Employer not found');
+    return employer;
+  }
+
+  async getOwnProfile(userId: string) {
+    if (!userId) throw new NotFoundException('Authenticated user not found');
+
     const employer = await this.prisma.employer.findUnique({
-      where: { id },
+      where: { userId },
       select: this.employerSelect,
     });
 
-    if (!employer) {
-      throw new NotFoundException('Employer not found');
-    }
-
+    if (!employer) throw new NotFoundException('Employer profile not found');
     return employer;
+  }
+
+  async updateOwnProfile(userId: string, dto: UpdateEmployerProfileDto) {
+    if (!userId) throw new NotFoundException('Authenticated user not found');
+
+    const employer = await this.prisma.employer.findUnique({
+      where: { userId },
+      select: { id: true, userId: true },
+    });
+
+    if (!employer) throw new NotFoundException('Employer profile not found');
+
+    const userData: Record<string, string | null> = {};
+    if (dto.firstName !== undefined) userData.firstName = dto.firstName.trim();
+    if (dto.lastName !== undefined) userData.lastName = dto.lastName.trim() || null;
+
+    const employerData: Record<string, string | null> = {};
+    if (dto.companyName !== undefined) employerData.companyName = dto.companyName.trim();
+    if (dto.companyType !== undefined) employerData.companyType = dto.companyType.trim() || null;
+    if (dto.registrationNo !== undefined) employerData.registrationNo = dto.registrationNo.trim() || null;
+    if (dto.gstNumber !== undefined) employerData.gstNumber = dto.gstNumber.trim() || null;
+    if (dto.description !== undefined) employerData.description = dto.description.trim() || null;
+
+    return this.prisma.$transaction(async (tx) => {
+      if (Object.keys(userData).length) {
+        await tx.user.update({ where: { id: employer.userId }, data: userData });
+      }
+
+      if (Object.keys(employerData).length) {
+        await tx.employer.update({ where: { id: employer.id }, data: employerData });
+      }
+
+      return tx.employer.findUnique({ where: { id: employer.id }, select: this.employerSelect });
+    });
   }
 
   async create(dto: CreateEmployerDto) {
     const email = dto.email.trim().toLowerCase();
     const phone = dto.phone.trim();
-
     const [existingEmail, existingPhone, employerRole] = await Promise.all([
       this.prisma.user.findUnique({ where: { email } }),
       this.prisma.user.findUnique({ where: { phone } }),
       this.prisma.role.findUnique({ where: { name: 'EMPLOYER' } }),
     ]);
 
-    if (existingEmail) {
-      throw new ConflictException('Email is already registered');
-    }
-
-    if (existingPhone) {
-      throw new ConflictException('Phone number is already registered');
-    }
-
-    if (!employerRole) {
-      throw new NotFoundException('EMPLOYER role is not configured');
-    }
+    if (existingEmail) throw new ConflictException('Email is already registered');
+    if (existingPhone) throw new ConflictException('Phone number is already registered');
+    if (!employerRole) throw new NotFoundException('EMPLOYER role is not configured');
 
     const passwordHash = await bcrypt.hash(dto.password, 12);
-
     return this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
@@ -136,11 +158,7 @@ export class EmployersService {
           passwordHash,
           firstName: dto.firstName.trim(),
           lastName: dto.lastName?.trim() || null,
-          roles: {
-            create: {
-              roleId: employerRole.id,
-            },
-          },
+          roles: { create: { roleId: employerRole.id } },
         },
       });
 
@@ -160,30 +178,13 @@ export class EmployersService {
   }
 
   async updateStatus(id: string, status: 'VERIFIED' | 'SUSPENDED') {
-    const employer = await this.prisma.employer.findUnique({
-      where: { id },
-      select: { id: true, userId: true },
-    });
-
-    if (!employer) {
-      throw new NotFoundException('Employer not found');
-    }
+    const employer = await this.prisma.employer.findUnique({ where: { id }, select: { id: true, userId: true } });
+    if (!employer) throw new NotFoundException('Employer not found');
 
     return this.prisma.$transaction(async (tx) => {
-      await tx.employer.update({
-        where: { id },
-        data: { status: status as EmployerStatus },
-      });
-
-      await tx.user.update({
-        where: { id: employer.userId },
-        data: { status: status === 'VERIFIED' ? 'ACTIVE' : 'INACTIVE' },
-      });
-
-      return tx.employer.findUnique({
-        where: { id },
-        select: this.employerSelect,
-      });
+      await tx.employer.update({ where: { id }, data: { status: status as EmployerStatus } });
+      await tx.user.update({ where: { id: employer.userId }, data: { status: status === 'VERIFIED' ? 'ACTIVE' : 'INACTIVE' } });
+      return tx.employer.findUnique({ where: { id }, select: this.employerSelect });
     });
   }
 }
