@@ -6,6 +6,8 @@ import { BrandColors } from '@/constants/theme';
 import { useAuthStore } from '@/store/auth';
 import { openRazorpaySubscriptionCheckout } from '@/lib/razorpay-subscription-checkout';
 
+const wait = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+
 export default function EmployerSubscriptionScreen() {
   const { jobId } = useLocalSearchParams<{ jobId?: string }>();
   const user = useAuthStore((state) => state.user);
@@ -32,6 +34,27 @@ export default function EmployerSubscriptionScreen() {
   }, []);
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
+
+  async function waitForSubscriptionActivation(expectedSubscriptionId: string) {
+    // Razorpay can briefly report AUTHENTICATED after checkout while the
+    // immediate-start subscription transitions to ACTIVE. Poll the signed API
+    // reconciliation endpoint instead of leaving the employer on the billing page.
+    for (let attempt = 0; attempt < 15; attempt += 1) {
+      const current = await getCurrentSubscription();
+      const currentSubscription = current.subscription;
+      if (
+        current.active &&
+        currentSubscription?.razorpaySubscriptionId === expectedSubscriptionId &&
+        currentSubscription.status === 'active'
+      ) {
+        setSubscription(currentSubscription);
+        setActive(true);
+        return true;
+      }
+      if (attempt < 14) await wait(2000);
+    }
+    return false;
+  }
 
   async function choosePlan(plan: EmployerSubscriptionPlan) {
     if (creating) return;
@@ -68,14 +91,29 @@ export default function EmployerSubscriptionScreen() {
         razorpaySignature: payment.razorpay_signature,
       });
 
-      await load();
-
-      if (verification.active) {
-        Alert.alert('Payment successful', `${plan.name} is now active. You can publish more jobs.`);
-        if (jobId) router.replace({ pathname: '/employer-job-details', params: { id: String(jobId) } });
-      } else {
-        Alert.alert('Payment authorised', 'Your subscription authorisation was received. The plan will become active when Razorpay activates the billing cycle.');
+      if (!verification.verified) {
+        throw new Error('Razorpay payment verification failed.');
       }
+
+      const activated = verification.active
+        ? true
+        : await waitForSubscriptionActivation(verification.subscriptionId);
+
+      if (activated) {
+        await load();
+        if (jobId) {
+          router.replace({ pathname: '/employer-job-details', params: { id: String(jobId) } });
+          return;
+        }
+        Alert.alert('Payment successful', `${plan.name} is now active.`);
+        return;
+      }
+
+      await load();
+      Alert.alert(
+        'Payment successful',
+        'Your payment was received and the subscription authorisation is complete. Razorpay is still activating the billing cycle. Please refresh the subscription status in a moment.',
+      );
     } catch (error: any) {
       const message = error?.response?.data?.message ?? error?.message ?? 'Payment was not completed.';
       Alert.alert('Payment not completed', message);
@@ -91,7 +129,7 @@ export default function EmployerSubscriptionScreen() {
       const current = await getCurrentSubscription();
       setSubscription(current.subscription);
       setActive(current.active);
-      if (current.active && jobId && current.subscription && current.subscription.jobsUsed < current.subscription.jobLimit) {
+      if (current.active && jobId && current.subscription && current.subscription.jobsUsed < current.subscription.jobLimit && current.subscription.planCode !== 'FREE') {
         router.replace({ pathname: '/employer-job-details', params: { id: String(jobId) } });
         return;
       }
