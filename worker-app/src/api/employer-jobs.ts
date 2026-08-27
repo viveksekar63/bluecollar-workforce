@@ -18,6 +18,7 @@ export type EmployerJob = {
   createdAt: string;
   updatedAt?: string;
   skills?: Array<{ required: boolean; skill: { id: string; name: string; category?: string | null } }>;
+  _count?: { applications: number };
 };
 
 export type EmployerApplication = {
@@ -87,6 +88,26 @@ export async function updateEmployerJob(jobId: string, input: Record<string, unk
 
 export async function publishEmployerJob(jobId: string) {
   const response = await api.post<EmployerJob>(`/jobs/employer/${jobId}/publish`);
+  return response.data;
+}
+
+export async function pauseEmployerJob(jobId: string) {
+  const response = await api.post<EmployerJob>(`/jobs/employer/${jobId}/pause`);
+  return response.data;
+}
+
+export async function resumeEmployerJob(jobId: string) {
+  const response = await api.post<EmployerJob>(`/jobs/employer/${jobId}/resume`);
+  return response.data;
+}
+
+export async function closeEmployerJob(jobId: string) {
+  const response = await api.post<EmployerJob>(`/jobs/employer/${jobId}/close`);
+  return response.data;
+}
+
+export async function reopenEmployerJob(jobId: string) {
+  const response = await api.post<EmployerJob>(`/jobs/employer/${jobId}/reopen`);
   return response.data;
 }
 
