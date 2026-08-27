@@ -129,6 +129,40 @@ export class JobsService {
     });
   }
 
+  async updateEmployerJobStatus(
+    userId: string,
+    jobId: string,
+    action: 'PAUSE' | 'RESUME' | 'CLOSE' | 'REOPEN',
+  ) {
+    const employer = await this.getEmployer(userId);
+    const job = await this.prisma.job.findFirst({
+      where: { id: jobId, employerId: employer.id },
+      select: { id: true, status: true },
+    });
+    if (!job) throw new NotFoundException('Job not found');
+
+    const current = String(job.status);
+    const transitions: Record<string, { next: string; message: string }> = {
+      'PAUSE:PUBLISHED': { next: 'PAUSED', message: 'Job paused' },
+      'RESUME:PAUSED': { next: 'PUBLISHED', message: 'Job resumed' },
+      'CLOSE:PUBLISHED': { next: 'CLOSED', message: 'Job closed' },
+      'CLOSE:PAUSED': { next: 'CLOSED', message: 'Job closed' },
+      'REOPEN:CLOSED': { next: 'PUBLISHED', message: 'Job reopened' },
+    };
+
+    const transition = transitions[`${action}:${current}`];
+    if (!transition) {
+      throw new BadRequestException(`Cannot ${action.toLowerCase()} a ${current.toLowerCase()} job`);
+    }
+
+    const updated = await this.prisma.job.update({
+      where: { id: jobId },
+      data: { status: transition.next as any },
+    });
+
+    return { ...updated, message: transition.message };
+  }
+
   async publishEmployerJob(userId: string, jobId: string) {
     const employer = await this.getEmployer(userId);
     const job = await this.prisma.job.findFirst({
