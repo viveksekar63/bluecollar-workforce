@@ -38,7 +38,11 @@ export default function EmployerNavigation() {
 
   return (
     <>
-      <Pressable accessibilityLabel="Open employer menu" style={styles.menuButton} onPress={() => setOpen(true)}>
+      <Pressable
+        accessibilityLabel="Open employer menu"
+        style={styles.menuButton}
+        onPress={() => setOpen(true)}
+      >
         <Text style={styles.menuIcon}>☰</Text>
       </Pressable>
 
@@ -50,7 +54,9 @@ export default function EmployerNavigation() {
               {user?.profilePhotoUrl ? (
                 <Image source={{ uri: user.profilePhotoUrl }} style={styles.avatar} />
               ) : (
-                <View style={styles.avatar}><Text style={styles.avatarText}>{initials}</Text></View>
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>{initials}</Text>
+                </View>
               )}
               <View style={styles.profileCopy}>
                 <Text style={styles.name} numberOfLines={1}>{displayName}</Text>
@@ -110,7 +116,7 @@ const styles = StyleSheet.create({
   menuButton: {
     position: 'absolute',
     top: 14,
-    left: 14,
+    left: 24,
     zIndex: 50,
     width: 46,
     height: 46,
