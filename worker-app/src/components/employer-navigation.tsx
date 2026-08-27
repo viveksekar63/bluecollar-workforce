@@ -78,6 +78,12 @@ export default function EmployerNavigation() {
             <NavItem icon="⚙" label="Settings" onPress={() => navigate('/employer-settings')} />
             <NavItem icon="◉" label="Profile" onPress={() => navigate('/employer-profile')} />
 
+            <View style={styles.legalSection}>
+              <Text style={styles.sectionLabel}>LEGAL</Text>
+              <NavItem icon="▤" label="Privacy Policy" onPress={() => navigate('/privacy-policy')} />
+              <NavItem icon="ⓘ" label="Disclaimer" onPress={() => navigate('/disclaimer')} />
+            </View>
+
             <View style={styles.bottomArea}>
               {(user?.roles ?? []).includes('WORKER') && (
                 <NavItem
@@ -114,35 +120,17 @@ function NavItem({ icon, label, onPress }: { icon: string; label: string; onPres
 
 const styles = StyleSheet.create({
   menuButton: {
-    position: 'absolute',
-    top: 14,
-    left: 24,
-    zIndex: 50,
-    width: 46,
-    height: 46,
-    borderRadius: 14,
-    backgroundColor: BrandColors.slateSoft,
-    borderWidth: 1,
-    borderColor: BrandColors.slateBorder,
-    alignItems: 'center',
-    justifyContent: 'center',
+    position: 'absolute', top: 14, left: 24, zIndex: 50, width: 46, height: 46,
+    borderRadius: 14, backgroundColor: BrandColors.slateSoft, borderWidth: 1,
+    borderColor: BrandColors.slateBorder, alignItems: 'center', justifyContent: 'center',
   },
   menuIcon: { color: BrandColors.gold, fontSize: 24, fontWeight: '800', lineHeight: 25 },
   layer: { ...StyleSheet.absoluteFillObject, zIndex: 100 },
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.62)' },
   drawer: {
-    width: 292,
-    maxWidth: '84%',
-    height: '100%',
-    backgroundColor: BrandColors.background,
-    borderRightWidth: 1,
-    borderRightColor: BrandColors.gold,
-    paddingHorizontal: 14,
-    shadowColor: '#000',
-    shadowOpacity: 0.35,
-    shadowRadius: 18,
-    shadowOffset: { width: 8, height: 0 },
-    elevation: 18,
+    width: 292, maxWidth: '84%', height: '100%', backgroundColor: BrandColors.background,
+    borderRightWidth: 1, borderRightColor: BrandColors.gold, paddingHorizontal: 14,
+    shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 18, shadowOffset: { width: 8, height: 0 }, elevation: 18,
   },
   profileHeader: { flexDirection: 'row', alignItems: 'center', paddingTop: 10, paddingBottom: 16 },
   avatar: { width: 54, height: 54, borderRadius: 27, backgroundColor: BrandColors.gold, alignItems: 'center', justifyContent: 'center' },
@@ -154,11 +142,13 @@ const styles = StyleSheet.create({
   closeButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   close: { color: BrandColors.textSecondary, fontSize: 28, lineHeight: 28 },
   divider: { height: 1, backgroundColor: BrandColors.slateBorder, marginBottom: 10 },
-  item: { minHeight: 52, borderRadius: 12, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, marginBottom: 4 },
+  item: { minHeight: 48, borderRadius: 12, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, marginBottom: 3 },
   itemPressed: { backgroundColor: BrandColors.slateSoft },
-  itemIcon: { width: 30, color: BrandColors.gold, fontSize: 19, textAlign: 'center', fontWeight: '800' },
+  itemIcon: { width: 30, color: BrandColors.gold, fontSize: 18, textAlign: 'center', fontWeight: '800' },
   itemLabel: { flex: 1, color: BrandColors.text, fontSize: 14, fontWeight: '700', marginLeft: 10 },
   chevron: { color: BrandColors.muted, fontSize: 22 },
+  legalSection: { marginTop: 8, paddingTop: 9, borderTopWidth: 1, borderTopColor: BrandColors.slateBorder },
+  sectionLabel: { color: BrandColors.muted, fontSize: 9, fontWeight: '900', letterSpacing: 1.4, marginHorizontal: 12, marginBottom: 3 },
   bottomArea: { marginTop: 'auto', paddingBottom: 10, borderTopWidth: 1, borderTopColor: BrandColors.slateBorder, paddingTop: 10 },
   logout: { minHeight: 52, borderRadius: 12, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, marginTop: 4 },
   logoutIcon: { width: 30, color: '#E58B8B', fontSize: 21, textAlign: 'center', fontWeight: '900' },
