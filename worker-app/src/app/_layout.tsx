@@ -10,7 +10,7 @@ export default function RootLayout() {
   return (
     <>
       <StatusBar style="light" />
-      <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right', contentStyle: { backgroundColor: '#0D141A' }}>
+      <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right', contentStyle: { backgroundColor: '#0D141A' } }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="login" />
         <Stack.Screen name="register" />
@@ -26,6 +26,8 @@ export default function RootLayout() {
         <Stack.Screen name="employer-application-details" />
         <Stack.Screen name="employer-profile" />
         <Stack.Screen name="employer-settings" />
+        <Stack.Screen name="privacy-policy" />
+        <Stack.Screen name="disclaimer" />
         <Stack.Screen name="profile" />
         <Stack.Screen name="address" />
         <Stack.Screen name="home" />
