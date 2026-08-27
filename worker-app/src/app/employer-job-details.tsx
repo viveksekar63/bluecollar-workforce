@@ -57,9 +57,18 @@ export default function EmployerJobDetailsScreen() {
       await publishEmployerJob(String(id));
       router.replace({ pathname: '/employer-job-details', params: { id: String(id), published: '1' } });
     } catch (e: any) {
-      const message = e?.response?.data?.message ?? 'Unable to publish this job.';
-      if (String(message).includes('SUBSCRIPTION_REQUIRED') || String(message).includes('SUBSCRIPTION_INACTIVE')) router.push({ pathname: '/employer-subscription', params: { jobId: String(id) } });
-      else Alert.alert('Publish failed', message);
+      const message = String(e?.response?.data?.message ?? 'Unable to publish this job.');
+      const requiresSubscription = message.includes('SUBSCRIPTION_REQUIRED')
+        || message.includes('SUBSCRIPTION_INACTIVE')
+        || message.includes('JOB_LIMIT_REACHED')
+        || message.includes('job posting')
+        || message.toLowerCase().includes('free plan includes');
+
+      if (requiresSubscription) {
+        router.push({ pathname: '/employer-subscription', params: { jobId: String(id), reason: 'job-limit' } });
+      } else {
+        Alert.alert('Publish failed', message);
+      }
     } finally { setPublishing(false); }
   }
 
