@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { BrandColors } from '../constants/colors';
+import { BrandColors } from '../constants/theme';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
 const packages = [
@@ -15,7 +15,6 @@ export default function EmployerCredits() {
   const [balance, setBalance] = useState(0);
   const [loading, setLoading] = useState(true);
   const [buying, setBuying] = useState(false);
-
   const token = undefined as string | undefined;
 
   const loadBalance = useCallback(async () => {
