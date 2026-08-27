@@ -263,40 +263,69 @@ export class SubscriptionsService {
     }
 
     const pending = await this.getPendingForEmployer(employer.id);
-    if (pending && pending.planCode === plan.code && pending.razorpaySubscriptionId) {
+    if (pending && pending.razorpaySubscriptionId) {
       const { keyId, keySecret } = this.razorpayConfig();
       try {
         const response = await axios.get(
           `https://api.razorpay.com/v1/subscriptions/${pending.razorpaySubscriptionId}`,
           { auth: { username: keyId, password: keySecret } },
         );
-        const remoteStatus = String(response.data.status ?? 'created');
+        const remoteSubscription = response.data;
+        const remoteStatus = String(remoteSubscription.status ?? 'created');
+        const remotePlanId = String(remoteSubscription.plan_id ?? '');
+        const samePlan = pending.planCode === plan.code && remotePlanId === plan.razorpayPlanId;
 
-        // Never activate here. This path can be reached simply by opening the
-        // plan screen again. Only a verified checkout signature or a verified
-        // Razorpay webhook is allowed to grant paid entitlement.
+        // A local row can point to a newly configured Razorpay plan while its
+        // remote subscription still belongs to an older plan. Never reuse that
+        // subscription because Checkout will charge the remote plan amount.
+        if (samePlan && PENDING_STATUSES.includes(remoteStatus)) {
+          return {
+            keyId,
+            subscriptionId: pending.razorpaySubscriptionId,
+            shortUrl: remoteSubscription.short_url ?? null,
+            status: remoteStatus,
+            active: false,
+            plan,
+            subscription: pending,
+          };
+        }
+
         if (TERMINAL_STATUSES.includes(remoteStatus)) {
           await this.prisma.$executeRaw`
             UPDATE "employer_subscriptions"
             SET "status" = ${remoteStatus},
-                "endedAt" = ${response.data.ended_at ? new Date(Number(response.data.ended_at) * 1000) : null},
+                "endedAt" = ${remoteSubscription.ended_at ? new Date(Number(remoteSubscription.ended_at) * 1000) : null},
+                "cancelAtPeriodEnd" = false,
+                "updatedAt" = CURRENT_TIMESTAMP
+            WHERE "id" = ${pending.id}
+          `;
+        } else if (!samePlan && PENDING_STATUSES.includes(remoteStatus)) {
+          try {
+            await axios.post(
+              `https://api.razorpay.com/v1/subscriptions/${pending.razorpaySubscriptionId}/cancel`,
+              {},
+              { auth: { username: keyId, password: keySecret } },
+            );
+          } catch (cancelError: any) {
+            const description = cancelError?.response?.data?.error?.description;
+            if (description && !/already|cancelled|completed|expired|halted/i.test(description)) {
+              throw new BadRequestException(`Unable to cancel previous Razorpay subscription: ${description}`);
+            }
+          }
+
+          await this.prisma.$executeRaw`
+            UPDATE "employer_subscriptions"
+            SET "status" = 'cancelled',
+                "endedAt" = CURRENT_TIMESTAMP,
+                "cancelAtPeriodEnd" = false,
                 "updatedAt" = CURRENT_TIMESTAMP
             WHERE "id" = ${pending.id}
           `;
         }
-
-        return {
-          keyId,
-          subscriptionId: pending.razorpaySubscriptionId,
-          shortUrl: response.data.short_url ?? null,
-          status: remoteStatus,
-          active: false,
-          plan,
-          subscription: pending,
-        };
       } catch (error: any) {
+        if (error instanceof BadRequestException) throw error;
         throw new BadRequestException(
-          error?.response?.data?.error?.description || 'Unable to resume Razorpay subscription',
+          error?.response?.data?.error?.description || 'Unable to verify existing Razorpay subscription',
         );
       }
     }
@@ -316,6 +345,10 @@ export class SubscriptionsService {
       );
 
       const razorpaySubscription = response.data;
+      const remotePlanId = String(razorpaySubscription.plan_id ?? '');
+      if (remotePlanId !== plan.razorpayPlanId) {
+        throw new BadRequestException('Razorpay returned a subscription for a different plan');
+      }
 
       await this.prisma.$executeRaw`
         INSERT INTO "employer_subscriptions"
@@ -351,6 +384,7 @@ export class SubscriptionsService {
         },
       };
     } catch (error: any) {
+      if (error instanceof BadRequestException) throw error;
       throw new BadRequestException(
         error?.response?.data?.error?.description || 'Unable to create Razorpay subscription',
       );
@@ -384,11 +418,12 @@ export class SubscriptionsService {
       throw new BadRequestException('Subscription payment signature verification failed');
     }
 
-    const owned = await this.prisma.$queryRaw<Array<{ id: string }>>`
-      SELECT "id"
-      FROM "employer_subscriptions"
-      WHERE "employerId" = ${employer.id}
-        AND "razorpaySubscriptionId" = ${subscriptionId}
+    const owned = await this.prisma.$queryRaw<Array<{ id: string; planCode: string; razorpayPlanId: string | null }>>`
+      SELECT s."id", p."code" AS "planCode", p."razorpayPlanId"
+      FROM "employer_subscriptions" s
+      INNER JOIN "employer_subscription_plans" p ON p."id" = s."planId"
+      WHERE s."employerId" = ${employer.id}
+        AND s."razorpaySubscriptionId" = ${subscriptionId}
       LIMIT 1
     `;
     if (!owned[0]) throw new NotFoundException('Subscription not found for this employer');
@@ -398,6 +433,11 @@ export class SubscriptionsService {
         `https://api.razorpay.com/v1/subscriptions/${subscriptionId}`,
         { auth: { username: keyId, password: keySecret } },
       );
+      const remotePlanId = String(response.data.plan_id ?? '');
+      if (!owned[0].razorpayPlanId || remotePlanId !== owned[0].razorpayPlanId) {
+        throw new BadRequestException('Razorpay subscription plan does not match the selected plan');
+      }
+
       const status = String(response.data.status ?? 'created');
       if (!ACTIVE_STATUSES.includes(status)) {
         return {
@@ -418,6 +458,7 @@ export class SubscriptionsService {
         active: true,
       };
     } catch (error: any) {
+      if (error instanceof BadRequestException) throw error;
       throw new BadRequestException(
         error?.response?.data?.error?.description || 'Unable to verify subscription with Razorpay',
       );
@@ -436,12 +477,17 @@ export class SubscriptionsService {
       ? new Date(Number(subscription.ended_at) * 1000)
       : null;
 
-    const rows = await this.prisma.$queryRaw<Array<{ employerId: string }>>`
-      SELECT "employerId"
-      FROM "employer_subscriptions"
-      WHERE "razorpaySubscriptionId" = ${String(subscription.id)}
+    const rows = await this.prisma.$queryRaw<Array<{ employerId: string; razorpayPlanId: string | null }>>`
+      SELECT s."employerId", p."razorpayPlanId"
+      FROM "employer_subscriptions" s
+      INNER JOIN "employer_subscription_plans" p ON p."id" = s."planId"
+      WHERE s."razorpaySubscriptionId" = ${String(subscription.id)}
       LIMIT 1
     `;
+
+    if (rows[0] && String(subscription.plan_id ?? '') !== String(rows[0].razorpayPlanId ?? '')) {
+      throw new BadRequestException('Razorpay subscription plan does not match the local subscription plan');
+    }
 
     await this.prisma.$executeRaw`
       UPDATE "employer_subscriptions"
@@ -510,12 +556,22 @@ export class SubscriptionsService {
         const resetUsage =
           eventName === 'subscription.activated' || eventName === 'subscription.charged';
 
-        const employerRows = await tx.$queryRaw<Array<{ employerId: string }>>`
-          SELECT "employerId"
-          FROM "employer_subscriptions"
-          WHERE "razorpaySubscriptionId" = ${String(subscription.id)}
+        const employerRows = await tx.$queryRaw<Array<{ employerId: string; razorpayPlanId: string | null }>>`
+          SELECT s."employerId", p."razorpayPlanId"
+          FROM "employer_subscriptions" s
+          INNER JOIN "employer_subscription_plans" p ON p."id" = s."planId"
+          WHERE s."razorpaySubscriptionId" = ${String(subscription.id)}
           LIMIT 1
         `;
+
+        // Webhooks are the source of truth, but a signed event for a stale
+        // Razorpay subscription must never activate a different local plan.
+        if (
+          employerRows[0] &&
+          String(subscription.plan_id ?? '') !== String(employerRows[0].razorpayPlanId ?? '')
+        ) {
+          throw new BadRequestException('Razorpay webhook plan does not match the local subscription plan');
+        }
 
         await tx.$executeRaw`
           UPDATE "employer_subscriptions"
