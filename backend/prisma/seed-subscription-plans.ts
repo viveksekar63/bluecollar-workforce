@@ -2,6 +2,13 @@ import { randomUUID } from 'crypto';
 
 const plans = [
   {
+    code: 'FREE',
+    name: 'Free',
+    description: 'Start with one free job posting. No payment required.',
+    priceInr: 0,
+    jobLimit: 1,
+  },
+  {
     code: 'STARTER',
     name: 'Starter',
     description: 'For employers posting a few jobs each month.',
@@ -30,7 +37,7 @@ const plans = [
 export async function seedSubscriptionPlans(prisma: any) {
   console.log('\nCreating employer subscription plans...');
   for (const plan of plans) {
-    const razorpayPlanId = process.env[plan.envKey]?.trim() || null;
+    const razorpayPlanId = plan.envKey ? process.env[plan.envKey]?.trim() || null : null;
     await prisma.$executeRaw`
       INSERT INTO "employer_subscription_plans"
         ("id", "code", "name", "description", "priceInr", "currency", "billingInterval", "jobLimit", "razorpayPlanId", "isActive", "updatedAt")
@@ -40,12 +47,13 @@ export async function seedSubscriptionPlans(prisma: any) {
         "name" = EXCLUDED."name",
         "description" = EXCLUDED."description",
         "priceInr" = EXCLUDED."priceInr",
+        "priceInr" = EXCLUDED."priceInr",
         "billingInterval" = EXCLUDED."billingInterval",
         "jobLimit" = EXCLUDED."jobLimit",
         "razorpayPlanId" = EXCLUDED."razorpayPlanId",
         "isActive" = true,
         "updatedAt" = CURRENT_TIMESTAMP
     `;
-    console.log(`  ✓ ${plan.code} (${razorpayPlanId ? 'Razorpay configured' : 'Razorpay plan id pending'})`);
+    console.log(`  ✓ ${plan.code} (${razorpayPlanId ? 'Razorpay configured' : plan.code === 'FREE' ? 'Free / no Razorpay' : 'Razorpay plan id pending'})`);
   }
 }
