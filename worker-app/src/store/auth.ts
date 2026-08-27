@@ -11,6 +11,7 @@ interface AuthState {
   employer: EmployerSummary | null;
   activeRole: MobileRole | null;
   setSession: (accessToken: string, user: AuthUser, worker?: WorkerSummary, employer?: EmployerSummary) => void;
+  updateEmployerProfile: (user: Partial<AuthUser>, employer: Partial<EmployerSummary>) => void;
   setActiveRole: (role: MobileRole) => void;
   clearSession: () => void;
 }
@@ -29,6 +30,10 @@ export const useAuthStore = create<AuthState>((set) => ({
     const roles = availableRoles(user);
     set({ accessToken, user, worker: worker ?? null, employer: employer ?? null, activeRole: roles.length === 1 ? roles[0] : null });
   },
+  updateEmployerProfile: (user, employer) => set((state) => ({
+    user: state.user ? { ...state.user, ...user } : state.user,
+    employer: state.employer ? { ...state.employer, ...employer } : state.employer,
+  })),
   setActiveRole: (activeRole) => set({ activeRole }),
   clearSession: () => {
     logoutWorker();
