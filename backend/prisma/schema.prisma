@@ -158,6 +158,7 @@ model WorkerWorkPreference {
   updatedAt         DateTime @updatedAt
   worker            Worker   @relation(fields: [workerId], references: [id], onDelete: Cascade)
   @@index([mobility])
+  @@map("worker_work_preferences")
 }
 
 model WorkerPreferredLocation {
@@ -172,6 +173,7 @@ model WorkerPreferredLocation {
   @@unique([workerId, city, state])
   @@index([workerId])
   @@index([city, state])
+  @@map("worker_preferred_locations")
 }
 
 model EmergencyContact {
@@ -398,7 +400,7 @@ model VerificationResult {
   remarks             String?
   evidenceStorageKey  String?
   rawResponse         Json?
-  createdAt           DateTime                 @default(now())
+  createdAt            DateTime                 @default(now())
   verificationCheck   VerificationCheck        @relation(fields: [verificationCheckId], references: [id], onDelete: Cascade)
 }
 
@@ -463,7 +465,7 @@ model JobApplication {
   status        ApplicationStatus @default(APPLIED)
   appliedAt     DateTime          @default(now())
   shortlistedAt DateTime?
-  rejectedAt   DateTime?
+  rejectedAt    DateTime?
   job           Job               @relation(fields: [jobId], references: [id], onDelete: Cascade)
   worker        Worker            @relation(fields: [workerId], references: [id], onDelete: Cascade)
   @@unique([jobId, workerId])
