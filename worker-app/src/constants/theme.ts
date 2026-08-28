@@ -22,10 +22,15 @@ export const BrandColors = {
   successSoft: '#123A2E',
   danger: '#FF6B6B',
   background: '#0D141A',
+
+  // Backward-compatible aliases for screens built before the final theme.
+  // They intentionally resolve to the WorkTrust slate/gold palette.
   burgundy: '#F4B93F',
   burgundyDark: '#C99122',
   burgundySoft: '#2C2414',
   rose: '#F4B93F',
+  blush: '#FFC95A',
+  blushSoft: '#2C2414',
 } as const;
 
 export const Colors = {
