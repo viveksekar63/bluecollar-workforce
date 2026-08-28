@@ -13,9 +13,11 @@ import {
 } from "@nestjs/common";
 
 import { WorkersService } from "./workers.service";
+import { EmployerWorkerDiscoveryService } from "./employer-worker-discovery.service";
 import { UpdateWorkerOnboardingDto } from "./dto/update-worker-onboarding.dto";
 import { UpdateWorkerProfileDto } from "./dto/update-worker-profile.dto";
 import { UpdateWorkerProfessionDto } from "./dto/update-worker-profession.dto";
+import { UpdateWorkerWorkPreferencesDto } from "./dto/update-worker-work-preferences.dto";
 import { CreateWorkerEmploymentDto, UpdateWorkerEmploymentDto } from "./dto/worker-employment.dto";
 import { WorkersQueryDto } from "./dto/workers-query.dto";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
@@ -33,6 +35,7 @@ import { PrismaService } from "../prisma/prisma.service";
 export class WorkersController {
   constructor(
     private readonly workersService: WorkersService,
+    private readonly employerWorkerDiscoveryService: EmployerWorkerDiscoveryService,
     private readonly workerProfessionService: WorkerProfessionService,
     private readonly workerVerificationService: WorkerVerificationService,
     private readonly creditWalletService: CreditWalletService,
@@ -43,10 +46,10 @@ export class WorkersController {
   @UseGuards(PermissionGuard)
   @RequirePermissions(PERMISSIONS.WORKERS_READ)
   async discover(@Query() query: WorkersQueryDto) {
-    const result = await this.workersService.findAll(query);
+    const result = await this.employerWorkerDiscoveryService.findAll(query);
     return {
       ...result,
-      items: result.items.map(({ phone, email, ...worker }) => worker),
+      items: result.items.map(({ phone, email, ...worker }: any) => worker),
     };
   }
 
@@ -60,6 +63,16 @@ export class WorkersController {
   @Get("me")
   async getMyProfile(@Req() request: any) {
     return this.workersService.getMyProfile(request.user.userId);
+  }
+
+  @Get("me/work-preferences")
+  async getMyWorkPreferences(@Req() request: any) {
+    return this.workersService.getMyWorkPreferences(request.user.userId);
+  }
+
+  @Patch("me/work-preferences")
+  async updateMyWorkPreferences(@Req() request: any, @Body() dto: UpdateWorkerWorkPreferencesDto) {
+    return this.workersService.updateMyWorkPreferences(request.user.userId, dto);
   }
 
   @Get("me/profession")
