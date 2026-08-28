@@ -14,6 +14,7 @@ import {
 
 import { WorkersService } from "./workers.service";
 import { EmployerWorkerDiscoveryService } from "./employer-worker-discovery.service";
+import { WorkerWorkPreferencesService } from "./worker-work-preferences.service";
 import { UpdateWorkerOnboardingDto } from "./dto/update-worker-onboarding.dto";
 import { UpdateWorkerProfileDto } from "./dto/update-worker-profile.dto";
 import { UpdateWorkerProfessionDto } from "./dto/update-worker-profession.dto";
@@ -36,6 +37,7 @@ export class WorkersController {
   constructor(
     private readonly workersService: WorkersService,
     private readonly employerWorkerDiscoveryService: EmployerWorkerDiscoveryService,
+    private readonly workerWorkPreferencesService: WorkerWorkPreferencesService,
     private readonly workerProfessionService: WorkerProfessionService,
     private readonly workerVerificationService: WorkerVerificationService,
     private readonly creditWalletService: CreditWalletService,
@@ -67,12 +69,12 @@ export class WorkersController {
 
   @Get("me/work-preferences")
   async getMyWorkPreferences(@Req() request: any) {
-    return this.workersService.getMyWorkPreferences(request.user.userId);
+    return this.workerWorkPreferencesService.get(request.user.userId);
   }
 
   @Patch("me/work-preferences")
   async updateMyWorkPreferences(@Req() request: any, @Body() dto: UpdateWorkerWorkPreferencesDto) {
-    return this.workersService.updateMyWorkPreferences(request.user.userId, dto);
+    return this.workerWorkPreferencesService.update(request.user.userId, dto);
   }
 
   @Get("me/profession")
