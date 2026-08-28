@@ -10,6 +10,7 @@ import { DashboardModule } from "./dashboard/dashboard.module";
 import { UsersModule } from "./users/users.module";
 import { RolesModule } from "./roles/roles.module";
 import { WorkersModule } from "./workers/workers.module";
+import { WorkerImportModule } from "./workers/worker-import.module";
 import { EmployersModule } from "./employers/employers.module";
 import { EmploymentModule } from "./employment/employment.module";
 import { DocumentsModule } from "./documents/documents.module";
@@ -29,7 +30,7 @@ import { AuditModule } from "./audit/audit.module";
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }), PrismaModule, StorageModule, AuthModule,
-    DashboardModule, UsersModule, RolesModule, WorkersModule, EmployersModule,
+    DashboardModule, UsersModule, RolesModule, WorkersModule, WorkerImportModule, EmployersModule,
     EmploymentModule, DocumentsModule, VerificationModule, SkillsModule, JobsModule,
     SubscriptionsModule, CreditsModule, ApplicationsModule, AttendanceModule,
     PaymentsModule, RatingsModule, NotificationsModule, ComplaintsModule, AuditModule,
