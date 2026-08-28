@@ -7,13 +7,27 @@ import { RegistrationService } from "./registration.service";
 import { LoginOtpService } from "./login-otp.service";
 import { JwtStrategy } from "./strategies/jwt.strategy";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard";
-import { PermissionService } from "./permissions/permission.service";
-import { PermissionGuard } from "./permissions/permission.guard";
+import { PermissionModule } from "./permissions/permission.module";
 
 @Module({
-  imports: [ConfigModule, JwtModule.registerAsync({ imports: [ConfigModule], inject: [ConfigService], useFactory: (configService: ConfigService) => ({ secret: configService.get<string>("JWT_ACCESS_SECRET"), signOptions: { expiresIn: configService.get<"1d" | "7d" | "30d">("JWT_ACCESS_EXPIRES_IN") || "1d" } }) })],
+  imports: [
+    ConfigModule,
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        secret: configService.get<string>("JWT_ACCESS_SECRET"),
+        signOptions: {
+          expiresIn:
+            configService.get<"1d" | "7d" | "30d">("JWT_ACCESS_EXPIRES_IN") ||
+            "1d",
+        },
+      }),
+    }),
+    PermissionModule,
+  ],
   controllers: [AuthController],
-  providers: [AuthService, RegistrationService, LoginOtpService, JwtStrategy, JwtAuthGuard, PermissionService, PermissionGuard],
-  exports: [PermissionService, PermissionGuard],
+  providers: [AuthService, RegistrationService, LoginOtpService, JwtStrategy, JwtAuthGuard],
+  exports: [PermissionModule],
 })
 export class AuthModule {}
