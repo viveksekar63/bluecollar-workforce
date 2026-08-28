@@ -166,15 +166,17 @@ export class EmployerWorkerDiscoveryService {
       ${where}
       ORDER BY
         CASE
-          WHEN ${location} IS NOT NULL AND EXISTS (
+          WHEN CAST(${location} AS TEXT) IS NOT NULL AND EXISTS (
             SELECT 1 FROM "WorkerAddress" wa3
             WHERE wa3."workerId" = w."id" AND wa3."isCurrent" = true
-              AND (wa3."city" ILIKE ${location ? `%${location}%` : ''} OR wa3."state" ILIKE ${location ? `%${location}%` : ''})
+              AND (wa3."city" ILIKE CONCAT('%', CAST(${location} AS TEXT), '%')
+                OR wa3."state" ILIKE CONCAT('%', CAST(${location} AS TEXT), '%'))
           ) THEN 0
-          WHEN ${location} IS NOT NULL AND EXISTS (
+          WHEN CAST(${location} AS TEXT) IS NOT NULL AND EXISTS (
             SELECT 1 FROM "worker_preferred_locations" pl3
             WHERE pl3."workerId" = w."id"
-              AND (pl3."city" ILIKE ${location ? `%${location}%` : ''} OR pl3."state" ILIKE ${location ? `%${location}%` : ''})
+              AND (pl3."city" ILIKE CONCAT('%', CAST(${location} AS TEXT), '%')
+                OR pl3."state" ILIKE CONCAT('%', CAST(${location} AS TEXT), '%'))
           ) THEN 1
           WHEN wp."mobility" = 'ANYWHERE_INDIA' THEN 2
           ELSE 3
