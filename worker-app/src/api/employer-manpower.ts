@@ -1,5 +1,12 @@
 import { api } from './client';
 
+export type ManpowerPreferredLocation = {
+  city: string;
+  district?: string | null;
+  state: string;
+  country?: string;
+};
+
 export type ManpowerWorker = {
   id: string;
   workerCode?: string | null;
@@ -15,6 +22,10 @@ export type ManpowerWorker = {
   verificationScore: number;
   verificationStatus?: string | null;
   availability?: string | null;
+  mobility?: string | null;
+  willingToRelocate?: boolean;
+  willingToTravel?: boolean;
+  preferredLocations?: ManpowerPreferredLocation[];
 };
 
 export type ManpowerSearchResponse = {
