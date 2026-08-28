@@ -108,7 +108,36 @@ export class WorkerWorkPreferencesService {
         `;
       }
 
-      return this.getByWorkerId(worker.id);
+      const [preference] = await tx.$queryRaw<Array<{
+        mobility: string;
+        willingToRelocate: boolean;
+        willingToTravel: boolean;
+      }>>`
+        SELECT "mobility", "willingToRelocate", "willingToTravel"
+        FROM "worker_work_preferences"
+        WHERE "workerId" = ${worker.id}
+        LIMIT 1
+      `;
+
+      const savedLocations = await tx.$queryRaw<Array<{
+        id: string;
+        city: string;
+        district: string | null;
+        state: string;
+        country: string;
+      }>>`
+        SELECT "id", "city", "district", "state", "country"
+        FROM "worker_preferred_locations"
+        WHERE "workerId" = ${worker.id}
+        ORDER BY "city" ASC
+      `;
+
+      return {
+        mobility: preference?.mobility ?? dto.mobility,
+        willingToRelocate: preference?.willingToRelocate ?? dto.willingToRelocate ?? false,
+        willingToTravel: preference?.willingToTravel ?? dto.willingToTravel ?? false,
+        preferredLocations: savedLocations,
+      };
     });
   }
 }
