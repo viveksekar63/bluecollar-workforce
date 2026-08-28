@@ -1,11 +1,12 @@
 import {
+  IsBoolean,
   IsInt,
   IsOptional,
   IsString,
   Max,
   Min,
-} from "class-validator";
-import { Type } from "class-transformer";
+} from 'class-validator';
+import { Transform, Type } from 'class-transformer';
 
 export class WorkersQueryDto {
   @IsOptional()
@@ -14,11 +15,29 @@ export class WorkersQueryDto {
 
   @IsOptional()
   @IsString()
+  professionCategory?: string;
+
+  @IsOptional()
+  @IsString()
+  profession?: string;
+
+  @IsOptional()
+  @IsString()
   verificationStatus?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true' || value === '1')
+  @IsBoolean()
+  verifiedOnly?: boolean;
 
   @IsOptional()
   @IsString()
   availability?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true' || value === '1')
+  @IsBoolean()
+  availableOnly?: boolean;
 
   @IsOptional()
   @IsString()
@@ -27,6 +46,10 @@ export class WorkersQueryDto {
   @IsOptional()
   @IsString()
   location?: string;
+
+  @IsOptional()
+  @IsString()
+  mobility?: string;
 
   @IsOptional()
   @Type(() => Number)
