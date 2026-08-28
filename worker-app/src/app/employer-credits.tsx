@@ -45,8 +45,11 @@ export default function EmployerCredits() {
       ]);
       setBalance(Number(balanceResponse.data?.balance || 0));
       setPackages(packagesResponse.data || []);
-    } catch (e) { console.warn(e); }
-    finally { setLoading(false); }
+    } catch (e) {
+      console.warn(e);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
@@ -75,7 +78,7 @@ export default function EmployerCredits() {
           name: 'WorkTrust',
           description: `${creditPackage.name} - ${creditPackage.credits} credits`,
           order_id: order.orderId,
-          theme: { color: '#F7B93E' },
+          theme: { color: BrandColors.indigo },
           modal: { confirm_close: true, escape: true },
           handler: async (response: any) => {
             try { await completePayment(response); }
@@ -96,7 +99,7 @@ export default function EmployerCredits() {
         amount: String(order.amount),
         name: 'WorkTrust',
         order_id: order.orderId,
-        theme: { color: '#F7B93E' },
+        theme: { color: BrandColors.indigo },
       });
       await completePayment(response);
     } catch (e: any) {
@@ -107,31 +110,196 @@ export default function EmployerCredits() {
     }
   };
 
-  return <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-    <Pressable onPress={() => router.back()}><Text style={styles.back}>‹  Back</Text></Pressable>
-    <Text style={styles.eyebrow}>EMPLOYER WALLET</Text>
-    <Text style={styles.title}>My Credits</Text>
-    <Text style={styles.subtitle}>Use credits to unlock worker contact details.</Text>
-    <View style={styles.balanceCard}>
-      <Text style={styles.balanceLabel}>AVAILABLE CREDITS</Text>
-      {loading ? <ActivityIndicator color={BrandColors.gold} /> : <Text style={styles.balance}>{balance}</Text>}
-      <Text style={styles.balanceHint}>1 credit unlocks one worker contact</Text>
-    </View>
-    <Text style={styles.section}>Buy Credits</Text>
-    {packages.map((p, index) => <View key={p.code} style={styles.package}>
-      <View style={styles.packageCopy}>
-        {index === 1 && <Text style={styles.popular}>MOST POPULAR</Text>}
-        <Text style={styles.packageTitle}>{p.name}</Text>
-        <Text style={styles.packageCredits}>{p.credits} credits</Text>
-        <Text style={styles.packagePrice}>₹{Number(p.priceInr).toLocaleString('en-IN')}</Text>
+  return <View style={styles.screen}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
+    >
+      <View style={styles.topHeader}>
+        <View style={styles.headerCopy}>
+          <Text style={styles.eyebrow}>EMPLOYER WALLET</Text>
+          <Text style={styles.title}>My Credits</Text>
+          <Text style={styles.subtitle}>Unlock trusted worker contacts when you need them.</Text>
+        </View>
+        <View style={styles.headerIcon}>
+          <Text style={styles.creditGlyph}>▤</Text>
+        </View>
       </View>
-      <Pressable disabled={buying} onPress={() => buy(p)} style={[styles.buy, buying && styles.disabled]}><Text style={styles.buyText}>{buying ? '...' : 'Buy'}</Text></Pressable>
-    </View>)}
-    {!loading && !packages.length && <Text style={styles.muted}>Credit packages are currently unavailable.</Text>}
-    <Pressable style={styles.history} onPress={() => router.push('/credit-history')}><Text style={styles.historyText}>View credit history →</Text></Pressable>
-  </ScrollView>;
+
+      <View style={styles.hero}>
+        <View style={styles.heroGlow} />
+        <View style={styles.heroTopRow}>
+          <View style={styles.heroIconCircle}>
+            <Text style={styles.heroIcon}>▤</Text>
+          </View>
+          <View style={styles.heroCopy}>
+            <Text style={styles.heroEyebrow}>YOUR CREDIT BALANCE</Text>
+            <Text style={styles.heroTitle}>Ready to hire?</Text>
+          </View>
+          <View style={styles.securePill}><Text style={styles.secureText}>SECURE</Text></View>
+        </View>
+
+        <View style={styles.balanceRow}>
+          {loading ? <ActivityIndicator color={BrandColors.white} size="large" /> : <Text style={styles.balance}>{balance}</Text>}
+          <View style={styles.balanceCopy}>
+            <Text style={styles.balanceLabel}>AVAILABLE CREDITS</Text>
+            <Text style={styles.balanceHint}>1 credit = 1 worker contact</Text>
+          </View>
+        </View>
+
+        <Pressable style={styles.findButton} onPress={() => router.push('/employer-find-manpower')}>
+          <Text style={styles.findButtonText}>Find verified workers</Text>
+          <Text style={styles.findButtonArrow}>→</Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.trustRow}>
+        <TrustItem icon="✓" title="Verified" subtitle="Worker profiles" />
+        <View style={styles.trustDivider} />
+        <TrustItem icon="▤" title="Simple" subtitle="1 credit per contact" />
+        <View style={styles.trustDivider} />
+        <TrustItem icon="↗" title="Instant" subtitle="Credits added fast" />
+      </View>
+
+      <View style={styles.sectionHeader}>
+        <View>
+          <Text style={styles.section}>Choose your plan</Text>
+          <Text style={styles.sectionSubtitle}>Buy credits and unlock contacts anytime.</Text>
+        </View>
+        <View style={styles.valuePill}><Text style={styles.valuePillText}>BEST VALUE</Text></View>
+      </View>
+
+      {packages.map((p, index) => {
+        const popular = index === 1;
+        const perCredit = p.priceInr / p.credits;
+        return <View key={p.code} style={[styles.package, popular && styles.packagePopular]}>
+          {popular && <View style={styles.popularRibbon}><Text style={styles.popularRibbonText}>MOST POPULAR</Text></View>}
+          <View style={styles.packageTop}>
+            <View style={[styles.packageIcon, popular && styles.packageIconPopular]}>
+              <Text style={[styles.packageIconText, popular && styles.packageIconTextPopular]}>▤</Text>
+            </View>
+            <View style={styles.packageCopy}>
+              <Text style={styles.packageTitle}>{p.name.replace(' Credits', '')}</Text>
+              <Text style={styles.packageDescription}>{p.credits} contacts to unlock</Text>
+            </View>
+            <View style={styles.priceBlock}>
+              <Text style={styles.packagePrice}>₹{Number(p.priceInr).toLocaleString('en-IN')}</Text>
+              <Text style={styles.perCredit}>₹{perCredit.toFixed(0)} / credit</Text>
+            </View>
+          </View>
+          <View style={styles.packageBottom}>
+            <View style={styles.featureLine}><Text style={styles.check}>✓</Text><Text style={styles.featureText}>{p.credits} worker contact unlocks</Text></View>
+            <Pressable disabled={buying} onPress={() => buy(p)} style={[styles.buy, popular && styles.buyPopular, buying && styles.disabled]}>
+              <Text style={styles.buyText}>{buying ? '...' : 'Buy now'}</Text>
+              {!buying && <Text style={styles.buyArrow}>→</Text>}
+            </Pressable>
+          </View>
+        </View>;
+      })}
+
+      {!loading && !packages.length && <View style={styles.empty}><Text style={styles.muted}>Credit packages are currently unavailable.</Text></View>}
+
+      <Pressable style={styles.historyCard} onPress={() => router.push('/credit-history')}>
+        <View style={styles.historyIcon}><Text style={styles.historyGlyph}>▤</Text></View>
+        <View style={styles.historyCopy}>
+          <Text style={styles.historyTitle}>Credit history</Text>
+          <Text style={styles.historySubtitle}>View purchases, usage and wallet activity.</Text>
+        </View>
+        <Text style={styles.historyArrow}>→</Text>
+      </Pressable>
+
+      <View style={styles.safeNote}>
+        <Text style={styles.safeIcon}>✓</Text>
+        <Text style={styles.safeText}>Secure payments • Your balance updates after successful payment</Text>
+      </View>
+    </ScrollView>
+  </View>;
+}
+
+function TrustItem({ icon, title, subtitle }: { icon: string; title: string; subtitle: string }) {
+  return <View style={styles.trustItem}>
+    <View style={styles.trustIcon}><Text style={styles.trustIconText}>{icon}</Text></View>
+    <Text style={styles.trustTitle}>{title}</Text>
+    <Text style={styles.trustSubtitle}>{subtitle}</Text>
+  </View>;
 }
 
 const styles = StyleSheet.create({
-  container:{flex:1,backgroundColor:BrandColors.background},content:{padding:20,paddingBottom:60},back:{color:BrandColors.gold,fontSize:14,fontWeight:'800',marginBottom:24},eyebrow:{color:BrandColors.gold,fontSize:10,fontWeight:'900',letterSpacing:1.7},title:{color:BrandColors.text,fontSize:30,fontWeight:'900',marginTop:5},subtitle:{color:BrandColors.textSecondary,fontSize:13,lineHeight:20,marginTop:5},balanceCard:{marginTop:22,padding:22,borderRadius:20,backgroundColor:BrandColors.slateSoft,borderWidth:1,borderColor:BrandColors.gold},balanceLabel:{color:BrandColors.textSecondary,fontSize:10,fontWeight:'900',letterSpacing:1.2},balance:{color:BrandColors.gold,fontSize:48,fontWeight:'900',marginTop:5},balanceHint:{color:BrandColors.textSecondary,fontSize:11,marginTop:2},section:{color:BrandColors.text,fontSize:19,fontWeight:'900',marginTop:28,marginBottom:12},package:{flexDirection:'row',alignItems:'center',padding:16,borderRadius:17,backgroundColor:BrandColors.slateSoft,borderWidth:1,borderColor:BrandColors.slateBorder,marginBottom:10},packageCopy:{flex:1},popular:{color:BrandColors.gold,fontSize:8,fontWeight:'900',letterSpacing:1},packageTitle:{color:BrandColors.text,fontSize:16,fontWeight:'900',marginTop:2},packageCredits:{color:BrandColors.textSecondary,fontSize:11,marginTop:2},packagePrice:{color:BrandColors.text,fontSize:18,fontWeight:'900',marginTop:5},buy:{backgroundColor:BrandColors.gold,borderRadius:12,paddingHorizontal:20,paddingVertical:12},buyText:{color:BrandColors.slate,fontWeight:'900'},disabled:{opacity:0.55},history:{alignItems:'center',padding:20},historyText:{color:BrandColors.gold,fontSize:13,fontWeight:'800'},muted:{color:BrandColors.muted,fontSize:11,textAlign:'center',marginTop:16}
+  screen: { flex: 1, backgroundColor: BrandColors.background },
+  container: { flex: 1 },
+  content: { paddingHorizontal: 18, paddingTop: 88, paddingBottom: 122 },
+  topHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 },
+  headerCopy: { flex: 1, paddingRight: 12 },
+  eyebrow: { color: BrandColors.indigo, fontSize: 10, fontWeight: '900', letterSpacing: 1.8 },
+  title: { color: BrandColors.navy, fontSize: 30, lineHeight: 34, fontWeight: '900', marginTop: 4 },
+  subtitle: { color: BrandColors.textSecondary, fontSize: 12, lineHeight: 18, marginTop: 5, maxWidth: 300 },
+  headerIcon: { width: 54, height: 54, borderRadius: 18, backgroundColor: BrandColors.skySoft, borderWidth: 1, borderColor: BrandColors.border, alignItems: 'center', justifyContent: 'center' },
+  creditGlyph: { color: BrandColors.indigo, fontSize: 26, fontWeight: '900' },
+  hero: { overflow: 'hidden', minHeight: 248, borderRadius: 26, padding: 20, backgroundColor: BrandColors.navy, borderWidth: 1, borderColor: BrandColors.indigo, shadowColor: BrandColors.navy, shadowOpacity: .18, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 7 },
+  heroGlow: { position: 'absolute', width: 190, height: 190, borderRadius: 95, right: -55, top: -55, backgroundColor: '#173D78', opacity: .9 },
+  heroTopRow: { flexDirection: 'row', alignItems: 'center' },
+  heroIconCircle: { width: 46, height: 46, borderRadius: 16, backgroundColor: BrandColors.indigo, alignItems: 'center', justifyContent: 'center' },
+  heroIcon: { color: BrandColors.white, fontSize: 23, fontWeight: '900' },
+  heroCopy: { flex: 1, marginLeft: 12 },
+  heroEyebrow: { color: '#BFDBFE', fontSize: 9, fontWeight: '900', letterSpacing: 1.4 },
+  heroTitle: { color: BrandColors.white, fontSize: 18, fontWeight: '900', marginTop: 2 },
+  securePill: { paddingHorizontal: 9, paddingVertical: 5, borderRadius: 10, backgroundColor: 'rgba(255,255,255,.12)', borderWidth: 1, borderColor: 'rgba(255,255,255,.18)' },
+  secureText: { color: '#BAE6FD', fontSize: 7, fontWeight: '900', letterSpacing: 1 },
+  balanceRow: { flexDirection: 'row', alignItems: 'flex-end', marginTop: 24 },
+  balance: { color: BrandColors.white, fontSize: 56, lineHeight: 58, fontWeight: '900' },
+  balanceCopy: { marginLeft: 13, marginBottom: 6 },
+  balanceLabel: { color: '#BAE6FD', fontSize: 9, fontWeight: '900', letterSpacing: 1 },
+  balanceHint: { color: '#E0F2FE', fontSize: 11, fontWeight: '700', marginTop: 3 },
+  findButton: { marginTop: 20, height: 48, borderRadius: 14, paddingHorizontal: 16, backgroundColor: BrandColors.indigo, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  findButtonText: { color: BrandColors.white, fontSize: 13, fontWeight: '900' },
+  findButtonArrow: { color: BrandColors.white, fontSize: 20, fontWeight: '700' },
+  trustRow: { marginTop: 14, minHeight: 86, borderRadius: 20, backgroundColor: BrandColors.surfaceLight, borderWidth: 1, borderColor: BrandColors.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', paddingHorizontal: 6, shadowColor: BrandColors.navy, shadowOpacity: .05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 2 },
+  trustItem: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  trustIcon: { width: 28, height: 28, borderRadius: 10, backgroundColor: BrandColors.skySoft, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  trustIconText: { color: BrandColors.indigo, fontSize: 14, fontWeight: '900' },
+  trustTitle: { color: BrandColors.navy, fontSize: 10, fontWeight: '900' },
+  trustSubtitle: { color: BrandColors.muted, fontSize: 7, marginTop: 2, textAlign: 'center' },
+  trustDivider: { width: 1, height: 38, backgroundColor: BrandColors.border },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 28, marginBottom: 12 },
+  section: { color: BrandColors.navy, fontSize: 19, fontWeight: '900' },
+  sectionSubtitle: { color: BrandColors.textSecondary, fontSize: 10, marginTop: 3 },
+  valuePill: { paddingHorizontal: 9, paddingVertical: 6, borderRadius: 10, backgroundColor: BrandColors.skySoft },
+  valuePillText: { color: BrandColors.indigo, fontSize: 7, fontWeight: '900', letterSpacing: .8 },
+  package: { position: 'relative', overflow: 'hidden', padding: 16, borderRadius: 20, backgroundColor: BrandColors.surface, borderWidth: 1, borderColor: BrandColors.border, marginBottom: 12, shadowColor: BrandColors.navy, shadowOpacity: .07, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 3 },
+  packagePopular: { borderColor: BrandColors.indigo, borderWidth: 1.5, paddingTop: 21 },
+  popularRibbon: { position: 'absolute', top: 0, right: 0, paddingHorizontal: 11, paddingVertical: 5, borderBottomLeftRadius: 11, backgroundColor: BrandColors.indigo },
+  popularRibbonText: { color: BrandColors.white, fontSize: 7, fontWeight: '900', letterSpacing: .8 },
+  packageTop: { flexDirection: 'row', alignItems: 'center' },
+  packageIcon: { width: 48, height: 48, borderRadius: 15, backgroundColor: BrandColors.skySoft, alignItems: 'center', justifyContent: 'center' },
+  packageIconPopular: { backgroundColor: BrandColors.indigo },
+  packageIconText: { color: BrandColors.indigo, fontSize: 21, fontWeight: '900' },
+  packageIconTextPopular: { color: BrandColors.white },
+  packageCopy: { flex: 1, marginLeft: 12, paddingRight: 8 },
+  packageTitle: { color: BrandColors.navy, fontSize: 17, fontWeight: '900' },
+  packageDescription: { color: BrandColors.textSecondary, fontSize: 10, marginTop: 3 },
+  priceBlock: { alignItems: 'flex-end' },
+  packagePrice: { color: BrandColors.navy, fontSize: 20, fontWeight: '900' },
+  perCredit: { color: BrandColors.muted, fontSize: 8, marginTop: 2 },
+  packageBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: BrandColors.border },
+  featureLine: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingRight: 8 },
+  check: { color: BrandColors.success, fontSize: 12, fontWeight: '900', marginRight: 5 },
+  featureText: { color: BrandColors.textSecondary, fontSize: 9, fontWeight: '700' },
+  buy: { minWidth: 98, height: 40, borderRadius: 12, paddingHorizontal: 13, backgroundColor: BrandColors.skySoft, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  buyPopular: { backgroundColor: BrandColors.indigo },
+  buyText: { color: BrandColors.navy, fontSize: 11, fontWeight: '900' },
+  buyArrow: { color: BrandColors.navy, fontSize: 15, fontWeight: '900', marginLeft: 5 },
+  disabled: { opacity: .55 },
+  empty: { padding: 18, alignItems: 'center' },
+  muted: { color: BrandColors.muted, fontSize: 11, textAlign: 'center' },
+  historyCard: { marginTop: 4, padding: 15, minHeight: 70, borderRadius: 18, backgroundColor: BrandColors.skySoft, borderWidth: 1, borderColor: BrandColors.border, flexDirection: 'row', alignItems: 'center' },
+  historyIcon: { width: 40, height: 40, borderRadius: 13, backgroundColor: BrandColors.white, alignItems: 'center', justifyContent: 'center' },
+  historyGlyph: { color: BrandColors.indigo, fontSize: 19, fontWeight: '900' },
+  historyCopy: { flex: 1, marginLeft: 11 },
+  historyTitle: { color: BrandColors.navy, fontSize: 13, fontWeight: '900' },
+  historySubtitle: { color: BrandColors.textSecondary, fontSize: 9, marginTop: 3 },
+  historyArrow: { color: BrandColors.indigo, fontSize: 20, fontWeight: '900' },
+  safeNote: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 16, paddingHorizontal: 8 },
+  safeIcon: { color: BrandColors.success, fontSize: 12, fontWeight: '900', marginRight: 5 },
+  safeText: { color: BrandColors.muted, fontSize: 8, textAlign: 'center' },
 });
