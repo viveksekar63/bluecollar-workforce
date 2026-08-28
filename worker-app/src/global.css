@@ -7,17 +7,24 @@
   --font-rounded: 'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif;
   --font-serif: Georgia, 'Times New Roman', serif;
 
-  /* WorkTrust dark slate + gold brand palette */
-  --brand-slate: #0D141A;
-  --brand-slate-soft: #151E26;
-  --brand-slate-elevated: #1B2731;
-  --brand-gold: #F4B93F;
-  --brand-gold-bright: #FFC95A;
-  --brand-gold-soft: #2C2414;
-  --brand-text: #FFFFFF;
-  --brand-text-secondary: #C2CBD2;
-  --brand-background: #0D141A;
-  --brand-surface: #151E26;
-  --brand-border: #34424D;
-  --brand-success: #39C58A;
+  /* WorkTrust Theme #5 — Indigo & Sky Blue */
+  --brand-navy: #0A1F44;
+  --brand-indigo: #2563EB;
+  --brand-sky: #7DD3FC;
+  --brand-white: #FFFFFF;
+  --brand-sky-soft: #E0F2FE;
+
+  /* Shared semantic tokens */
+  --brand-slate: #0A1F44;
+  --brand-slate-soft: #E0F2FE;
+  --brand-slate-elevated: #FFFFFF;
+  --brand-gold: #2563EB;
+  --brand-gold-bright: #2563EB;
+  --brand-gold-soft: #E0F2FE;
+  --brand-text: #0A1F44;
+  --brand-text-secondary: #35537D;
+  --brand-background: #FFFFFF;
+  --brand-surface: #FFFFFF;
+  --brand-border: #BFDBFE;
+  --brand-success: #15803D;
 }
