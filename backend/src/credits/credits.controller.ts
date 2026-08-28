@@ -11,8 +11,23 @@ class VerifyCreditPaymentDto { @IsString() orderId!: string; @IsString() payment
 @UseGuards(JwtAuthGuard)
 export class CreditsController {
   constructor(private readonly creditsService: CreditsService) {}
-  @Get('balance') balance(@CurrentUser() user: { userId: string }) { return this.creditsService.balance(user.userId); }
-  @Get('transactions') transactions(@CurrentUser() user: { userId: string }) { return this.creditsService.transactions(user.userId); }
-  @Post('orders') createOrder(@CurrentUser() user: { userId: string }, @Body() dto: CreateCreditOrderDto) { return this.creditsService.createOrder(user.userId, dto.credits); }
-  @Post('verify') verify(@CurrentUser() user: { userId: string }, @Body() dto: VerifyCreditPaymentDto) { return this.creditsService.verify(user.userId, dto.orderId, dto.paymentId, dto.signature); }
+
+  @Get('packages')
+  packages() { return this.creditsService.packages(); }
+
+  @Get('balance')
+  balance(@CurrentUser() user: { userId: string }) { return this.creditsService.balance(user.userId); }
+
+  @Get('transactions')
+  transactions(@CurrentUser() user: { userId: string }) { return this.creditsService.transactions(user.userId); }
+
+  @Post('orders')
+  createOrder(@CurrentUser() user: { userId: string }, @Body() dto: CreateCreditOrderDto) {
+    return this.creditsService.createOrder(user.userId, dto.credits);
+  }
+
+  @Post('verify')
+  verify(@CurrentUser() user: { userId: string }, @Body() dto: VerifyCreditPaymentDto) {
+    return this.creditsService.verify(user.userId, dto.orderId, dto.paymentId, dto.signature);
+  }
 }
