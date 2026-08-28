@@ -109,6 +109,12 @@ export default function ProfileScreen() {
       <Field label="Years of experience" value={form.experienceYears} placeholder="e.g. 5" keyboardType="number-pad" onChangeText={(value) => setForm({ ...form, experienceYears: value.replace(/[^0-9]/g, '') })} />
       <Field label="About you" value={form.bio} placeholder="Tell employers about your experience and strengths" multiline onChangeText={(value) => setForm({ ...form, bio: value })} />
 
+      <Pressable onPress={() => router.push('/work-preferences')} style={({ pressed }) => [styles.mobilityCard, pressed && styles.pressed]}>
+        <View style={styles.mobilityIcon}><Text style={styles.mobilityIconText}>↗</Text></View>
+        <View style={styles.mobilityCopy}><Text style={styles.mobilityTitle}>Work location preferences</Text><Text style={styles.mobilitySubtitle}>Tell employers if you are willing to travel or relocate anywhere in India.</Text></View>
+        <Text style={styles.mobilityChevron}>›</Text>
+      </Pressable>
+
       <Pressable style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, saving && styles.disabled]} onPress={save} disabled={saving}>
         {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>Save & Continue</Text>}
       </Pressable>
@@ -159,6 +165,13 @@ const styles = StyleSheet.create({
   optionTextSelected: { color: BrandColors.burgundy, fontWeight: '800' },
   input: { minHeight: 54, borderWidth: 1, borderColor: BrandColors.border, borderRadius: 14, backgroundColor: BrandColors.surface, paddingHorizontal: 16, fontSize: 16, color: BrandColors.text },
   textArea: { minHeight: 110, paddingTop: 14, textAlignVertical: 'top' },
+  mobilityCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#EEF6FF', borderWidth: 1, borderColor: '#BFDBFE', borderRadius: 16, padding: 14, marginTop: 2, marginBottom: 12 },
+  mobilityIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#DBEAFE', alignItems: 'center', justifyContent: 'center', marginRight: 11 },
+  mobilityIconText: { color: '#2563EB', fontSize: 22, fontWeight: '900' },
+  mobilityCopy: { flex: 1 },
+  mobilityTitle: { color: BrandColors.text, fontSize: 13, fontWeight: '900' },
+  mobilitySubtitle: { color: BrandColors.textSecondary, fontSize: 10, lineHeight: 15, marginTop: 3 },
+  mobilityChevron: { color: '#2563EB', fontSize: 28, marginLeft: 6 },
   primaryButton: { height: 54, borderRadius: 14, backgroundColor: BrandColors.burgundy, alignItems: 'center', justifyContent: 'center', marginTop: 8, shadowColor: BrandColors.burgundy, shadowOpacity: 0.18, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 3 },
   primaryText: { color: '#fff', fontSize: 16, fontWeight: '800' },
   pressed: { opacity: 0.85 },
