@@ -42,3 +42,8 @@ export async function getManpowerWorker(workerId: string) {
   const response = await api.get(`/workers/${workerId}`);
   return response.data;
 }
+
+export async function unlockManpowerWorkerContact(workerId: string) {
+  const response = await api.post(`/workers/${workerId}/contact`);
+  return response.data;
+}
