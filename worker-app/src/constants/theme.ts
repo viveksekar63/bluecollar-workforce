@@ -1,52 +1,60 @@
-/** WorkTrust dark-slate + gold design tokens. */
+/** WorkTrust Indigo & Sky Blue design tokens. */
 
 import '@/global.css';
 import { Platform } from 'react-native';
 
 export const BrandColors = {
-  slate: '#0D141A',
-  slateSoft: '#151E26',
-  slateElevated: '#1B2731',
-  slateBorder: '#34424D',
-  gold: '#F4B93F',
-  goldBright: '#FFC95A',
-  goldSoft: '#2C2414',
-  text: '#FFFFFF',
-  textSecondary: '#C2CBD2',
-  muted: '#8D99A3',
-  surface: '#151E26',
-  surfaceLight: '#202C36',
-  border: '#34424D',
-  borderStrong: '#F4B93F',
-  success: '#39C58A',
-  successSoft: '#123A2E',
-  danger: '#FF6B6B',
-  background: '#0D141A',
+  // Primary brand palette from WorkTrust Theme #5: Indigo & Sky Blue.
+  navy: '#0A1F44',
+  indigo: '#2563EB',
+  sky: '#7DD3FC',
+  white: '#FFFFFF',
+  skySoft: '#E0F2FE',
+
+  // Semantic tokens used throughout the mobile application.
+  slate: '#0A1F44',
+  slateSoft: '#E0F2FE',
+  slateElevated: '#FFFFFF',
+  slateBorder: '#7DD3FC',
+  gold: '#2563EB',
+  goldBright: '#2563EB',
+  goldSoft: '#E0F2FE',
+  text: '#0A1F44',
+  textSecondary: '#35537D',
+  muted: '#64748B',
+  surface: '#FFFFFF',
+  surfaceLight: '#F7FBFF',
+  border: '#BFDBFE',
+  borderStrong: '#2563EB',
+  success: '#15803D',
+  successSoft: '#DCFCE7',
+  danger: '#DC2626',
+  background: '#FFFFFF',
 
   // Backward-compatible aliases for screens built before the final theme.
-  // They intentionally resolve to the WorkTrust slate/gold palette.
-  burgundy: '#F4B93F',
-  burgundyDark: '#C99122',
-  burgundySoft: '#2C2414',
-  rose: '#F4B93F',
-  blush: '#FFC95A',
-  blushSoft: '#2C2414',
+  // They intentionally resolve to the Indigo & Sky Blue palette.
+  burgundy: '#2563EB',
+  burgundyDark: '#1D4ED8',
+  burgundySoft: '#E0F2FE',
+  rose: '#2563EB',
+  blush: '#7DD3FC',
+  blushSoft: '#E0F2FE',
 } as const;
 
 export const Colors = {
   light: {
     text: BrandColors.text,
     background: BrandColors.background,
-    backgroundElement: BrandColors.slateSoft,
-    backgroundSelected: BrandColors.goldSoft,
+    backgroundElement: BrandColors.surface,
+    backgroundSelected: BrandColors.skySoft,
     textSecondary: BrandColors.textSecondary,
   },
   dark: {
-    text: BrandColors.text,
-    background: BrandColors.background,
-    backgroundElement: BrandColors.slateSoft,
-    backgroundSelected: BrandColors.goldSoft,
-    textSecondary: BrandColors.textSecondary,
+    text: BrandColors.white,
+    background: BrandColors.navy,
+    backgroundElement: '#102B56',
+    backgroundSelected: '#173D78',
+    textSecondary: '#C7E9FF',
   },
 } as const;
 
