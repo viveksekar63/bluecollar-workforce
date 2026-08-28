@@ -40,7 +40,7 @@ export class CreditWalletService {
       const wallet = await tx.$queryRaw<Array<{ id: string; balance: number }>>`
         SELECT "id", "balance" FROM "employer_credit_wallets" WHERE "employerId" = ${employerId} FOR UPDATE`;
       if (!wallet[0]) throw new BadRequestException('Credit wallet not found');
-      const balanceAfter = wallet[0].balance + credits;
+      const balanceAfter = Number(wallet[0].balance) + credits;
       await tx.$executeRaw`
         UPDATE "employer_credit_wallets" SET "balance" = ${balanceAfter}, "updatedAt" = CURRENT_TIMESTAMP WHERE "id" = ${wallet[0].id}`;
       await tx.$executeRaw`
@@ -57,7 +57,16 @@ export class CreditWalletService {
       const existing = await tx.$queryRaw<Array<{ id: string }>>`
         SELECT "id" FROM "employer_contact_purchases"
         WHERE "employerId" = ${employerId} AND "workerId" = ${workerId} AND "status" = 'PAID' LIMIT 1`;
-      if (existing.length) return { alreadyUnlocked: true, purchaseId: existing[0].id };
+      if (existing.length) {
+        const wallet = await tx.$queryRaw<Array<{ balance: number }>>`
+          SELECT "balance" FROM "employer_credit_wallets" WHERE "employerId" = ${employerId} LIMIT 1`;
+        return {
+          alreadyUnlocked: true,
+          purchaseId: existing[0].id,
+          balance: Number(wallet[0]?.balance ?? 0),
+          creditsUsed: 0,
+        };
+      }
 
       const wallet = await tx.$queryRaw<Array<{ id: string; balance: number }>>`
         SELECT "id", "balance" FROM "employer_credit_wallets" WHERE "employerId" = ${employerId} FOR UPDATE`;
