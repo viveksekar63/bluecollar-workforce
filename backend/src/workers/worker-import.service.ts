@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 
 export type WorkerImportRow = {
@@ -83,17 +84,17 @@ export class WorkerImportService {
           throw new Error(`Unknown work category: ${row.professionCategory}`);
         }
 
-        // work_locations is hierarchical: CITY -> DISTRICT -> STATE.
-        // Resolve the CSV city/state against that hierarchy instead of
-        // assuming city/state columns exist on the table.
         const location = await this.resolveLocation(row.city, row.state, row.district);
 
-        const mobility = row.workPreference?.trim() || 'LOCAL';
+        const mobility = row.workPreference?.trim().toUpperCase() || 'LOCAL';
         if (!VALID_MOBILITIES.has(mobility)) {
           throw new Error(
             `Invalid workPreference: ${mobility}. Allowed values: ${Array.from(VALID_MOBILITIES).join(', ')}`,
           );
         }
+
+        const willingToRelocate = this.parseBoolean(row.willingToRelocate);
+        const willingToTravel = this.parseBoolean(row.willingToTravel);
 
         const preferredLocations = this.parsePreferredLocations(row.preferredLocations);
         if (mobility === 'SPECIFIC_LOCATIONS' && !preferredLocations.length) {
@@ -142,9 +143,10 @@ export class WorkerImportService {
               },
               workPreferences: {
                 create: {
+                  id: randomUUID(),
                   mobility,
-                  willingToRelocate: this.parseBoolean(row.willingToRelocate),
-                  willingToTravel: this.parseBoolean(row.willingToTravel),
+                  willingToRelocate,
+                  willingToTravel,
                 },
               },
             },
@@ -153,6 +155,7 @@ export class WorkerImportService {
           if (preferredLocationRows.length) {
             await tx.workerPreferredLocation.createMany({
               data: preferredLocationRows.map((preferred) => ({
+                id: randomUUID(),
                 workerId: worker.id,
                 city: preferred.city,
                 district: preferred.district,
@@ -192,7 +195,7 @@ export class WorkerImportService {
       SELECT "id", "name", "parentId"
       FROM "work_locations"
       WHERE "type" = 'CITY'
-        AND "name" = ${city}
+        AND "name" = ${city.trim()}
         AND "isActive" = true
       LIMIT 10
     `;
@@ -218,7 +221,7 @@ export class WorkerImportService {
       if (!districts.length || !districts[0].parentId) continue;
       const districtRow = districts[0];
 
-      if (district && district.trim() && district.trim() !== districtRow.name) continue;
+      if (district && district.trim() && district.trim().toLowerCase() !== districtRow.name.toLowerCase()) continue;
 
       const states = await this.prisma.$queryRaw<Array<{ id: string; name: string }>>`
         SELECT "id", "name"
@@ -229,7 +232,7 @@ export class WorkerImportService {
         LIMIT 1
       `;
 
-      if (states.length && states[0].name === state) {
+      if (states.length && states[0].name.toLowerCase() === state.trim().toLowerCase()) {
         return {
           id: cityRow.id,
           city: cityRow.name,
@@ -265,7 +268,7 @@ export class WorkerImportService {
 
   private parseBoolean(value?: boolean | string) {
     if (typeof value === 'boolean') return value;
-    if (value === undefined || value === '') return false;
+    if (value === undefined || value === null || value === '') return false;
 
     const normalized = String(value).trim().toLowerCase();
     if (['true', '1', 'yes', 'y'].includes(normalized)) return true;
@@ -283,7 +286,7 @@ export class WorkerImportService {
       !row.profession ||
       !row.city ||
       !row.state ||
-      !/^\d{6}$/.test(row.pincode)
+      !/^\d{6}$/.test(String(row.pincode).trim())
     ) {
       return 'Required fields missing or pincode is invalid';
     }
