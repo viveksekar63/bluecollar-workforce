@@ -4,6 +4,7 @@ import { router, usePathname } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BrandColors } from '@/constants/theme';
 import { useAuthStore } from '@/store/auth';
+import CreditIcon from './credit-icon';
 
 export default function EmployerNavigation() {
   const [open, setOpen] = useState(false);
@@ -28,7 +29,7 @@ export default function EmployerNavigation() {
       <Tab icon="⌂" label="Home" active={pathname === '/employer-home'} onPress={() => navigate('/employer-home')} />
       <Tab icon="⌕" label="Find Workers" active={pathname === '/employer-find-manpower'} onPress={() => navigate('/employer-find-manpower')} />
       <Tab icon="▣" label="My Jobs" active={pathname === '/employer-jobs'} onPress={() => navigate('/employer-jobs')} />
-      <Tab icon="▤" label="Credits" active={pathname === '/employer-credits'} onPress={() => navigate('/employer-credits')} />
+      <Tab credit label="Credits" active={pathname === '/employer-credits'} onPress={() => navigate('/employer-credits')} />
       <Tab icon="◉" label="Profile" active={pathname === '/employer-profile'} onPress={() => navigate('/employer-profile')} />
     </View>}
     {open && <View style={styles.layer} pointerEvents="box-none">
@@ -44,7 +45,7 @@ export default function EmployerNavigation() {
         <NavItem icon="▣" label="Contact Purchases" onPress={() => navigate('/employer-contact-purchases')} />
         <NavItem icon="✓" label="Verification & Trust" onPress={() => navigate('/employer-verification')} />
         <NavItem icon="₹" label="My Subscription" onPress={() => navigate('/employer-subscription')} />
-        <NavItem icon="▤" label="Payment Methods" onPress={() => navigate('/employer-payment-method')} />
+        <NavItem credit label="Payment Methods" onPress={() => navigate('/employer-payment-method')} />
         <NavItem icon="◉" label="Profile" onPress={() => navigate('/employer-profile')} />
         <NavItem icon="⚙" label="Settings" onPress={() => navigate('/employer-settings')} />
         <View style={styles.legalSection}><Text style={styles.sectionLabel}>LEGAL</Text><NavItem icon="▤" label="Privacy Policy" onPress={() => navigate('/privacy-policy')} /><NavItem icon="ⓘ" label="Disclaimer" onPress={() => navigate('/disclaimer')} /></View>
@@ -57,12 +58,19 @@ export default function EmployerNavigation() {
   </>;
 }
 
-function Tab({ icon, label, active, onPress }: { icon: string; label: string; active: boolean; onPress: () => void }) {
-  return <Pressable style={styles.tab} onPress={onPress}><Text style={[styles.tabIcon, active && styles.tabIconActive]}>{icon}</Text><Text style={[styles.tabLabel, active && styles.tabLabelActive]} numberOfLines={1}>{label}</Text>{active && <View style={styles.activeLine} />}</Pressable>;
+function Tab({ icon, label, active, onPress, credit = false }: { icon?: string; label: string; active: boolean; onPress: () => void; credit?: boolean }) {
+  return <Pressable style={styles.tab} onPress={onPress}>
+    {credit ? <CreditIcon size={23} color={active ? BrandColors.indigo : '#64748B'} /> : <Text style={[styles.tabIcon, active && styles.tabIconActive]}>{icon}</Text>}
+    <Text style={[styles.tabLabel, active && styles.tabLabelActive]} numberOfLines={1}>{label}</Text>
+    {active && <View style={styles.activeLine} />}
+  </Pressable>;
 }
 
-function NavItem({ icon, label, onPress }: { icon: string; label: string; onPress: () => void }) {
-  return <Pressable style={({ pressed }) => [styles.item, pressed && styles.itemPressed]} onPress={onPress}><Text style={styles.itemIcon}>{icon}</Text><Text style={styles.itemLabel}>{label}</Text><Text style={styles.chevron}>›</Text></Pressable>;
+function NavItem({ icon, label, onPress, credit = false }: { icon?: string; label: string; onPress: () => void; credit?: boolean }) {
+  return <Pressable style={({ pressed }) => [styles.item, pressed && styles.itemPressed]} onPress={onPress}>
+    <View style={styles.itemIcon}>{credit ? <CreditIcon size={18} color={BrandColors.indigo} /> : <Text style={styles.itemIconText}>{icon}</Text>}</View>
+    <Text style={styles.itemLabel}>{label}</Text><Text style={styles.chevron}>›</Text>
+  </Pressable>;
 }
 
 const styles = StyleSheet.create({
@@ -90,7 +98,8 @@ const styles = StyleSheet.create({
   divider: { height: 1, backgroundColor: BrandColors.border, marginBottom: 10 },
   item: { minHeight: 48, borderRadius: 12, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, marginBottom: 3 },
   itemPressed: { backgroundColor: BrandColors.skySoft },
-  itemIcon: { width: 30, color: BrandColors.indigo, fontSize: 18, textAlign: 'center', fontWeight: '800' },
+  itemIcon: { width: 30, alignItems: 'center', justifyContent: 'center' },
+  itemIconText: { color: BrandColors.indigo, fontSize: 18, textAlign: 'center', fontWeight: '800' },
   itemLabel: { flex: 1, color: BrandColors.text, fontSize: 14, fontWeight: '700', marginLeft: 10 },
   chevron: { color: BrandColors.muted, fontSize: 22 },
   legalSection: { marginTop: 8, paddingTop: 9, borderTopWidth: 1, borderTopColor: BrandColors.border },
