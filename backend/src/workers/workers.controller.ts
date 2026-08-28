@@ -100,7 +100,8 @@ export class WorkersController {
     const roles: string[] = request.user?.roles ?? [];
     if (roles.includes("EMPLOYER")) {
       const safeUser = worker.user ? { ...worker.user, phone: undefined, email: undefined } : worker.user;
-      return { ...worker, user: safeUser };
+      const workPreferences = await this.workerWorkPreferencesService.getForWorker(id);
+      return { ...worker, user: safeUser, workPreferences };
     }
     return worker;
   }
