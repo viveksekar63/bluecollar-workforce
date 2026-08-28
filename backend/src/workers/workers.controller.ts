@@ -24,6 +24,7 @@ import { PERMISSIONS } from "../auth/permissions/permissions";
 import { UpdateWorkerSkillsDto } from "./dto/update-worker-skills.dto";
 import { WorkerProfessionService } from "./worker-profession.service";
 import { WorkerVerificationService } from "./worker-verification.service";
+import { CreditWalletService } from "../contact-purchases/credit-wallet.service";
 
 @Controller("workers")
 @UseGuards(JwtAuthGuard)
@@ -32,6 +33,7 @@ export class WorkersController {
     private readonly workersService: WorkersService,
     private readonly workerProfessionService: WorkerProfessionService,
     private readonly workerVerificationService: WorkerVerificationService,
+    private readonly creditWalletService: CreditWalletService,
   ) {}
 
   @Get("discover")
@@ -83,6 +85,33 @@ export class WorkersController {
       return { ...worker, user: safeUser };
     }
     return worker;
+  }
+
+  @Post(":id/contact")
+  @UseGuards(PermissionGuard)
+  @RequirePermissions(PERMISSIONS.WORKERS_READ)
+  async unlockContact(@Param("id") workerId: string, @Req() request: any) {
+    const roles: string[] = request.user?.roles ?? [];
+    if (!roles.includes("EMPLOYER")) return { success: false, message: "Only employers can unlock worker contact details" };
+
+    const employer = await this.workersService.getEmployerByUserId(request.user.userId);
+    const worker = await this.workersService.findOne(workerId);
+    if (!worker) return { success: false, message: "Worker not found" };
+
+    const result = await this.creditWalletService.debitForContact(employer.id, workerId);
+    const user = worker.user;
+    return {
+      success: true,
+      alreadyUnlocked: result.alreadyUnlocked,
+      purchaseId: result.purchaseId,
+      balance: result.balance,
+      creditsUsed: result.creditsUsed,
+      workerId,
+      contact: {
+        phone: user?.phone ?? null,
+        email: user?.email ?? null,
+      },
+    };
   }
 
   @Patch("me")
