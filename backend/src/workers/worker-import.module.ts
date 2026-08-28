@@ -2,10 +2,10 @@ import { Module } from '@nestjs/common';
 import { WorkerImportController } from './worker-import.controller';
 import { WorkerImportService } from './worker-import.service';
 import { PrismaModule } from '../prisma/prisma.module';
-import { AuthModule } from '../auth/auth.module';
+import { PermissionModule } from '../auth/permissions/permission.module';
 
 @Module({
-  imports: [PrismaModule, AuthModule],
+  imports: [PrismaModule, PermissionModule],
   controllers: [WorkerImportController],
   providers: [WorkerImportService],
 })
