@@ -45,7 +45,7 @@ export default function EmployerNavigation() {
         <NavItem icon="▣" label="Contact Purchases" onPress={() => navigate('/employer-contact-purchases')} />
         <NavItem icon="✓" label="Verification & Trust" onPress={() => navigate('/employer-verification')} />
         <NavItem icon="₹" label="My Subscription" onPress={() => navigate('/employer-subscription')} />
-        <NavItem credit label="Payment Methods" onPress={() => navigate('/employer-payment-method')} />
+        <NavItem icon="▤" label="Payment Methods" onPress={() => navigate('/employer-payment-method')} />
         <NavItem icon="◉" label="Profile" onPress={() => navigate('/employer-profile')} />
         <NavItem icon="⚙" label="Settings" onPress={() => navigate('/employer-settings')} />
         <View style={styles.legalSection}><Text style={styles.sectionLabel}>LEGAL</Text><NavItem icon="▤" label="Privacy Policy" onPress={() => navigate('/privacy-policy')} /><NavItem icon="ⓘ" label="Disclaimer" onPress={() => navigate('/disclaimer')} /></View>
@@ -66,9 +66,9 @@ function Tab({ icon, label, active, onPress, credit = false }: { icon?: string; 
   </Pressable>;
 }
 
-function NavItem({ icon, label, onPress, credit = false }: { icon?: string; label: string; onPress: () => void; credit?: boolean }) {
+function NavItem({ icon, label, onPress }: { icon?: string; label: string; onPress: () => void }) {
   return <Pressable style={({ pressed }) => [styles.item, pressed && styles.itemPressed]} onPress={onPress}>
-    <View style={styles.itemIcon}>{credit ? <CreditIcon size={18} color={BrandColors.indigo} /> : <Text style={styles.itemIconText}>{icon}</Text>}</View>
+    <View style={styles.itemIcon}><Text style={styles.itemIconText}>{icon}</Text></View>
     <Text style={styles.itemLabel}>{label}</Text><Text style={styles.chevron}>›</Text>
   </Pressable>;
 }
