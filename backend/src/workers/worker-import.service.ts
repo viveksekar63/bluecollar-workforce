@@ -72,18 +72,18 @@ export class WorkerImportService {
         }
 
         const category = await this.prisma.$queryRaw<Array<{ id: string }>>`
-          SELECT id
+          SELECT "id"
           FROM work_categories
-          WHERE name = ${row.professionCategory}
+          WHERE "name" = ${row.professionCategory}
             AND "isActive" = true
           LIMIT 1
         `;
 
         const location = await this.prisma.$queryRaw<Array<{ id: string }>>`
-          SELECT id
+          SELECT "id"
           FROM work_locations
-          WHERE city = ${row.city}
-            AND state = ${row.state}
+          WHERE "city" = ${row.city}
+            AND "state" = ${row.state}
             AND "isActive" = true
           LIMIT 1
         `;
@@ -112,10 +112,10 @@ export class WorkerImportService {
           const masterLocation = await this.prisma.$queryRaw<
             Array<{ city: string; state: string; district: string | null }>
           >`
-            SELECT city, state, district
+            SELECT "city", "state", "district"
             FROM work_locations
-            WHERE city = ${preferred.city}
-              AND state = ${preferred.state}
+            WHERE "city" = ${preferred.city}
+              AND "state" = ${preferred.state}
               AND "isActive" = true
             LIMIT 1
           `;
