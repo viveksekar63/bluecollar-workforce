@@ -9,6 +9,7 @@ import {
   Query,
   Req,
   UseGuards,
+  NotFoundException,
 } from "@nestjs/common";
 
 import { WorkersService } from "./workers.service";
@@ -25,6 +26,7 @@ import { UpdateWorkerSkillsDto } from "./dto/update-worker-skills.dto";
 import { WorkerProfessionService } from "./worker-profession.service";
 import { WorkerVerificationService } from "./worker-verification.service";
 import { CreditWalletService } from "../contact-purchases/credit-wallet.service";
+import { PrismaService } from "../prisma/prisma.service";
 
 @Controller("workers")
 @UseGuards(JwtAuthGuard)
@@ -34,6 +36,7 @@ export class WorkersController {
     private readonly workerProfessionService: WorkerProfessionService,
     private readonly workerVerificationService: WorkerVerificationService,
     private readonly creditWalletService: CreditWalletService,
+    private readonly prisma: PrismaService,
   ) {}
 
   @Get("discover")
@@ -92,11 +95,21 @@ export class WorkersController {
   @RequirePermissions(PERMISSIONS.WORKERS_READ)
   async unlockContact(@Param("id") workerId: string, @Req() request: any) {
     const roles: string[] = request.user?.roles ?? [];
-    if (!roles.includes("EMPLOYER")) return { success: false, message: "Only employers can unlock worker contact details" };
+    if (!roles.includes("EMPLOYER")) {
+      return { success: false, message: "Only employers can unlock worker contact details" };
+    }
 
-    const employer = await this.workersService.getEmployerByUserId(request.user.userId);
+    const employer = await this.prisma.employer.findUnique({
+      where: { userId: request.user.userId },
+      select: { id: true, status: true },
+    });
+    if (!employer) throw new NotFoundException("Employer profile not found");
+    if (String(employer.status) !== "VERIFIED") {
+      return { success: false, message: "Employer account is not verified" };
+    }
+
     const worker = await this.workersService.findOne(workerId);
-    if (!worker) return { success: false, message: "Worker not found" };
+    if (!worker) throw new NotFoundException("Worker not found");
 
     const result = await this.creditWalletService.debitForContact(employer.id, workerId);
     const user = worker.user;
@@ -105,7 +118,7 @@ export class WorkersController {
       alreadyUnlocked: result.alreadyUnlocked,
       purchaseId: result.purchaseId,
       balance: result.balance,
-      creditsUsed: result.creditsUsed,
+      creditsUsed: result.creditsUsed ?? 0,
       workerId,
       contact: {
         phone: user?.phone ?? null,
