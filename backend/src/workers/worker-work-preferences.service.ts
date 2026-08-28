@@ -7,10 +7,7 @@ import { UpdateWorkerWorkPreferencesDto } from "./dto/update-worker-work-prefere
 export class WorkerWorkPreferencesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async get(userId: string) {
-    const worker = await this.prisma.worker.findUnique({ where: { userId }, select: { id: true } });
-    if (!worker) throw new NotFoundException("Worker profile not found");
-
+  private async getByWorkerId(workerId: string) {
     const [preference] = await this.prisma.$queryRaw<Array<{
       id: string;
       mobility: string;
@@ -19,7 +16,7 @@ export class WorkerWorkPreferencesService {
     }>>`
       SELECT "id", "mobility", "willingToRelocate", "willingToTravel"
       FROM "worker_work_preferences"
-      WHERE "workerId" = ${worker.id}
+      WHERE "workerId" = ${workerId}
       LIMIT 1
     `;
 
@@ -32,7 +29,7 @@ export class WorkerWorkPreferencesService {
     }>>`
       SELECT "id", "city", "district", "state", "country"
       FROM "worker_preferred_locations"
-      WHERE "workerId" = ${worker.id}
+      WHERE "workerId" = ${workerId}
       ORDER BY "city" ASC
     `;
 
@@ -42,6 +39,16 @@ export class WorkerWorkPreferencesService {
       willingToTravel: preference?.willingToTravel ?? false,
       preferredLocations: locations,
     };
+  }
+
+  async get(userId: string) {
+    const worker = await this.prisma.worker.findUnique({ where: { userId }, select: { id: true } });
+    if (!worker) throw new NotFoundException("Worker profile not found");
+    return this.getByWorkerId(worker.id);
+  }
+
+  async getForWorker(workerId: string) {
+    return this.getByWorkerId(workerId);
   }
 
   async update(userId: string, dto: UpdateWorkerWorkPreferencesDto) {
@@ -101,36 +108,7 @@ export class WorkerWorkPreferencesService {
         `;
       }
 
-      const [preference] = await tx.$queryRaw<Array<{
-        mobility: string;
-        willingToRelocate: boolean;
-        willingToTravel: boolean;
-      }>>`
-        SELECT "mobility", "willingToRelocate", "willingToTravel"
-        FROM "worker_work_preferences"
-        WHERE "workerId" = ${worker.id}
-        LIMIT 1
-      `;
-
-      const savedLocations = await tx.$queryRaw<Array<{
-        id: string;
-        city: string;
-        district: string | null;
-        state: string;
-        country: string;
-      }>>`
-        SELECT "id", "city", "district", "state", "country"
-        FROM "worker_preferred_locations"
-        WHERE "workerId" = ${worker.id}
-        ORDER BY "city" ASC
-      `;
-
-      return {
-        mobility: preference.mobility,
-        willingToRelocate: preference.willingToRelocate,
-        willingToTravel: preference.willingToTravel,
-        preferredLocations: savedLocations,
-      };
+      return this.getByWorkerId(worker.id);
     });
   }
 }
