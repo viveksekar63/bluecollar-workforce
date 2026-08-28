@@ -18,7 +18,7 @@ if (Platform.OS === 'web') {
 
 export default function RootLayout() {
   const activeRole = useAuthStore((state) => state.activeRole);
-  return <><StatusBar style="light" /><Stack screenOptions={{ headerShown: false, animation: 'slide_from_right', contentStyle: { backgroundColor: BrandColors.background } }}>
+  return <><StatusBar style="dark" /><Stack screenOptions={{ headerShown: false, animation: 'slide_from_right', contentStyle: { backgroundColor: BrandColors.background } }}>
     <Stack.Screen name="index" /><Stack.Screen name="login" /><Stack.Screen name="register" /><Stack.Screen name="register-otp" /><Stack.Screen name="role-select" />
     <Stack.Screen name="employer-home" /><Stack.Screen name="employer-find-manpower" /><Stack.Screen name="employer-worker-details" /><Stack.Screen name="employer-jobs" /><Stack.Screen name="employer-job-create" /><Stack.Screen name="employer-job-details" />
     <Stack.Screen name="employer-subscription" /><Stack.Screen name="employer-payment-method" /><Stack.Screen name="employer-applications" /><Stack.Screen name="employer-application-details" /><Stack.Screen name="employer-profile" /><Stack.Screen name="employer-settings" />
