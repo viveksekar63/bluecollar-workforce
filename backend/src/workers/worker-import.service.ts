@@ -73,17 +73,8 @@ export class WorkerImportService {
 
         const category = await this.prisma.$queryRaw<Array<{ id: string }>>`
           SELECT "id"
-          FROM work_categories
+          FROM "work_categories"
           WHERE "name" = ${row.professionCategory}
-            AND "isActive" = true
-          LIMIT 1
-        `;
-
-        const location = await this.prisma.$queryRaw<Array<{ id: string }>>`
-          SELECT "id"
-          FROM work_locations
-          WHERE "city" = ${row.city}
-            AND "state" = ${row.state}
             AND "isActive" = true
           LIMIT 1
         `;
@@ -91,9 +82,11 @@ export class WorkerImportService {
         if (!category.length) {
           throw new Error(`Unknown work category: ${row.professionCategory}`);
         }
-        if (!location.length) {
-          throw new Error(`Unknown work location: ${row.city}, ${row.state}`);
-        }
+
+        // work_locations is hierarchical: CITY -> DISTRICT -> STATE.
+        // Resolve the CSV city/state against that hierarchy instead of
+        // assuming city/state columns exist on the table.
+        const location = await this.resolveLocation(row.city, row.state, row.district);
 
         const mobility = row.workPreference?.trim() || 'LOCAL';
         if (!VALID_MOBILITIES.has(mobility)) {
@@ -109,25 +102,11 @@ export class WorkerImportService {
 
         const preferredLocationRows: Array<{ city: string; state: string; district?: string }> = [];
         for (const preferred of preferredLocations) {
-          const masterLocation = await this.prisma.$queryRaw<
-            Array<{ city: string; state: string; district: string | null }>
-          >`
-            SELECT "city", "state", "district"
-            FROM work_locations
-            WHERE "city" = ${preferred.city}
-              AND "state" = ${preferred.state}
-              AND "isActive" = true
-            LIMIT 1
-          `;
-
-          if (!masterLocation.length) {
-            throw new Error(`Unknown preferred work location: ${preferred.city}, ${preferred.state}`);
-          }
-
+          const masterLocation = await this.resolveLocation(preferred.city, preferred.state);
           preferredLocationRows.push({
-            city: masterLocation[0].city,
-            state: masterLocation[0].state,
-            district: masterLocation[0].district || undefined,
+            city: masterLocation.city,
+            state: masterLocation.state,
+            district: masterLocation.district || undefined,
           });
         }
 
@@ -154,9 +133,9 @@ export class WorkerImportService {
                 create: {
                   type: 'CURRENT',
                   addressLine1: row.addressLine1 || row.city,
-                  city: row.city,
-                  district: row.district || undefined,
-                  state: row.state,
+                  city: location.city,
+                  district: location.district || row.district || undefined,
+                  state: location.state,
                   pincode: row.pincode,
                   isCurrent: true,
                 },
@@ -201,9 +180,66 @@ export class WorkerImportService {
     return [
       'workerCode,phone,email,firstName,lastName,professionCategory,profession,experienceYears,addressLine1,city,district,state,pincode,workPreference,preferredLocations,willingToRelocate,willingToTravel',
       'WKR-0001,9876543210,worker@example.com,Ravi,Kumar,Hotel & Restaurant,Parota Master,6,Main Road,Thanjavur,Thanjavur,Tamil Nadu,613001,ANYWHERE_INDIA,,true,true',
-      'WKR-0002,9876543211,worker2@example.com,Suresh,Yadav,Plumbing,Plumber,5,Station Road,Patna,Patna,Bihar,800001,SPECIFIC_LOCATIONS,"Chennai, Tamil Nadu|Coimbatore, Tamil Nadu",true,true',
+      'WKR-0002,9876543211,worker2@example.com,Suresh,Yadav,Hotel & Restaurant,Kitchen Helper,5,Station Road,Thanjavur,Thanjavur,Tamil Nadu,613001,SPECIFIC_LOCATIONS,"Chennai, Tamil Nadu|Kumbakonam, Tamil Nadu",true,true',
       '',
     ].join('\n');
+  }
+
+  private async resolveLocation(city: string, state: string, district?: string) {
+    const cities = await this.prisma.$queryRaw<
+      Array<{ id: string; name: string; parentId: string | null }>
+    >`
+      SELECT "id", "name", "parentId"
+      FROM "work_locations"
+      WHERE "type" = 'CITY'
+        AND "name" = ${city}
+        AND "isActive" = true
+      LIMIT 10
+    `;
+
+    if (!cities.length) {
+      throw new Error(`Unknown work location: ${city}, ${state}`);
+    }
+
+    for (const cityRow of cities) {
+      if (!cityRow.parentId) continue;
+
+      const districts = await this.prisma.$queryRaw<
+        Array<{ id: string; name: string; parentId: string | null }>
+      >`
+        SELECT "id", "name", "parentId"
+        FROM "work_locations"
+        WHERE "id" = ${cityRow.parentId}
+          AND "type" = 'DISTRICT'
+          AND "isActive" = true
+        LIMIT 1
+      `;
+
+      if (!districts.length || !districts[0].parentId) continue;
+      const districtRow = districts[0];
+
+      if (district && district.trim() && district.trim() !== districtRow.name) continue;
+
+      const states = await this.prisma.$queryRaw<Array<{ id: string; name: string }>>`
+        SELECT "id", "name"
+        FROM "work_locations"
+        WHERE "id" = ${districtRow.parentId}
+          AND "type" = 'STATE'
+          AND "isActive" = true
+        LIMIT 1
+      `;
+
+      if (states.length && states[0].name === state) {
+        return {
+          id: cityRow.id,
+          city: cityRow.name,
+          district: districtRow.name,
+          state: states[0].name,
+        };
+      }
+    }
+
+    throw new Error(`Unknown work location: ${city}, ${state}`);
   }
 
   private parsePreferredLocations(value?: string) {
