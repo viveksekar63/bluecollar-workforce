@@ -26,6 +26,7 @@ import { RatingsModule } from "./ratings/ratings.module";
 import { NotificationsModule } from "./notifications/notifications.module";
 import { ComplaintsModule } from "./complaints/complaints.module";
 import { AuditModule } from "./audit/audit.module";
+import { MasterDataModule } from "./master-data/master-data.module";
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { AuditModule } from "./audit/audit.module";
     EmploymentModule, DocumentsModule, VerificationModule, SkillsModule, JobsModule,
     SubscriptionsModule, CreditsModule, ApplicationsModule, AttendanceModule,
     PaymentsModule, RatingsModule, NotificationsModule, ComplaintsModule, AuditModule,
+    MasterDataModule,
   ],
   controllers: [AppController],
   providers: [AppService],
