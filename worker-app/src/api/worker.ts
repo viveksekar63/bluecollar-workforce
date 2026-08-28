@@ -47,6 +47,30 @@ export interface WorkerProfile {
   employmentHistory?: WorkerEmployment[];
 }
 
+export type WorkMobility = 'LOCAL' | 'WITHIN_RADIUS' | 'WITHIN_STATE' | 'SPECIFIC_LOCATIONS' | 'ANYWHERE_INDIA';
+
+export interface PreferredWorkLocation {
+  id?: string;
+  city: string;
+  district?: string | null;
+  state: string;
+  country?: string;
+}
+
+export interface WorkerWorkPreferences {
+  mobility: WorkMobility;
+  willingToRelocate: boolean;
+  willingToTravel: boolean;
+  preferredLocations: PreferredWorkLocation[];
+}
+
+export interface UpdateWorkerWorkPreferencesInput {
+  mobility: WorkMobility;
+  willingToRelocate?: boolean;
+  willingToTravel?: boolean;
+  preferredLocations?: PreferredWorkLocation[];
+}
+
 export interface UpdateWorkerSkillsInput {
   skills: string[];
   languages: string[];
@@ -187,6 +211,16 @@ export async function getMyWorkerProfile() {
 
 export async function updateMyWorkerProfile(input: UpdateWorkerProfileInput) {
   const { data } = await api.patch<WorkerProfile>('/workers/me', input);
+  return data;
+}
+
+export async function getMyWorkPreferences() {
+  const { data } = await api.get<WorkerWorkPreferences>('/workers/me/work-preferences');
+  return data;
+}
+
+export async function updateMyWorkPreferences(input: UpdateWorkerWorkPreferencesInput) {
+  const { data } = await api.patch<WorkerWorkPreferences>('/workers/me/work-preferences', input);
   return data;
 }
 
