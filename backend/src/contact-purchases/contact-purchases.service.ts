@@ -1,39 +1,33 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { randomUUID } from 'crypto';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { CreditWalletService } from './credit-wallet.service';
 
 @Injectable()
 export class ContactPurchasesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly creditWalletService: CreditWalletService,
+  ) {}
 
   async getPrice() {
-    const value = Number(process.env.WORKER_CONTACT_FEE_INR || 25);
-    if (!Number.isFinite(value) || value <= 0) throw new BadRequestException('Worker contact fee is not configured');
-    return { priceInr: value, currency: 'INR' };
+    const credits = Number(process.env.WORKER_CONTACT_CREDITS || 1);
+    return { credits, currency: 'CREDITS' };
   }
 
   async createPurchase(employerId: string, workerId: string) {
-    const worker = await this.prisma.worker.findUnique({ where: { id: workerId }, include: { user: true } });
-    if (!worker) throw new NotFoundException('Worker not found');
-    const { priceInr, currency } = await this.getPrice();
-    const existing = await this.prisma.$queryRaw<Array<{ id: string }>>`
-      SELECT "id" FROM "employer_contact_purchases"
-      WHERE "employerId" = ${employerId} AND "workerId" = ${workerId} AND "status" = 'PAID' LIMIT 1`;
-    if (existing.length) return { alreadyPurchased: true, purchaseId: existing[0].id, priceInr, currency };
-    const purchaseId = randomUUID();
-    await this.prisma.$executeRaw`
-      INSERT INTO "employer_contact_purchases" ("id", "employerId", "workerId", "amountInr", "currency", "status", "createdAt", "updatedAt")
-      VALUES (${purchaseId}, ${employerId}, ${workerId}, ${priceInr}, ${currency}, 'PENDING', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`;
-    return { purchaseId, priceInr, currency, workerId };
+    const worker = await this.prisma.worker.findUnique({ where: { id: workerId } });
+    if (!worker) return { success: false, message: 'Worker not found' };
+
+    return this.creditWalletService.debitForContact(employerId, workerId);
   }
 
-  async markPaid(purchaseId: string, employerId: string, paymentId: string) {
-    const result = await this.prisma.$executeRaw`
-      UPDATE "employer_contact_purchases"
-      SET "status" = 'PAID', "razorpayPaymentId" = ${paymentId}, "paidAt" = CURRENT_TIMESTAMP, "updatedAt" = CURRENT_TIMESTAMP
-      WHERE "id" = ${purchaseId} AND "employerId" = ${employerId} AND "status" = 'PENDING'`;
-    if (!result) throw new BadRequestException('Purchase is invalid or already completed');
-    return { success: true };
+  async markPaid(purchaseId: string, employerId: string, _paymentId: string) {
+    const rows = await this.prisma.$queryRaw<Array<{ id: string; workerId: string }>>`
+      SELECT "id", "workerId"
+      FROM "employer_contact_purchases"
+      WHERE "id" = ${purchaseId} AND "employerId" = ${employerId} AND "status" = 'PAID'
+      LIMIT 1`;
+    return { success: rows.length > 0 };
   }
 
   async history(employerId: string) {
