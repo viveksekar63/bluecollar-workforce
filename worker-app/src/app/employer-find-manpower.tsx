@@ -176,10 +176,24 @@ function FilterSection({ label, children }: { label: string; children: React.Rea
   );
 }
 
+function getWorkPreferenceLabel(worker: ManpowerWorker) {
+  if (worker.mobility === 'ANYWHERE_INDIA') return '🇮🇳 Willing to work anywhere in India';
+  if (worker.mobility === 'SPECIFIC_LOCATIONS' && worker.preferredLocations?.length) {
+    const locations = worker.preferredLocations.slice(0, 2).map((item) => item.city).join(' • ');
+    const more = worker.preferredLocations.length > 2 ? ` +${worker.preferredLocations.length - 2}` : '';
+    return `📌 Preferred: ${locations}${more}`;
+  }
+  if (worker.mobility === 'WITHIN_STATE') return '📍 Open to work across the state';
+  if (worker.mobility === 'WITHIN_RADIUS') return '🚗 Willing to travel nearby';
+  if (worker.willingToRelocate) return '✈️ Ready to relocate';
+  return '';
+}
+
 function WorkerCard({ worker }: { worker: ManpowerWorker }) {
   const name = `${worker.firstName ?? 'Worker'} ${worker.lastName ?? ''}`.trim();
   const verified = ['VERIFIED', 'COMPLETED', 'APPROVED'].includes(String(worker.verificationStatus ?? '').toUpperCase());
   const available = ['AVAILABLE', 'ACTIVE'].includes(String(worker.availability ?? '').toUpperCase());
+  const workPreference = getWorkPreferenceLabel(worker);
 
   return (
     <Pressable
@@ -198,6 +212,7 @@ function WorkerCard({ worker }: { worker: ManpowerWorker }) {
           </View>
           <Text style={styles.profession} numberOfLines={1}>{worker.profession || worker.primarySkill || 'Skilled Worker'}</Text>
           <Text style={styles.meta} numberOfLines={1}>📍 {worker.city || 'Location'}, {worker.state || 'Tamil Nadu'}  •  {worker.experienceYears ?? 0} yrs exp.</Text>
+          {!!workPreference && <Text style={styles.workPreference} numberOfLines={1}>{workPreference}</Text>}
         </View>
         <View style={styles.availabilityBadge}>
           <View style={styles.availabilityDot} />
@@ -264,6 +279,7 @@ const styles = StyleSheet.create({
   verifiedText: { color: BrandColors.indigo, fontSize: 9, fontWeight: '900' },
   profession: { color: BrandColors.indigo, fontSize: 12, fontWeight: '900', marginTop: 4 },
   meta: { color: BrandColors.textSecondary, fontSize: 10, marginTop: 5 },
+  workPreference: { color: '#2563EB', fontSize: 9, fontWeight: '900', marginTop: 4 },
   availabilityBadge: { position: 'absolute', right: 0, top: 0, borderRadius: 10, backgroundColor: '#F0FDF4', borderWidth: 1, borderColor: '#BBF7D0', paddingHorizontal: 7, paddingVertical: 5, flexDirection: 'row', alignItems: 'center', gap: 4 },
   availabilityDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#16A34A' },
   availabilityText: { color: '#15803D', fontSize: 8, fontWeight: '900' },
