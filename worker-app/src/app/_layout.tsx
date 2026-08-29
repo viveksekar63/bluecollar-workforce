@@ -1,13 +1,11 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Alert, Platform } from 'react-native';
+import { Alert } from 'react-native';
 import EmployerNavigation from '@/components/employer-navigation';
 import { WorkTrustAlertHost, showWorkTrustAlert } from '@/components/worktrust-alert';
 import { BrandColors } from '@/constants/theme';
 import { useAuthStore } from '@/store/auth';
 
-// Keep the existing Alert.alert API across the app, but render it through the
-// branded WorkTrust dialog so every screen gets the same visual treatment.
 const nativeAlert = Alert.alert;
 Alert.alert = ((title, message, buttons) => {
   showWorkTrustAlert(title, message, buttons);
@@ -33,14 +31,9 @@ export default function RootLayout() {
         <Stack.Screen name="employer-home" />
         <Stack.Screen name="employer-find-manpower" />
         <Stack.Screen name="employer-worker-details" />
-        <Stack.Screen name="employer-jobs" />
-        <Stack.Screen name="employer-job-create" />
-        <Stack.Screen name="employer-job-details" />
         <Stack.Screen name="employer-credits" />
         <Stack.Screen name="employer-subscription" />
         <Stack.Screen name="employer-payment-method" />
-        <Stack.Screen name="employer-applications" />
-        <Stack.Screen name="employer-application-details" />
         <Stack.Screen name="employer-profile" />
         <Stack.Screen name="employer-settings" />
         <Stack.Screen name="privacy-policy" />
@@ -55,7 +48,6 @@ export default function RootLayout() {
         <Stack.Screen name="verification" />
         <Stack.Screen name="documents" />
         <Stack.Screen name="explore" />
-        <Stack.Screen name="job-details" />
       </Stack>
       {activeRole === 'EMPLOYER' && <EmployerNavigation />}
       <WorkTrustAlertHost />
