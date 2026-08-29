@@ -10,17 +10,20 @@ import { WorkerProfessionService } from "./worker-profession.service";
 import { WorkerVerificationService } from "./worker-verification.service";
 import { EmployerWorkerDiscoveryService } from "./employer-worker-discovery.service";
 import { WorkerWorkPreferencesService } from "./worker-work-preferences.service";
+import { WorkerShortlistController } from "./worker-shortlist.controller";
+import { WorkerShortlistService } from "./worker-shortlist.service";
 
 @Module({
   imports: [PrismaModule, AuthModule, VerificationModule, CreditsModule],
-  controllers: [WorkersController],
+  controllers: [WorkersController, WorkerShortlistController],
   providers: [
     WorkersService,
     WorkerProfessionService,
     WorkerVerificationService,
     EmployerWorkerDiscoveryService,
     WorkerWorkPreferencesService,
+    WorkerShortlistService,
   ],
-  exports: [WorkersService, WorkerProfessionService, WorkerVerificationService],
+  exports: [WorkersService, WorkerProfessionService, WorkerVerificationService, WorkerShortlistService],
 })
 export class WorkersModule {}
