@@ -2,29 +2,39 @@ import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 
-import { requestRegistrationOtp, MobileRole } from '@/api/auth';
+import { requestRegistrationOtp } from '@/api/auth';
 import { BrandColors } from '@/constants/theme';
 
+const EMPLOYER_ROLE = 'EMPLOYER' as const;
+
 export default function RegisterScreen() {
-  const [role, setRole] = useState<MobileRole>('WORKER');
-  const [form, setForm] = useState({ firstName: '', lastName: '', phone: '', email: '', password: '', companyName: '' });
+  const [form, setForm] = useState({
+    firstName: '',
+    lastName: '',
+    phone: '',
+    email: '',
+    password: '',
+    companyName: '',
+  });
   const [loading, setLoading] = useState(false);
-  const update = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
+  const update = (key: keyof typeof form, value: string) =>
+    setForm((current) => ({ ...current, [key]: value }));
 
   async function handleRegister() {
-    const required = [form.firstName, form.phone, form.password, form.email];
+    const required = [form.firstName, form.phone, form.password, form.email, form.companyName];
     if (required.some((value) => !value.trim())) {
-      Alert.alert('Missing information', 'Please complete your first name, mobile number, email and password.');
+      Alert.alert(
+        'Missing information',
+        'Please complete your name, company/business name, mobile number, email and password.',
+      );
       return;
     }
-    if (role === 'EMPLOYER' && !form.companyName.trim()) {
-      Alert.alert('Company name required', 'Please enter your company or business name.');
-      return;
-    }
+
     if (!/^\d{10}$/.test(form.phone.replace(/\D/g, ''))) {
       Alert.alert('Invalid mobile number', 'Enter a valid 10-digit mobile number.');
       return;
     }
+
     if (form.password.length < 8) {
       Alert.alert('Password too short', 'Password must contain at least 8 characters.');
       return;
@@ -32,57 +42,100 @@ export default function RegisterScreen() {
 
     try {
       setLoading(true);
-      const response = await requestRegistrationOtp({ role, ...form });
-      router.push({ pathname: '/register-otp', params: { phone: response.phone, role, devOtp: response.devOtp ?? '' } });
+      const response = await requestRegistrationOtp({
+        role: EMPLOYER_ROLE,
+        ...form,
+      });
+      router.push({
+        pathname: '/register-otp',
+        params: {
+          phone: response.phone,
+          role: EMPLOYER_ROLE,
+          devOtp: response.devOtp ?? '',
+        },
+      });
     } catch (error: any) {
       const message = error?.response?.data?.message;
-      Alert.alert('Unable to continue', Array.isArray(message) ? message.join('\n') : message ?? 'Unable to send OTP. Please try again.');
+      Alert.alert(
+        'Unable to continue',
+        Array.isArray(message)
+          ? message.join('\n')
+          : message ?? 'Unable to send OTP. Please try again.',
+      );
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-      <View style={styles.brandMark}><Text style={styles.brandMarkText}>W</Text></View>
-      <Text style={styles.eyebrow}>JOIN WORKTRUST</Text>
-      <Text style={styles.title}>Create your account</Text>
-      <Text style={styles.subtitle}>One account for workers and employers. Verify your mobile number to get started.</Text>
-
-      <Text style={styles.sectionLabel}>I want to join as</Text>
-      <View style={styles.roles}>
-        <Pressable onPress={() => setRole('WORKER')} style={[styles.roleCard, role === 'WORKER' && styles.roleActive]}>
-          <Text style={styles.roleIcon}>👷</Text>
-          <Text style={styles.roleTitle}>Worker</Text>
-          <Text style={styles.roleHint}>Find jobs & apply</Text>
-          {role === 'WORKER' && <View style={styles.check}><Text style={styles.checkText}>✓</Text></View>}
-        </Pressable>
-        <Pressable onPress={() => setRole('EMPLOYER')} style={[styles.roleCard, role === 'EMPLOYER' && styles.roleActive]}>
-          <Text style={styles.roleIcon}>💼</Text>
-          <Text style={styles.roleTitle}>Employer</Text>
-          <Text style={styles.roleHint}>Post jobs & hire</Text>
-          {role === 'EMPLOYER' && <View style={styles.check}><Text style={styles.checkText}>✓</Text></View>}
-        </Pressable>
+    <ScrollView
+      contentContainerStyle={styles.container}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+    >
+      <View style={styles.brandHeader}>
+        <View style={styles.brandMark}>
+          <Text style={styles.brandMarkText}>W</Text>
+        </View>
+        <View>
+          <Text style={styles.brandName}>WorkTrust</Text>
+          <Text style={styles.brandTagline}>Verified people. Trusted work.</Text>
+        </View>
       </View>
 
-      {role === 'EMPLOYER' && (
-        <View style={styles.field}>
-          <Text style={styles.label}>Company / business name</Text>
-          <TextInput value={form.companyName} onChangeText={(value) => update('companyName', value)} placeholder="e.g. Avive Catering" placeholderTextColor={BrandColors.muted} style={styles.input} />
-        </View>
-      )}
+      <Text style={styles.eyebrow}>EMPLOYER REGISTRATION</Text>
+      <Text style={styles.title}>Create your account</Text>
+      <Text style={styles.subtitle}>
+        Set up your employer account to find verified workers, post jobs and manage your hiring.
+      </Text>
 
-      {([['firstName', 'First name'], ['lastName', 'Last name'], ['phone', 'Mobile number'], ['email', 'Email'], ['password', 'Password']] as const).map(([key, label]) => (
+      <View style={styles.employerBanner}>
+        <View style={styles.bannerIcon}>
+          <Text style={styles.bannerIconText}>✓</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.bannerTitle}>Employer account</Text>
+          <Text style={styles.bannerText}>Your account will be created with employer access.</Text>
+        </View>
+      </View>
+
+      <View style={styles.field}>
+        <Text style={styles.label}>Company / business name *</Text>
+        <TextInput
+          value={form.companyName}
+          onChangeText={(value) => update('companyName', value)}
+          placeholder="e.g. Avive Catering"
+          placeholderTextColor={BrandColors.muted}
+          style={styles.input}
+        />
+      </View>
+
+      {(
+        [
+          ['firstName', 'First name', true],
+          ['lastName', 'Last name', false],
+          ['phone', 'Mobile number', true],
+          ['email', 'Email', true],
+          ['password', 'Password', true],
+        ] as const
+      ).map(([key, label, required]) => (
         <View key={key} style={styles.field}>
-          <Text style={styles.label}>{label}{key === 'firstName' || key === 'phone' || key === 'email' || key === 'password' ? ' *' : ''}</Text>
+          <Text style={styles.label}>
+            {label}
+            {required ? ' *' : ''}
+          </Text>
           <TextInput
             value={form[key]}
             onChangeText={(value) => update(key, value)}
             placeholder={label}
             placeholderTextColor={BrandColors.muted}
             secureTextEntry={key === 'password'}
-            keyboardType={key === 'phone' ? 'phone-pad' : key === 'email' ? 'email-address' : 'default'}
-            autoCapitalize={key === 'email' ? 'none' : key === 'password' ? 'none' : 'words'}
+            keyboardType={
+              key === 'phone' ? 'phone-pad' : key === 'email' ? 'email-address' : 'default'
+            }
+            autoCapitalize={
+              key === 'email' || key === 'password' ? 'none' : 'words'
+            }
             style={styles.input}
           />
         </View>
@@ -92,49 +145,256 @@ export default function RegisterScreen() {
         <Text style={styles.otpIcon}>✓</Text>
         <View style={{ flex: 1 }}>
           <Text style={styles.otpTitle}>Mobile verification</Text>
-          <Text style={styles.otpText}>We will send a 6-digit OTP to verify this mobile number.</Text>
+          <Text style={styles.otpText}>
+            We will send a 6-digit OTP to verify this mobile number.
+          </Text>
         </View>
       </View>
 
-      <Pressable style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed, loading && styles.disabled]} onPress={handleRegister} disabled={loading}>
-        {loading ? <ActivityIndicator color={BrandColors.slate} /> : <><Text style={styles.primaryText}>Continue & send OTP</Text><Text style={styles.arrow}>→</Text></>}
+      <Pressable
+        style={({ pressed }) => [
+          styles.primaryButton,
+          pressed && styles.pressed,
+          loading && styles.disabled,
+        ]}
+        onPress={handleRegister}
+        disabled={loading}
+      >
+        {loading ? (
+          <ActivityIndicator color={BrandColors.white} />
+        ) : (
+          <>
+            <Text style={styles.primaryText}>Continue & send OTP</Text>
+            <Text style={styles.arrow}>→</Text>
+          </>
+        )}
       </Pressable>
 
-      <Pressable onPress={() => router.back()} style={styles.linkButton}><Text style={styles.linkText}>Already have an account? Sign in</Text></Pressable>
-      <Text style={styles.footer}>Worker and Employer access in one app</Text>
+      <Pressable onPress={() => router.back()} style={styles.linkButton}>
+        <Text style={styles.linkText}>Already have an account? Sign in</Text>
+      </Pressable>
+
+      <View style={styles.security}>
+        <Text style={styles.securityIcon}>✓</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.securityTitle}>Safe. Secure. Reliable.</Text>
+          <Text style={styles.securityText}>Your data is protected with industry-leading security.</Text>
+        </View>
+      </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, backgroundColor: BrandColors.background, padding: 24, paddingTop: 48, paddingBottom: 40 },
-  brandMark: { width: 52, height: 52, borderRadius: 16, backgroundColor: BrandColors.gold, alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
-  brandMarkText: { color: BrandColors.slate, fontSize: 25, fontWeight: '900' },
-  eyebrow: { fontSize: 12, fontWeight: '800', letterSpacing: 2, color: BrandColors.gold, marginBottom: 10 },
-  title: { fontSize: 32, lineHeight: 37, fontWeight: '900', color: BrandColors.text, marginBottom: 9 },
-  subtitle: { fontSize: 14, lineHeight: 21, color: BrandColors.textSecondary, marginBottom: 20 },
-  sectionLabel: { color: BrandColors.text, fontSize: 13, fontWeight: '900', marginBottom: 8 },
-  roles: { flexDirection: 'row', gap: 8, marginBottom: 17 },
-  roleCard: { flex: 1, minHeight: 112, borderWidth: 1, borderColor: BrandColors.slateBorder, borderRadius: 16, backgroundColor: BrandColors.slate, alignItems: 'center', justifyContent: 'center', position: 'relative', padding: 10 },
-  roleActive: { borderColor: BrandColors.gold, backgroundColor: BrandColors.goldSoft },
-  roleIcon: { fontSize: 27, marginBottom: 3 },
-  roleTitle: { color: BrandColors.gold, fontSize: 15, fontWeight: '900' },
-  roleHint: { color: BrandColors.textSecondary, fontSize: 10, marginTop: 3 },
-  check: { position: 'absolute', right: 8, top: 8, width: 20, height: 20, borderRadius: 10, backgroundColor: BrandColors.gold, alignItems: 'center', justifyContent: 'center' },
-  checkText: { color: BrandColors.slate, fontWeight: '900' },
-  field: { marginBottom: 13 },
-  label: { fontSize: 13, fontWeight: '800', color: BrandColors.text, marginBottom: 7 },
-  input: { height: 54, borderWidth: 1, borderColor: BrandColors.slateBorder, borderRadius: 14, backgroundColor: BrandColors.slate, paddingHorizontal: 16, fontSize: 15, color: BrandColors.text },
-  otpHint: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: BrandColors.slateBorder, backgroundColor: BrandColors.slateSoft, borderRadius: 14, padding: 12, marginTop: 2, marginBottom: 14 },
-  otpIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: BrandColors.goldSoft, color: BrandColors.gold, textAlign: 'center', lineHeight: 32, fontWeight: '900', marginRight: 10 },
-  otpTitle: { color: BrandColors.text, fontSize: 12, fontWeight: '900' },
-  otpText: { color: BrandColors.muted, fontSize: 10, lineHeight: 15, marginTop: 2 },
-  primaryButton: { height: 56, borderRadius: 15, backgroundColor: BrandColors.gold, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', marginTop: 3 },
-  primaryText: { color: BrandColors.slate, fontSize: 16, fontWeight: '900' },
-  arrow: { color: BrandColors.slate, position: 'absolute', right: 20, fontSize: 26 },
-  linkButton: { alignItems: 'center', paddingVertical: 18 },
-  linkText: { color: BrandColors.gold, fontSize: 14, fontWeight: '800' },
-  footer: { color: BrandColors.muted, fontSize: 10, textAlign: 'center' },
-  pressed: { opacity: 0.85 },
-  disabled: { opacity: 0.6 },
+  container: {
+    flexGrow: 1,
+    backgroundColor: BrandColors.background,
+    padding: 20,
+    paddingTop: 42,
+    paddingBottom: 40,
+  },
+  brandHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 28,
+  },
+  brandMark: {
+    width: 48,
+    height: 48,
+    borderRadius: 15,
+    backgroundColor: BrandColors.navy,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 11,
+  },
+  brandMarkText: {
+    color: '#F4B942',
+    fontSize: 29,
+    fontWeight: '900',
+  },
+  brandName: {
+    color: BrandColors.text,
+    fontSize: 21,
+    fontWeight: '900',
+  },
+  brandTagline: {
+    color: BrandColors.muted,
+    fontSize: 10,
+    marginTop: 1,
+  },
+  eyebrow: {
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1.7,
+    color: BrandColors.indigo,
+    marginBottom: 8,
+  },
+  title: {
+    fontSize: 30,
+    lineHeight: 35,
+    fontWeight: '900',
+    color: BrandColors.text,
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: BrandColors.textSecondary,
+    marginBottom: 18,
+  },
+  employerBanner: {
+    minHeight: 66,
+    borderRadius: 17,
+    backgroundColor: BrandColors.skySoft,
+    borderWidth: 1,
+    borderColor: BrandColors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 11,
+    marginBottom: 19,
+  },
+  bannerIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 13,
+    backgroundColor: BrandColors.indigo,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  bannerIconText: {
+    color: BrandColors.white,
+    fontSize: 19,
+    fontWeight: '900',
+  },
+  bannerTitle: {
+    color: BrandColors.text,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  bannerText: {
+    color: BrandColors.textSecondary,
+    fontSize: 9,
+    marginTop: 2,
+  },
+  field: {
+    marginBottom: 13,
+  },
+  label: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: BrandColors.text,
+    marginBottom: 7,
+  },
+  input: {
+    height: 54,
+    borderWidth: 1,
+    borderColor: BrandColors.border,
+    borderRadius: 14,
+    backgroundColor: BrandColors.surfaceLight,
+    paddingHorizontal: 15,
+    fontSize: 14,
+    color: BrandColors.text,
+  },
+  otpHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: BrandColors.border,
+    backgroundColor: BrandColors.skySoft,
+    borderRadius: 14,
+    padding: 12,
+    marginTop: 2,
+    marginBottom: 15,
+  },
+  otpIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: BrandColors.white,
+    color: BrandColors.indigo,
+    textAlign: 'center',
+    lineHeight: 32,
+    fontWeight: '900',
+    marginRight: 10,
+  },
+  otpTitle: {
+    color: BrandColors.text,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  otpText: {
+    color: BrandColors.muted,
+    fontSize: 10,
+    lineHeight: 15,
+    marginTop: 2,
+  },
+  primaryButton: {
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: BrandColors.indigo,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    shadowColor: BrandColors.indigo,
+    shadowOpacity: 0.22,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 3,
+  },
+  primaryText: {
+    color: BrandColors.white,
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  arrow: {
+    color: BrandColors.white,
+    position: 'absolute',
+    right: 19,
+    fontSize: 25,
+  },
+  linkButton: {
+    alignItems: 'center',
+    paddingVertical: 17,
+  },
+  linkText: {
+    color: BrandColors.indigo,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  security: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 3,
+    paddingTop: 15,
+    borderTopWidth: 1,
+    borderTopColor: BrandColors.border,
+  },
+  securityIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: BrandColors.skySoft,
+    color: BrandColors.indigo,
+    textAlign: 'center',
+    lineHeight: 36,
+    fontWeight: '900',
+    marginRight: 10,
+  },
+  securityTitle: {
+    color: BrandColors.text,
+    fontSize: 11,
+    fontWeight: '900',
+  },
+  securityText: {
+    color: BrandColors.muted,
+    fontSize: 9,
+    marginTop: 2,
+  },
+  pressed: {
+    opacity: 0.85,
+  },
+  disabled: {
+    opacity: 0.6,
+  },
 });
