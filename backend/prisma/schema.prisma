@@ -126,8 +126,41 @@ model Worker {
   skills               WorkerSkill[]
   workPreferences      WorkerWorkPreference?
   preferredWorkLocations WorkerPreferredLocation[]
+  shortlistsReceived   EmployerWorkerShortlist[]
   @@index([professionCategory])
   @@index([profession])
+}
+
+model Employer {
+  id             String         @id @default(uuid())
+  userId         String         @unique
+  companyName    String
+  companyType    String?
+  registrationNo String?
+  gstNumber      String?
+  description    String?
+  status         EmployerStatus @default(PENDING)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  complaints     Complaint[]
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobs           Job[]
+  ratings        WorkerRating[]
+  reviews        WorkerReview[]
+  workerShortlists EmployerWorkerShortlist[]
+}
+
+model EmployerWorkerShortlist {
+  id        String   @id @default(uuid())
+  employerId String
+  workerId   String
+  createdAt DateTime @default(now())
+  employer  Employer @relation(fields: [employerId], references: [id], onDelete: Cascade)
+  worker    Worker   @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  @@unique([employerId, workerId])
+  @@index([employerId, createdAt])
+  @@index([workerId])
+  @@map("employer_worker_shortlists")
 }
 
 model WorkerAddress {
@@ -266,24 +299,6 @@ model WorkerCertification {
   @@index([workerId])
 }
 
-model Employer {
-  id             String         @id @default(uuid())
-  userId         String         @unique
-  companyName    String
-  companyType    String?
-  registrationNo String?
-  gstNumber      String?
-  description    String?
-  status         EmployerStatus @default(PENDING)
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-  complaints     Complaint[]
-  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  jobs           Job[]
-  ratings        WorkerRating[]
-  reviews        WorkerReview[]
-}
-
 model EmploymentHistory {
   id                 String                @id @default(uuid())
   workerId           String
@@ -316,7 +331,7 @@ model EmploymentReference {
   email              String?
   relationship       String?
   verificationStatus VerificationStatus @default(PENDING)
-  createdAt          DateTime           @default(now())
+  createdAt          DateTime            @default(now())
   employment         EmploymentHistory  @relation(fields: [employmentId], references: [id], onDelete: Cascade)
   @@index([employmentId])
 }
@@ -596,7 +611,7 @@ model Complaint {
   description String
   status      ComplaintStatus @default(OPEN)
   resolution  String?
-  createdAt   DateTime        @default(now())
+  createdAt   DateTime         @default(now())
   resolvedAt  DateTime?
   employer    Employer?       @relation(fields: [employerId], references: [id])
   worker      Worker?         @relation("WorkerComplaints", fields: [workerId], references: [id])
@@ -622,203 +637,29 @@ model AuditLog {
   @@index([createdAt])
 }
 
-enum UserStatus {
-  ACTIVE
-  INACTIVE
-  BLOCKED
-}
-
-enum RoleName {
-  SUPER_ADMIN
-  ADMIN
-  VERIFICATION_AGENT
-  EMPLOYER
-  SUPERVISOR
-  WORKER
-}
-
-enum Gender {
-  MALE
-  FEMALE
-  OTHER
-}
-
-enum MaritalStatus {
-  SINGLE
-  MARRIED
-  OTHER
-}
-
-enum AddressType {
-  CURRENT
-  PERMANENT
-}
-
-enum AvailabilityStatus {
-  AVAILABLE
-  WORKING
-  NOT_AVAILABLE
-}
-
-enum VerificationStatus {
-  PENDING
-  IN_PROGRESS
-  VERIFIED
-  FAILED
-  MANUAL_REVIEW
-  EXPIRED
-}
-
-enum VerificationType {
-  IDENTITY
-  ADDRESS
-  DOCUMENT
-  EMPLOYMENT
-  REFERENCE
-  EDUCATION
-  CRIMINAL
-  SKILL
-}
-
-enum VerificationResultStatus {
-  MATCH
-  PARTIAL_MATCH
-  NO_MATCH
-  NOT_FOUND
-  MANUAL_REVIEW
-}
-
-enum ConsentType {
-  IDENTITY_CHECK
-  ADDRESS_CHECK
-  EMPLOYMENT_CHECK
-  REFERENCE_CHECK
-  BACKGROUND_CHECK
-  DOCUMENT_STORAGE
-  PROFILE_SHARING
-}
-
-enum SkillLevel {
-  BEGINNER
-  INTERMEDIATE
-  ADVANCED
-  EXPERT
-}
-
-enum LanguageLevel {
-  BASIC
-  CONVERSATIONAL
-  FLUENT
-  NATIVE
-}
-
-enum EmploymentType {
-  FULL_TIME
-  PART_TIME
-  CONTRACT
-  DAILY_WAGE
-  TEMPORARY
-  SELF_EMPLOYED
-}
-
-enum DocumentType {
-  PROFILE_PHOTO
-  ID_PROOF
-  ADDRESS_PROOF
-  EXPERIENCE_LETTER
-  SALARY_SLIP
-  EDUCATION_CERTIFICATE
-  SKILL_CERTIFICATE
-  BANK_DOCUMENT
-  OTHER
-}
-
-enum EmployerStatus {
-  PENDING
-  VERIFIED
-  SUSPENDED
-}
-
-enum SalaryType {
-  HOURLY
-  DAILY
-  WEEKLY
-  MONTHLY
-  CONTRACT
-}
-
-enum JobStatus {
-  DRAFT
-  PUBLISHED
-  PAUSED
-  CLOSED
-  CANCELLED
-}
-
-enum ApplicationStatus {
-  APPLIED
-  SHORTLISTED
-  INTERVIEW
-  SELECTED
-  REJECTED
-  WITHDRAWN
-}
-
-enum AssignmentStatus {
-  ACTIVE
-  COMPLETED
-  CANCELLED
-}
-
-enum AttendanceStatus {
-  PRESENT
-  ABSENT
-  HALF_DAY
-  LEAVE
-}
-
-enum PaymentAccountStatus {
-  PENDING
-  VERIFIED
-  BLOCKED
-}
-
-enum PaymentType {
-  SALARY
-  DAILY_WAGE
-  BONUS
-  REFUND
-  OTHER
-}
-
-enum PaymentStatus {
-  PENDING
-  PROCESSING
-  COMPLETED
-  FAILED
-  REFUNDED
-}
-
-enum NotificationType {
-  JOB
-  APPLICATION
-  VERIFICATION
-  PAYMENT
-  SYSTEM
-}
-
-enum ComplaintType {
-  WORKER
-  EMPLOYER
-  PAYMENT
-  SAFETY
-  FRAUD
-  OTHER
-}
-
-enum ComplaintStatus {
-  OPEN
-  INVESTIGATING
-  RESOLVED
-  REJECTED
-}
+enum UserStatus { ACTIVE INACTIVE BLOCKED }
+enum RoleName { SUPER_ADMIN ADMIN VERIFICATION_AGENT EMPLOYER SUPERVISOR WORKER }
+enum Gender { MALE FEMALE OTHER }
+enum MaritalStatus { SINGLE MARRIED OTHER }
+enum AddressType { CURRENT PERMANENT }
+enum AvailabilityStatus { AVAILABLE WORKING NOT_AVAILABLE }
+enum VerificationStatus { PENDING IN_PROGRESS VERIFIED FAILED MANUAL_REVIEW EXPIRED }
+enum VerificationType { IDENTITY ADDRESS DOCUMENT EMPLOYMENT REFERENCE EDUCATION CRIMINAL SKILL }
+enum VerificationResultStatus { MATCH PARTIAL_MATCH NO_MATCH NOT_FOUND MANUAL_REVIEW }
+enum ConsentType { IDENTITY_CHECK ADDRESS_CHECK EMPLOYMENT_CHECK REFERENCE_CHECK BACKGROUND_CHECK DOCUMENT_STORAGE PROFILE_SHARING }
+enum SkillLevel { BEGINNER INTERMEDIATE ADVANCED EXPERT }
+enum LanguageLevel { BASIC CONVERSATIONAL FLUENT NATIVE }
+enum EmploymentType { FULL_TIME PART_TIME CONTRACT DAILY_WAGE TEMPORARY SELF_EMPLOYED }
+enum DocumentType { PROFILE_PHOTO ID_PROOF ADDRESS_PROOF EXPERIENCE_LETTER SALARY_SLIP EDUCATION_CERTIFICATE SKILL_CERTIFICATE BANK_DOCUMENT OTHER }
+enum EmployerStatus { PENDING VERIFIED SUSPENDED }
+enum SalaryType { HOURLY DAILY WEEKLY MONTHLY CONTRACT }
+enum JobStatus { DRAFT PUBLISHED PAUSED CLOSED CANCELLED }
+enum ApplicationStatus { APPLIED SHORTLISTED INTERVIEW SELECTED REJECTED WITHDRAWN }
+enum AssignmentStatus { ACTIVE COMPLETED CANCELLED }
+enum AttendanceStatus { PRESENT ABSENT HALF_DAY LEAVE }
+enum PaymentAccountStatus { PENDING VERIFIED BLOCKED }
+enum PaymentType { SALARY DAILY_WAGE BONUS REFUND OTHER }
+enum PaymentStatus { PENDING PROCESSING COMPLETED FAILED REFUNDED }
+enum NotificationType { JOB APPLICATION VERIFICATION PAYMENT SYSTEM }
+enum ComplaintType { WORKER EMPLOYER PAYMENT SAFETY FRAUD OTHER }
+enum ComplaintStatus { OPEN INVESTIGATING RESOLVED REJECTED }
