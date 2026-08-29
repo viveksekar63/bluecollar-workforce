@@ -1,4 +1,4 @@
-import { Controller, Delete, Get, Param, ParseIntPipe, Post, Query, Req, UseGuards } from "@nestjs/common";
+import { Controller, Delete, ForbiddenException, Get, Param, ParseIntPipe, Post, Query, Req, UseGuards } from "@nestjs/common";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { PermissionGuard } from "../auth/permissions/permission.guard";
 import { RequirePermissions } from "../auth/permissions/permission.decorator";
@@ -42,7 +42,7 @@ export class WorkerShortlistController {
   private assertEmployer(request: any) {
     const roles: string[] = request.user?.roles ?? [];
     if (!roles.includes("EMPLOYER")) {
-      throw new Error("Only employers can manage worker shortlists");
+      throw new ForbiddenException("Only employers can manage worker shortlists");
     }
   }
 }
