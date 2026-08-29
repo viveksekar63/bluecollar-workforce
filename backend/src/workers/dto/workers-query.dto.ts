@@ -1,5 +1,6 @@
 import {
   IsBoolean,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -7,6 +8,14 @@ import {
   Min,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
+
+const MOBILITY_VALUES = [
+  'LOCAL',
+  'WITHIN_RADIUS',
+  'WITHIN_STATE',
+  'SPECIFIC_LOCATIONS',
+  'ANYWHERE_INDIA',
+] as const;
 
 export class WorkersQueryDto {
   @IsOptional()
@@ -43,18 +52,40 @@ export class WorkersQueryDto {
   @IsString()
   skill?: string;
 
+  /** Backward-compatible free-text location search. */
   @IsOptional()
   @IsString()
   location?: string;
 
   @IsOptional()
   @IsString()
-  mobility?: string;
+  state?: string;
+
+  @IsOptional()
+  @IsString()
+  district?: string;
+
+  @IsOptional()
+  @IsString()
+  city?: string;
+
+  @IsOptional()
+  @IsIn(MOBILITY_VALUES)
+  @Transform(({ value }) => typeof value === 'string' ? value.trim().toUpperCase() : value)
+  mobility?: (typeof MOBILITY_VALUES)[number];
 
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(500)
+  radiusKm?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
   page?: number = 1;
 
   @IsOptional()
