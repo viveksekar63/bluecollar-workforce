@@ -33,7 +33,6 @@ export default function RootLayout() {
         <Stack.Screen name="employer-worker-details" />
         <Stack.Screen name="employer-credits" />
         <Stack.Screen name="employer-subscription" />
-        <Stack.Screen name="employer-payment-method" />
         <Stack.Screen name="employer-profile" />
         <Stack.Screen name="employer-settings" />
         <Stack.Screen name="privacy-policy" />
