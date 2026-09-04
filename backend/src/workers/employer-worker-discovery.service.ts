@@ -20,6 +20,11 @@ export class EmployerWorkerDiscoveryService {
     const professionCategory = query.professionCategory?.trim() || null;
     const profession = query.profession?.trim() || null;
     const mobility = query.mobility?.trim().toUpperCase() || null;
+    const minimumExperienceYears = query.minimumExperienceYears ?? null;
+    const requestedLanguages = [
+      ...(query.language ? [query.language] : []),
+      ...(query.languages ? query.languages.split(',') : []),
+    ].map((value) => value.trim()).filter(Boolean);
 
     const filters: Prisma.Sql[] = [];
 
@@ -39,6 +44,10 @@ export class EmployerWorkerDiscoveryService {
       filters.push(Prisma.sql`w."availabilityStatus" = 'AVAILABLE'`);
     }
 
+    if (minimumExperienceYears !== null) {
+      filters.push(Prisma.sql`w."experienceYears" >= ${minimumExperienceYears}`);
+    }
+
     if (professionCategory) {
       filters.push(Prisma.sql`w."professionCategory" ILIKE ${`%${professionCategory}%`}`);
     }
@@ -56,6 +65,20 @@ export class EmployerWorkerDiscoveryService {
       )`);
     }
 
+    if (requestedLanguages.length) {
+      const languagePatterns = requestedLanguages.map((value) => `%${value}%`);
+      filters.push(Prisma.sql`(
+        SELECT COUNT(DISTINCT l."id")
+        FROM "WorkerLanguage" wl
+        JOIN "Language" l ON l."id" = wl."languageId"
+        WHERE wl."workerId" = w."id"
+          AND (${Prisma.join(
+            languagePatterns.map((pattern) => Prisma.sql`l."name" ILIKE ${pattern}`),
+            ' OR ',
+          )})
+      ) = ${requestedLanguages.length}`);
+    }
+
     const currentAddressMatches = (parts: Prisma.Sql[]) => Prisma.sql`EXISTS (
       SELECT 1 FROM "WorkerAddress" wa
       WHERE wa."workerId" = w."id"
@@ -69,8 +92,6 @@ export class EmployerWorkerDiscoveryService {
         AND (${Prisma.join(parts, ' AND ')})
     )`;
 
-    // Structured hierarchy filters are ANDed together. A worker can satisfy
-    // them through either the current address or a preferred work location.
     const hierarchyParts: Prisma.Sql[] = [];
     if (city) hierarchyParts.push(Prisma.sql`wa."city" ILIKE ${`%${city}%`}`);
     if (district) hierarchyParts.push(Prisma.sql`COALESCE(wa."district", '') ILIKE ${`%${district}%`}`);
@@ -93,7 +114,6 @@ export class EmployerWorkerDiscoveryService {
       )`);
     }
 
-    // Preserve the original free-text location search for backward compatibility.
     if (freeTextLocation) {
       const locationPattern = `%${freeTextLocation}%`;
       filters.push(Prisma.sql`(
@@ -125,9 +145,6 @@ export class EmployerWorkerDiscoveryService {
       )`);
     }
 
-    // Mobility is a capability filter. For a concrete requested location,
-    // broader mobility modes are allowed to match that location; LOCAL is
-    // restricted to the worker's current location.
     if (mobility) {
       switch (mobility) {
         case 'LOCAL':
