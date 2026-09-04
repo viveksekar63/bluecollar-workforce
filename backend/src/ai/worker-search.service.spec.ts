@@ -68,6 +68,7 @@ describe('WorkerSearchService matching', () => {
 
     expect(match.matchBreakdown).toEqual({ profession: 30, skills: 25, location: 20, experience: 10, availability: 5, verified: 5, verificationScore: 5 });
     expect(match.matchScore).toBe(100);
+    expect(match.preferenceScore).toBe(0);
     expect(match.matchDetails.skills).toHaveLength(3);
     expect(match.matchReasons).toEqual(expect.arrayContaining(['All 3 required skills matched', '3 required skills verified', '3 matched skills at advanced/expert level']));
   });
@@ -161,6 +162,7 @@ describe('WorkerSearchService matching', () => {
     const result = await service.search('electrician in Bengaluru willing to relocate');
     const match = result.results!.items[0];
     expect(match.preferenceMatch.relocation).toBe('MATCHED');
+    expect(match.preferenceScore).toBe(1);
     expect(match.matchReasons).toContain('Worker is willing to relocate');
     expect(match.matchBreakdown.location).toBe(0);
   });
@@ -173,7 +175,25 @@ describe('WorkerSearchService matching', () => {
     const result = await service.search('electrician willing to travel');
     const match = result.results!.items[0];
     expect(match.preferenceMatch.travel).toBe('MATCHED');
+    expect(match.preferenceScore).toBe(1);
     expect(match.matchReasons).toContain('Worker is willing to travel');
+  });
+
+  it('ranks a worker matching relocation and travel above relocation-only workers when matchScore is equal', async () => {
+    const normalized = requirement({ location: { name: 'Bengaluru', type: 'CITY' }, willingToRelocate: true, willingToTravel: true, accommodationAvailable: true });
+    parser.parse.mockResolvedValue({ clarificationRequired: false });
+    normalizer.normalize.mockResolvedValue(normalized);
+    const relocationOnly = worker({ id: 'worker-relocation', willingToRelocate: true, willingToTravel: false });
+    const relocationAndTravel = worker({ id: 'worker-both', willingToRelocate: true, willingToTravel: true });
+    discovery.findAll.mockResolvedValue({ items: [relocationOnly, relocationAndTravel], total: 2 });
+
+    const result = await service.search('electrician in Bengaluru willing to relocate and travel');
+    expect(result.results!.items.map((item) => item.id)).toEqual(['worker-both', 'worker-relocation']);
+    expect(result.results!.items[0].matchScore).toBe(result.results!.items[1].matchScore);
+    expect(result.results!.items[0].preferenceScore).toBe(2);
+    expect(result.results!.items[1].preferenceScore).toBe(1);
+    expect(result.results!.items[0].matchDetails.preferenceScore).toBe(2);
+    expect(result.results!.items[1].matchDetails.preferenceScore).toBe(1);
   });
 
   it('returns mobility compatibility and employer accommodation offer without changing the 100-point score', async () => {
@@ -184,6 +204,7 @@ describe('WorkerSearchService matching', () => {
     const result = await service.search('electrician anywhere in India, willing to relocate and travel, accommodation available');
     const match = result.results!.items[0];
     expect(match.matchScore).toBe(100);
+    expect(match.preferenceScore).toBe(3);
     expect(match.preferenceMatch).toEqual({ mobility: 'MATCHED', relocation: 'MATCHED', travel: 'MATCHED', accommodation: 'OFFERED' });
     expect(match.matchDetails.preferences).toEqual(match.preferenceMatch);
     expect(match.matchReasons).toEqual(expect.arrayContaining(['Mobility preference matched: ANYWHERE_INDIA', 'Worker is willing to relocate', 'Worker is willing to travel', 'Accommodation is available from the employer']));
@@ -195,7 +216,8 @@ describe('WorkerSearchService matching', () => {
     normalizer.normalize.mockResolvedValue(normalized);
     discovery.findAll.mockResolvedValue({ items: [worker({ mobility: 'LOCAL' })], total: 1 });
     await service.search('electrician within state');
-    expect(discovery.findAll).toHaveBeenCalledWith(expect.objectContaining({ mobility: undefined }));
+    const discoveryQuery = discovery.findAll.mock.calls[0][0];
+    expect(discoveryQuery.mobility).toBeUndefined();
   });
 
   it('returns clarification without querying master data or workers', async () => {
