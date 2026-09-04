@@ -59,7 +59,7 @@ export class EmployerWorkerDiscoveryService {
       const locationPattern = `%${freeTextLocation}%`;
       filters.push(Prisma.sql`(
         EXISTS (SELECT 1 FROM "WorkerAddress" wa WHERE wa."workerId" = w."id" AND wa."isCurrent" = true AND (wa."city" ILIKE ${locationPattern} OR COALESCE(wa."district", '') ILIKE ${locationPattern} OR wa."state" ILIKE ${locationPattern} OR wa."pincode" ILIKE ${locationPattern}))
-        OR EXISTS (SELECT 1 FROM "worker_preferred_locations" pl WHERE pl."workerId" = w."id" AND (pl."city" ILIKE ${locationPattern} OR COALESCE(pl."district", '') ILIKE ${locationPattern} OR pl."state" ILIKE ${locationPattern}))
+        OR EXISTS (SELECT 1 FROM "worker_preferred_locations" pl WHERE pl."workerId" = w."id" AND (pl."city" ILIKE ${locationPattern} OR COALESCE(pl."district", '') ILIKE ${locationPattern}))
         OR EXISTS (SELECT 1 FROM "worker_work_preferences" wp_anywhere WHERE wp_anywhere."workerId" = w."id" AND wp_anywhere."mobility" = 'ANYWHERE_INDIA')
       )`);
     }
@@ -78,9 +78,26 @@ export class EmployerWorkerDiscoveryService {
     const rankingLocation = city || district || state || freeTextLocation;
     const rankingPattern = rankingLocation ? `%${rankingLocation}%` : null;
     const skillMatchExpression = skillIds.length ? Prisma.sql`(SELECT COUNT(DISTINCT ws_rank."skillId") FROM "WorkerSkill" ws_rank WHERE ws_rank."workerId" = w."id" AND ws_rank."skillId" IN (${Prisma.join(skillIds)}))` : Prisma.sql`0`;
-    const distanceExpression = latitude !== null && longitude !== null ? Prisma.sql`(SELECT MIN(6371.0 * ACOS(LEAST(1.0, GREATEST(-1.0, COS(RADIANS(${latitude})) * COS(RADIANS(wa_distance."latitude"::double precision)) * COS(RADIANS(wa_distance."longitude"::double precision) - RADIANS(${longitude})) + SIN(RADIANS(${latitude})) * SIN(RADIANS(wa_distance."latitude"::double precision))))) FROM "WorkerAddress" wa_distance WHERE wa_distance."workerId" = w."id" AND wa_distance."isCurrent" = true AND wa_distance."latitude" IS NOT NULL AND wa_distance."longitude" IS NOT NULL)` : Prisma.sql`NULL`;
+    const distanceExpression = latitude !== null && longitude !== null
+      ? Prisma.sql`(
+          SELECT MIN(
+            6371.0 * ACOS(
+              LEAST(1.0, GREATEST(-1.0,
+                COS(RADIANS(${latitude})) * COS(RADIANS(wa_distance."latitude"::double precision)) *
+                COS(RADIANS(wa_distance."longitude"::double precision) - RADIANS(${longitude})) +
+                SIN(RADIANS(${latitude})) * SIN(RADIANS(wa_distance."latitude"::double precision))
+              ))
+            )
+          )
+          FROM "WorkerAddress" wa_distance
+          WHERE wa_distance."workerId" = w."id"
+            AND wa_distance."isCurrent" = true
+            AND wa_distance."latitude" IS NOT NULL
+            AND wa_distance."longitude" IS NOT NULL
+        )`
+      : Prisma.sql`NULL`;
     const rows = await this.prisma.$queryRaw<Array<{ id: string; workerCode: string; firstName: string; lastName: string | null; profileImageUrl: string | null; primarySkill: string | null; workerSkills: unknown; workerSkillDetails: unknown; skillMatchCount: number; distanceKm: number | null; professionCategory: string | null; profession: string | null; experienceYears: unknown; city: string | null; district: string | null; state: string | null; verificationScore: number | null; verificationStatus: string; availability: string; mobility: string | null; willingToRelocate: boolean | null; willingToTravel: boolean | null; preferredLocations: unknown; }>>(Prisma.sql`
-      SELECT w."id", w."workerCode", u."firstName", u."lastName", u."profilePhotoUrl", skill."name" AS "primarySkill",
+      SELECT w."id", w."workerCode", u."firstName", u."lastName", u."profileImageUrl", skill."name" AS "primarySkill",
         COALESCE((SELECT json_agg(sk_all."name" ORDER BY sk_all."name") FROM "WorkerSkill" ws_all JOIN "Skill" sk_all ON sk_all."id" = ws_all."skillId" WHERE ws_all."workerId" = w."id"), '[]'::json) AS "workerSkills",
         COALESCE((SELECT json_agg(json_build_object('id', sk_detail."id", 'name', sk_detail."name", 'experienceYears', ws_detail."experienceYears", 'skillLevel', ws_detail."skillLevel"::text, 'verified', ws_detail."verified") ORDER BY sk_detail."name") FROM "WorkerSkill" ws_detail JOIN "Skill" sk_detail ON sk_detail."id" = ws_detail."skillId" WHERE ws_detail."workerId" = w."id"), '[]'::json) AS "workerSkillDetails",
         ${skillMatchExpression} AS "skillMatchCount", ${distanceExpression} AS "distanceKm", w."professionCategory", w."profession", w."experienceYears", addr."city", addr."district", addr."state", w."verificationScore", w."verificationStatus", w."availabilityStatus" AS "availability", wp."mobility", wp."willingToRelocate", wp."willingToTravel",
@@ -90,7 +107,7 @@ export class EmployerWorkerDiscoveryService {
       LEFT JOIN LATERAL (SELECT wa."city", wa."district", wa."state" FROM "WorkerAddress" wa WHERE wa."workerId" = w."id" AND wa."isCurrent" = true ORDER BY wa."createdAt" DESC LIMIT 1) addr ON true
       LEFT JOIN "worker_work_preferences" wp ON wp."workerId" = w."id" ${where}
       ORDER BY ${skillMatchExpression} DESC,
-        CASE WHEN ${rankingPattern}::text IS NOT NULL AND EXISTS (SELECT 1 FROM "WorkerAddress" wa3 WHERE wa3."workerId" = w."id" AND wa3."isCurrent" = true AND (wa3."city" ILIKE ${rankingPattern} OR COALESCE(wa3."district", '') ILIKE ${rankingPattern} OR wa3."state" ILIKE ${rankingPattern})) THEN 0 WHEN ${rankingPattern}::text IS NOT NULL AND EXISTS (SELECT 1 FROM "worker_preferred_locations" pl3 WHERE pl3."workerId" = w."id" AND (pl3."city" ILIKE ${rankingPattern} OR COALESCE(pl3."district", '') ILIKE ${rankingPattern} OR pl3."state" ILIKE ${rankingPattern})) THEN 1 WHEN wp."mobility" = 'ANYWHERE_INDIA' THEN 2 ELSE 3 END,
+        CASE WHEN ${rankingPattern}::text IS NOT NULL AND EXISTS (SELECT 1 FROM "WorkerAddress" wa3 WHERE wa3."workerId" = w."id" AND wa3."isCurrent" = true AND (wa3."city" ILIKE ${rankingPattern} OR COALESCE(wa3."district", '') ILIKE ${rankingPattern} OR wa3."state" ILIKE ${rankingPattern})) THEN 0 WHEN ${rankingPattern}::text IS NOT NULL AND EXISTS (SELECT 1 FROM "worker_preferred_locations" pl3 WHERE pl3."workerId" = w."id" AND (pl3."city" ILIKE ${rankingPattern} OR COALESCE(pl3."district", '') ILIKE ${rankingPattern})) THEN 1 WHEN wp."mobility" = 'ANYWHERE_INDIA' THEN 2 ELSE 3 END,
         CASE WHEN ${latitude !== null && longitude !== null} AND (${distanceExpression}) IS NOT NULL THEN (${distanceExpression}) ELSE 0 END ASC,
         CASE WHEN w."verificationStatus" = 'VERIFIED' THEN 0 ELSE 1 END, CASE WHEN w."availabilityStatus" = 'AVAILABLE' THEN 0 ELSE 1 END,
         COALESCE(w."verificationScore", 0) DESC, w."experienceYears" DESC, w."createdAt" DESC, w."id" ASC LIMIT ${limit} OFFSET ${skip}`);
