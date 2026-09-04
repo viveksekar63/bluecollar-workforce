@@ -1,4 +1,5 @@
 import {
+  IsArray,
   IsBoolean,
   IsIn,
   IsInt,
@@ -51,6 +52,12 @@ export class WorkersQueryDto {
   @IsOptional()
   @IsString()
   skill?: string;
+
+  /** Internal canonical skill IDs used by AI matching to rank candidates before pagination. */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  skillIds?: string[];
 
   /** Backward-compatible single-language filter. */
   @IsOptional()
