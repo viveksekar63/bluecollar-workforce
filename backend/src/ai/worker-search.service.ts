@@ -2,28 +2,17 @@ import { Injectable } from '@nestjs/common';
 import { EmployerWorkerDiscoveryService } from '../workers/employer-worker-discovery.service';
 import { WorkersQueryDto } from '../workers/dto/workers-query.dto';
 import { RequirementParserService } from './requirement-parser.service';
-import {
-  MasterDataNotFoundError,
-  WorkerRequirementNormalizerService,
-} from './worker-requirement-normalizer.service';
+import { MasterDataNotFoundError, WorkerRequirementNormalizerService } from './worker-requirement-normalizer.service';
 
 export interface MatchBreakdown { profession: number; skills: number; location: number; experience: number; availability: number; verified: number; verificationScore: number; }
-export interface MatchSkillDetail { required: string; matched: boolean; }
+export interface MatchSkillDetail { required: string; matched: boolean; experienceYears: number | null; skillLevel: string | null; verified: boolean; }
 export interface MatchLanguageDetail { required: string; matched: boolean; }
 
-interface WorkerSearchGeoContext {
-  latitude?: number;
-  longitude?: number;
-  radiusKm?: number;
-}
+interface WorkerSearchGeoContext { latitude?: number; longitude?: number; radiusKm?: number; }
 
 @Injectable()
 export class WorkerSearchService {
-  constructor(
-    private readonly parser: RequirementParserService,
-    private readonly normalizer: WorkerRequirementNormalizerService,
-    private readonly discovery: EmployerWorkerDiscoveryService,
-  ) {}
+  constructor(private readonly parser: RequirementParserService, private readonly normalizer: WorkerRequirementNormalizerService, private readonly discovery: EmployerWorkerDiscoveryService) {}
 
   async search(query: string, geo: WorkerSearchGeoContext = {}) {
     const parsed = await this.parser.parse(query);
@@ -33,9 +22,7 @@ export class WorkerSearchService {
     try {
       normalized = await this.normalizer.normalize(parsed);
     } catch (error) {
-      if (error instanceof MasterDataNotFoundError) {
-        return { status: 'MASTER_DATA_NOT_FOUND' as const, query, requirement: parsed, results: null, missingMasterData: [{ type: error.masterType, value: error.value }] };
-      }
+      if (error instanceof MasterDataNotFoundError) return { status: 'MASTER_DATA_NOT_FOUND' as const, query, requirement: parsed, results: null, missingMasterData: [{ type: error.masterType, value: error.value }] };
       throw error;
     }
 
@@ -46,17 +33,13 @@ export class WorkerSearchService {
       city: normalized.location?.type === 'CITY' ? normalized.location.name : undefined,
       district: normalized.location?.type === 'DISTRICT' ? normalized.location.name : undefined,
       state: normalized.location?.type === 'STATE' ? normalized.location.name : undefined,
-      skill: undefined,
       skillIds: normalized.skills.map((skill) => skill.id),
       languages: normalized.languages.map((language) => language.name).join(','),
       minimumExperienceYears: normalized.minimumExperienceYears ?? undefined,
       availability: this.toAvailabilityFilter(normalized.availability),
       mobility: normalized.mobility ?? undefined,
-      latitude: geo.latitude,
-      longitude: geo.longitude,
-      radiusKm: geo.radiusKm,
-      page: 1,
-      limit: 100,
+      latitude: geo.latitude, longitude: geo.longitude, radiusKm: geo.radiusKm,
+      page: 1, limit: 100,
     };
 
     const candidateResults = await this.discovery.findAll(discoveryQuery);
@@ -66,13 +49,7 @@ export class WorkerSearchService {
     }).sort((a, b) => b.matchScore - a.matchScore || b.verificationScore - a.verificationScore || b.experienceYears - a.experienceYears || a.id.localeCompare(b.id));
 
     const selectedItems = scoredItems.slice(0, requestedCount);
-    return {
-      status: 'MATCHED' as const,
-      query,
-      requirement: parsed,
-      normalizedRequirement: normalized,
-      results: { items: selectedItems, page: 1, limit: requestedCount, total: scoredItems.length, totalPages: scoredItems.length ? 1 : 0, candidateTotal: candidateResults.total },
-    };
+    return { status: 'MATCHED' as const, query, requirement: parsed, normalizedRequirement: normalized, results: { items: selectedItems, page: 1, limit: requestedCount, total: scoredItems.length, totalPages: scoredItems.length ? 1 : 0, candidateTotal: candidateResults.total } };
   }
 
   private calculateMatchScore(worker: any, normalized: any, geo: WorkerSearchGeoContext) {
@@ -84,40 +61,54 @@ export class WorkerSearchService {
       reasons.push(`Exact profession match: ${worker.profession}`);
     }
 
-    const workerSkills = new Set<string>((Array.isArray(worker.skills) ? worker.skills : []).map((skill: unknown) => String(skill).trim().toLowerCase()).filter(Boolean));
-    const skillDetails: MatchSkillDetail[] = normalized.skills.map((skill: any) => ({ required: skill.name, matched: workerSkills.has(skill.name.trim().toLowerCase()) }));
+    const workerSkillDetails = Array.isArray(worker.skillDetails) ? worker.skillDetails : [];
+    const workerSkillsByName = new Map<string, any>(workerSkillDetails.map((skill: any) => [String(skill.name).trim().toLowerCase(), skill]));
+    const skillDetails: MatchSkillDetail[] = normalized.skills.map((required: any) => {
+      const matched = workerSkillsByName.get(required.name.trim().toLowerCase());
+      return {
+        required: required.name,
+        matched: Boolean(matched),
+        experienceYears: matched?.experienceYears == null ? null : Number(matched.experienceYears),
+        skillLevel: matched?.skillLevel ?? null,
+        verified: Boolean(matched?.verified),
+      };
+    });
+
     if (normalized.skills.length === 0) {
       breakdown.skills = 25;
       reasons.push('No specific skill requested');
     } else {
-      const matchedCount = skillDetails.filter((skill) => skill.matched).length;
-      breakdown.skills = Math.round((matchedCount / normalized.skills.length) * 25 * 100) / 100;
-      if (matchedCount === normalized.skills.length) reasons.push(`All ${matchedCount} required skills matched`);
-      else if (matchedCount > 0) reasons.push(`${matchedCount} of ${normalized.skills.length} required skills matched`);
+      const matched = skillDetails.filter((skill) => skill.matched);
+      const coverageScore = (matched.length / normalized.skills.length) * 15;
+      const levelWeights: Record<string, number> = { BEGINNER: 0.25, INTERMEDIATE: 0.5, ADVANCED: 0.75, EXPERT: 1 };
+      const proficiencyScore = matched.length
+        ? (matched.reduce((sum, skill) => sum + (levelWeights[skill.skillLevel ?? 'BEGINNER'] ?? 0.25), 0) / matched.length) * 3
+        : 0;
+      const experienceScore = matched.length
+        ? (matched.reduce((sum, skill) => sum + Math.min(Math.max(skill.experienceYears ?? 0, 0), 10) / 10, 0) / matched.length) * 2
+        : 0;
+      const skillVerificationScore = (matched.filter((skill) => skill.verified).length / normalized.skills.length) * 5;
+      breakdown.skills = Math.round((coverageScore + proficiencyScore + experienceScore + skillVerificationScore) * 100) / 100;
+
+      if (matched.length === normalized.skills.length) reasons.push(`All ${matched.length} required skills matched`);
+      else if (matched.length > 0) reasons.push(`${matched.length} of ${normalized.skills.length} required skills matched`);
       else reasons.push('No required skills matched');
+      const verifiedSkills = matched.filter((skill) => skill.verified).length;
+      if (verifiedSkills) reasons.push(`${verifiedSkills} required skill${verifiedSkills === 1 ? '' : 's'} verified`);
+      const advancedSkills = matched.filter((skill) => skill.skillLevel === 'ADVANCED' || skill.skillLevel === 'EXPERT').length;
+      if (advancedSkills) reasons.push(`${advancedSkills} matched skill${advancedSkills === 1 ? '' : 's'} at advanced/expert level`);
     }
 
     if (normalized.location?.name) {
       const requested = normalized.location.name.trim().toLowerCase();
-      const city = worker.city?.trim().toLowerCase();
-      const district = worker.district?.trim().toLowerCase();
-      const state = worker.state?.trim().toLowerCase();
-      if (city === requested || district === requested || state === requested) {
-        breakdown.location = 20;
-        reasons.push(`Exact location match: ${worker.city}`);
-      } else if (worker.mobility === 'ANYWHERE_INDIA') {
-        breakdown.location = 10;
-        reasons.push('Broader mobility: Anywhere India');
-      }
+      const city = worker.city?.trim().toLowerCase(); const district = worker.district?.trim().toLowerCase(); const state = worker.state?.trim().toLowerCase();
+      if (city === requested || district === requested || state === requested) { breakdown.location = 20; reasons.push(`Exact location match: ${worker.city}`); }
+      else if (worker.mobility === 'ANYWHERE_INDIA') { breakdown.location = 10; reasons.push('Broader mobility: Anywhere India'); }
     }
 
     if (!normalized.location?.name && geo.radiusKm && worker.distanceKm !== null && worker.distanceKm !== undefined) {
-      const distance = Number(worker.distanceKm);
-      const radius = geo.radiusKm;
-      if (distance <= radius * 0.25) breakdown.location = 20;
-      else if (distance <= radius * 0.5) breakdown.location = 15;
-      else if (distance <= radius * 0.75) breakdown.location = 10;
-      else breakdown.location = 5;
+      const distance = Number(worker.distanceKm); const radius = geo.radiusKm;
+      if (distance <= radius * 0.25) breakdown.location = 20; else if (distance <= radius * 0.5) breakdown.location = 15; else if (distance <= radius * 0.75) breakdown.location = 10; else breakdown.location = 5;
       reasons.push(`${distance.toFixed(1)} km from employer location`);
     }
 
@@ -137,15 +128,11 @@ export class WorkerSearchService {
     const languageDetails: MatchLanguageDetail[] = normalized.languages.map((language: any) => ({ required: language.name, matched: true }));
     if (languageDetails.length) reasons.push(`All ${languageDetails.length} required languages matched`);
 
-    const score = Object.values(breakdown).reduce((sum, value) => sum + value, 0);
+    const score = Math.round(Object.values(breakdown).reduce((sum, value) => sum + value, 0) * 100) / 100;
     return { score, breakdown, reasons, skillDetails, languageDetails };
   }
 
   private toAvailabilityFilter(value: string | null) {
-    switch (value) {
-      case 'IMMEDIATE':
-      case 'AVAILABLE': return 'AVAILABLE';
-      default: return undefined;
-    }
+    switch (value) { case 'IMMEDIATE': case 'AVAILABLE': return 'AVAILABLE'; default: return undefined; }
   }
 }
