@@ -9,7 +9,7 @@ import {
   WorkerRequirementNormalizerService,
 } from './worker-requirement-normalizer.service';
 
-interface MatchBreakdown {
+export interface MatchBreakdown {
   profession: number;
   skills: number;
   location: number;
