@@ -195,13 +195,13 @@ export class EmployerWorkerDiscoveryService {
       LEFT JOIN "worker_work_preferences" wp ON wp."workerId" = w."id"
       ${where}
       ORDER BY
-        "skillMatchCount" DESC,
+        ${skillMatchExpression} DESC,
         CASE
           WHEN ${rankingPattern}::text IS NOT NULL AND EXISTS (SELECT 1 FROM "WorkerAddress" wa3 WHERE wa3."workerId" = w."id" AND wa3."isCurrent" = true AND (wa3."city" ILIKE ${rankingPattern} OR COALESCE(wa3."district", '') ILIKE ${rankingPattern} OR wa3."state" ILIKE ${rankingPattern})) THEN 0
           WHEN ${rankingPattern}::text IS NOT NULL AND EXISTS (SELECT 1 FROM "worker_preferred_locations" pl3 WHERE pl3."workerId" = w."id" AND (pl3."city" ILIKE ${rankingPattern} OR COALESCE(pl3."district", '') ILIKE ${rankingPattern} OR pl3."state" ILIKE ${rankingPattern})) THEN 1
           WHEN wp."mobility" = 'ANYWHERE_INDIA' THEN 2 ELSE 3
         END,
-        CASE WHEN ${latitude !== null && longitude !== null} AND "distanceKm" IS NOT NULL THEN "distanceKm" ELSE 0 END ASC,
+        CASE WHEN ${latitude !== null && longitude !== null} AND (${distanceExpression}) IS NOT NULL THEN (${distanceExpression}) ELSE 0 END ASC,
         CASE WHEN w."verificationStatus" = 'VERIFIED' THEN 0 ELSE 1 END,
         CASE WHEN w."availabilityStatus" = 'AVAILABLE' THEN 0 ELSE 1 END,
         COALESCE(w."verificationScore", 0) DESC,
