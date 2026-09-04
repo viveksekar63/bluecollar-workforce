@@ -24,6 +24,12 @@ import { WorkerShortlistService } from "./worker-shortlist.service";
     WorkerWorkPreferencesService,
     WorkerShortlistService,
   ],
-  exports: [WorkersService, WorkerProfessionService, WorkerVerificationService, WorkerShortlistService],
+  exports: [
+    WorkersService,
+    WorkerProfessionService,
+    WorkerVerificationService,
+    WorkerShortlistService,
+    EmployerWorkerDiscoveryService,
+  ],
 })
 export class WorkersModule {}
