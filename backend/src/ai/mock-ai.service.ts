@@ -52,7 +52,7 @@ export class MockAiService implements AiProvider {
     }
 
     const cityMatch = query.match(
-      /\bin\s+([a-z]+(?:\s+[a-z]+)*?)(?=\s+(?:with|who|that|and|for|having|speaking|speak|available|availability|accommodation)\b|[,.]|$)/i,
+      /\bin\s+([a-z]+(?:\s+[a-z]+)*?)(?=\s+(?:with|who|that|and|for|having|speaking|speak|available|availability|accommodation|willing|must|should)\b|[,.]|$)/i,
     );
 
     const accommodationAvailable =
@@ -64,6 +64,19 @@ export class MockAiService implements AiProvider {
       query.includes('available immediately') ||
       query.includes('immediately available') ||
       query.includes('immediate');
+
+    const willingToRelocate =
+      query.includes('willing to relocate') ||
+      query.includes('willing to relocate') ||
+      query.includes('ready to relocate') ||
+      query.includes('can relocate');
+
+    const willingToTravel =
+      query.includes('willing to travel') ||
+      query.includes('ready to travel') ||
+      query.includes('can travel');
+
+    const mobility = this.extractMobility(query);
 
     return {
       profession,
@@ -79,9 +92,9 @@ export class MockAiService implements AiProvider {
       minimumExperienceYears: experienceMatch ? Number(experienceMatch[1]) : null,
       languages,
       availability: immediate ? 'IMMEDIATE' : null,
-      mobility: null,
-      willingToRelocate: null,
-      willingToTravel: null,
+      mobility,
+      willingToRelocate: willingToRelocate ? true : null,
+      willingToTravel: willingToTravel ? true : null,
       accommodationAvailable,
       clarificationRequired: profession === null,
       clarificationQuestion: profession === null
@@ -90,10 +103,36 @@ export class MockAiService implements AiProvider {
     };
   }
 
+  private extractMobility(query: string): string | null {
+    if (/\b(?:anywhere in india|across india|all over india)\b/i.test(query)) {
+      return 'ANYWHERE_INDIA';
+    }
+
+    if (/\b(?:specific locations?|selected locations?)\b/i.test(query)) {
+      return 'SPECIFIC_LOCATIONS';
+    }
+
+    if (/\b(?:within the state|within state|same state)\b/i.test(query)) {
+      return 'WITHIN_STATE';
+    }
+
+    if (/\b(?:within (?:a )?radius|within \d+\s*km|nearby|near the location)\b/i.test(query)) {
+      return 'WITHIN_RADIUS';
+    }
+
+    if (/\b(?:local|locally|same city|nearby only)\b/i.test(query)) {
+      return 'LOCAL';
+    }
+
+    return null;
+  }
+
   private normalizeCity(city: string): string | null {
     const normalized = city.trim().toLowerCase();
     const cities: Record<string, string> = {
       chennai: 'Chennai',
+      bengaluru: 'Bengaluru',
+      bangalore: 'Bengaluru',
       coimbatore: 'Coimbatore',
       madurai: 'Madurai',
       trichy: 'Tiruchirappalli',
