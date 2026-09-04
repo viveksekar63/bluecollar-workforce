@@ -1,6 +1,6 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
-
+import { AiModule } from './ai/ai.module';
 import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
 import { PrismaModule } from "./prisma/prisma.module";
@@ -35,7 +35,7 @@ import { MasterDataModule } from "./master-data/master-data.module";
     EmploymentModule, DocumentsModule, VerificationModule, SkillsModule, JobsModule,
     SubscriptionsModule, CreditsModule, ApplicationsModule, AttendanceModule,
     PaymentsModule, RatingsModule, NotificationsModule, ComplaintsModule, AuditModule,
-    MasterDataModule,
+    MasterDataModule,AiModule,
   ],
   controllers: [AppController],
   providers: [AppService],
