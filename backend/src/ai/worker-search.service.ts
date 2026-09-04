@@ -11,6 +11,12 @@ export interface MatchBreakdown { profession: number; skills: number; location: 
 export interface MatchSkillDetail { required: string; matched: boolean; }
 export interface MatchLanguageDetail { required: string; matched: boolean; }
 
+interface WorkerSearchGeoContext {
+  latitude?: number;
+  longitude?: number;
+  radiusKm?: number;
+}
+
 @Injectable()
 export class WorkerSearchService {
   constructor(
@@ -19,7 +25,7 @@ export class WorkerSearchService {
     private readonly discovery: EmployerWorkerDiscoveryService,
   ) {}
 
-  async search(query: string) {
+  async search(query: string, geo: WorkerSearchGeoContext = {}) {
     const parsed = await this.parser.parse(query);
     if (parsed.clarificationRequired) return { status: 'CLARIFICATION_REQUIRED' as const, query, requirement: parsed, results: null };
 
@@ -46,6 +52,9 @@ export class WorkerSearchService {
       minimumExperienceYears: normalized.minimumExperienceYears ?? undefined,
       availability: this.toAvailabilityFilter(normalized.availability),
       mobility: normalized.mobility ?? undefined,
+      latitude: geo.latitude,
+      longitude: geo.longitude,
+      radiusKm: geo.radiusKm,
       page: 1,
       limit: 100,
     };
