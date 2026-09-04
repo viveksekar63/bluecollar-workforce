@@ -33,5 +33,6 @@ INSERT INTO "work_locations" ("city","district","state","pincode") VALUES
  ('Madurai','Madurai','Tamil Nadu','625001'),
  ('Mayiladuthurai','Mayiladuthurai','Tamil Nadu','609001'),
  ('Coimbatore','Coimbatore','Tamil Nadu','641001'),
- ('Salem','Salem','Tamil Nadu','636001')
+ ('Salem','Salem','Tamil Nadu','636001'),
+ ('Bengaluru','Bengaluru Urban','Karnataka','560001')
 ON CONFLICT ("city", "state") DO NOTHING;
