@@ -41,6 +41,7 @@ export class WorkerSearchService {
       district: normalized.location?.type === 'DISTRICT' ? normalized.location.name : undefined,
       state: normalized.location?.type === 'STATE' ? normalized.location.name : undefined,
       skill: undefined,
+      skillIds: normalized.skills.map((skill) => skill.id),
       languages: normalized.languages.map((language) => language.name).join(','),
       minimumExperienceYears: normalized.minimumExperienceYears ?? undefined,
       availability: this.toAvailabilityFilter(normalized.availability),
@@ -53,7 +54,7 @@ export class WorkerSearchService {
     const scoredItems = candidateResults.items.map((worker) => {
       const match = this.calculateMatchScore(worker, normalized);
       return { ...worker, matchScore: match.score, matchBreakdown: match.breakdown, matchReasons: match.reasons, matchDetails: { skills: match.skillDetails, languages: match.languageDetails } };
-    }).sort((a, b) => b.matchScore - a.matchScore || b.verificationScore - a.verificationScore || b.experienceYears - a.experienceYears);
+    }).sort((a, b) => b.matchScore - a.matchScore || b.verificationScore - a.verificationScore || b.experienceYears - a.experienceYears || a.id.localeCompare(b.id));
 
     const selectedItems = scoredItems.slice(0, requestedCount);
     return {
