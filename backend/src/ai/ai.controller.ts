@@ -1,5 +1,6 @@
 import { Body, Controller, Post } from '@nestjs/common';
 import { ParseWorkerRequirementDto } from './dto/parse-worker-requirement.dto';
+import { WorkerSearchDto } from './dto/worker-search.dto';
 import { RequirementParserService } from './requirement-parser.service';
 import { WorkerSearchService } from './worker-search.service';
 
@@ -26,9 +27,13 @@ export class AiController {
 
   @Post('worker-search')
   async workerSearch(
-    @Body() dto: ParseWorkerRequirementDto,
+    @Body() dto: WorkerSearchDto,
   ) {
-    const result = await this.workerSearchService.search(dto.query);
+    const result = await this.workerSearchService.search(dto.query, {
+      latitude: dto.latitude,
+      longitude: dto.longitude,
+      radiusKm: dto.radiusKm,
+    });
 
     return {
       success: true,
