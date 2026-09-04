@@ -52,9 +52,15 @@ export class WorkersQueryDto {
   @IsString()
   skill?: string;
 
+  /** Backward-compatible single-language filter. */
   @IsOptional()
   @IsString()
   language?: string;
+
+  /** Comma-separated language names; every requested language must match. */
+  @IsOptional()
+  @IsString()
+  languages?: string;
 
   @IsOptional()
   @Type(() => Number)
