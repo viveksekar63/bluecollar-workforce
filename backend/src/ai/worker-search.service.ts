@@ -29,19 +29,22 @@ export class WorkerSearchService {
     }
 
     const requestedCount = Math.min(Math.max(normalized.workerCount ?? 20, 1), 100);
+    // A semantic destination is normally a hard discovery filter. When the employer
+    // explicitly accepts relocation/travel, however, the destination becomes a soft
+    // ranking preference so capable workers from other cities remain eligible.
+    const flexibleLocation = normalized.willingToRelocate === true || normalized.willingToTravel === true;
     const discoveryQuery: WorkersQueryDto = {
       profession: normalized.profession?.name ?? undefined,
       professionCategory: normalized.professionCategory?.name ?? undefined,
-      city: normalized.location?.type === 'CITY' ? normalized.location.name : undefined,
-      district: normalized.location?.type === 'DISTRICT' ? normalized.location.name : undefined,
-      state: normalized.location?.type === 'STATE' ? normalized.location.name : undefined,
+      city: !flexibleLocation && normalized.location?.type === 'CITY' ? normalized.location.name : undefined,
+      district: !flexibleLocation && normalized.location?.type === 'DISTRICT' ? normalized.location.name : undefined,
+      state: !flexibleLocation && normalized.location?.type === 'STATE' ? normalized.location.name : undefined,
       skillIds: normalized.skills.map((skill) => skill.id),
       languages: normalized.languages.map((language) => language.name).join(','),
       minimumExperienceYears: normalized.minimumExperienceYears ?? undefined,
       availability: this.toAvailabilityFilter(normalized.availability),
       // Mobility is intentionally scored as a preference instead of being a hard
-      // discovery filter. This allows relocation/travel-capable workers to remain
-      // eligible when their current location does not exactly match the request.
+      // discovery filter. Relocation/travel also makes the semantic destination soft.
       latitude: geo.latitude, longitude: geo.longitude, radiusKm: geo.radiusKm,
       page: 1, limit: 100,
     };
@@ -165,8 +168,6 @@ export class WorkerSearchService {
     if (travel === 'MATCHED') reasons.push('Worker is willing to travel');
     else if (travel === 'NOT_MATCHED') reasons.push('Worker is not marked willing to travel');
 
-    // The current worker schema does not store an accommodation preference.
-    // Treat employer-provided accommodation as an offer, not as an invented worker capability.
     let accommodation: PreferenceMatchStatus = 'NOT_SPECIFIED';
     if (normalized.accommodationAvailable === true) {
       accommodation = 'OFFERED';

@@ -67,14 +67,15 @@ export class MockAiService implements AiProvider {
 
     const willingToRelocate =
       query.includes('willing to relocate') ||
-      query.includes('willing to relocate') ||
       query.includes('ready to relocate') ||
-      query.includes('can relocate');
+      query.includes('can relocate') ||
+      query.includes('willing to relocate and travel');
 
     const willingToTravel =
       query.includes('willing to travel') ||
       query.includes('ready to travel') ||
-      query.includes('can travel');
+      query.includes('can travel') ||
+      query.includes('willing to relocate and travel');
 
     const mobility = this.extractMobility(query);
 
