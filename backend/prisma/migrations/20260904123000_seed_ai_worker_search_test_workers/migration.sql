@@ -46,7 +46,8 @@ BEGIN
       district_name := 'Chennai';
       pin_code := CASE WHEN i % 2 = 0 THEN '600001' ELSE '600017' END;
       experience := 3 + (i % 10);
-      availability_value := 'IMMEDIATE';
+      -- DB enum uses AVAILABLE for workers who can start immediately.
+      availability_value := 'AVAILABLE';
       verification_value := CASE WHEN i % 3 = 0 THEN 'VERIFIED' ELSE 'PENDING' END;
       first_name := CASE i
         WHEN 1 THEN 'Arun' WHEN 2 THEN 'Bala' WHEN 3 THEN 'Karthik' WHEN 4 THEN 'Dinesh'
@@ -75,11 +76,11 @@ BEGIN
       END CASE;
 
       experience := 1 + (i % 8);
-      availability_value := CASE (i % 4)
-        WHEN 0 THEN 'IMMEDIATE'
-        WHEN 1 THEN 'AVAILABLE'
-        WHEN 2 THEN 'WITHIN_7_DAYS'
-        ELSE 'WITHIN_15_DAYS'
+      -- Keep values aligned with the actual PostgreSQL AvailabilityStatus enum.
+      availability_value := CASE (i % 3)
+        WHEN 0 THEN 'AVAILABLE'
+        WHEN 1 THEN 'WORKING'
+        ELSE 'NOT_AVAILABLE'
       END;
       verification_value := CASE WHEN i % 4 = 0 THEN 'VERIFIED' ELSE 'PENDING' END;
       first_name := 'TestWorker' || i;
