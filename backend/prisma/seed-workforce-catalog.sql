@@ -113,3 +113,14 @@ BEGIN
   SELECT 'CITY', 'Bengaluru', 'KA-BLR-C', v_district_id, '560001', true
   WHERE NOT EXISTS (SELECT 1 FROM "work_locations" WHERE "type" = 'CITY' AND "parentId" = v_district_id AND LOWER("name") = LOWER('Bengaluru') AND "isActive" = true);
 END $$;
+INSERT INTO "work_locations" ("city","district","state","pincode") VALUES
+ ('Thanjavur','Thanjavur','Tamil Nadu','613001'),
+ ('Kumbakonam','Thanjavur','Tamil Nadu','612001'),
+ ('Trichy','Tiruchirappalli','Tamil Nadu','620001'),
+ ('Chennai','Chennai','Tamil Nadu','600001'),
+ ('Madurai','Madurai','Tamil Nadu','625001'),
+ ('Mayiladuthurai','Mayiladuthurai','Tamil Nadu','609001'),
+ ('Coimbatore','Coimbatore','Tamil Nadu','641001'),
+ ('Salem','Salem','Tamil Nadu','636001'),
+ ('Bengaluru','Bengaluru Urban','Karnataka','560001')
+ON CONFLICT ("city", "state") DO NOTHING;
