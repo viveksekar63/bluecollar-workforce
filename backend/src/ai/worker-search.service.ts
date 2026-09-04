@@ -11,6 +11,12 @@ export interface MatchBreakdown { profession: number; skills: number; location: 
 export interface MatchSkillDetail { required: string; matched: boolean; }
 export interface MatchLanguageDetail { required: string; matched: boolean; }
 
+interface WorkerSearchGeoContext {
+  latitude?: number;
+  longitude?: number;
+  radiusKm?: number;
+}
+
 @Injectable()
 export class WorkerSearchService {
   constructor(
@@ -19,7 +25,7 @@ export class WorkerSearchService {
     private readonly discovery: EmployerWorkerDiscoveryService,
   ) {}
 
-  async search(query: string) {
+  async search(query: string, geo: WorkerSearchGeoContext = {}) {
     const parsed = await this.parser.parse(query);
     if (parsed.clarificationRequired) return { status: 'CLARIFICATION_REQUIRED' as const, query, requirement: parsed, results: null };
 
@@ -41,19 +47,23 @@ export class WorkerSearchService {
       district: normalized.location?.type === 'DISTRICT' ? normalized.location.name : undefined,
       state: normalized.location?.type === 'STATE' ? normalized.location.name : undefined,
       skill: undefined,
+      skillIds: normalized.skills.map((skill) => skill.id),
       languages: normalized.languages.map((language) => language.name).join(','),
       minimumExperienceYears: normalized.minimumExperienceYears ?? undefined,
       availability: this.toAvailabilityFilter(normalized.availability),
       mobility: normalized.mobility ?? undefined,
+      latitude: geo.latitude,
+      longitude: geo.longitude,
+      radiusKm: geo.radiusKm,
       page: 1,
       limit: 100,
     };
 
     const candidateResults = await this.discovery.findAll(discoveryQuery);
     const scoredItems = candidateResults.items.map((worker) => {
-      const match = this.calculateMatchScore(worker, normalized);
+      const match = this.calculateMatchScore(worker, normalized, geo);
       return { ...worker, matchScore: match.score, matchBreakdown: match.breakdown, matchReasons: match.reasons, matchDetails: { skills: match.skillDetails, languages: match.languageDetails } };
-    }).sort((a, b) => b.matchScore - a.matchScore || b.verificationScore - a.verificationScore || b.experienceYears - a.experienceYears);
+    }).sort((a, b) => b.matchScore - a.matchScore || b.verificationScore - a.verificationScore || b.experienceYears - a.experienceYears || a.id.localeCompare(b.id));
 
     const selectedItems = scoredItems.slice(0, requestedCount);
     return {
@@ -65,7 +75,7 @@ export class WorkerSearchService {
     };
   }
 
-  private calculateMatchScore(worker: any, normalized: any) {
+  private calculateMatchScore(worker: any, normalized: any, geo: WorkerSearchGeoContext) {
     const breakdown: MatchBreakdown = { profession: 0, skills: 0, location: 0, experience: 0, availability: 0, verified: 0, verificationScore: 0 };
     const reasons: string[] = [];
 
@@ -92,8 +102,23 @@ export class WorkerSearchService {
       const city = worker.city?.trim().toLowerCase();
       const district = worker.district?.trim().toLowerCase();
       const state = worker.state?.trim().toLowerCase();
-      if (city === requested || district === requested || state === requested) { breakdown.location = 20; reasons.push(`Exact location match: ${worker.city}`); }
-      else if (worker.mobility === 'ANYWHERE_INDIA') { breakdown.location = 10; reasons.push('Broader mobility: Anywhere India'); }
+      if (city === requested || district === requested || state === requested) {
+        breakdown.location = 20;
+        reasons.push(`Exact location match: ${worker.city}`);
+      } else if (worker.mobility === 'ANYWHERE_INDIA') {
+        breakdown.location = 10;
+        reasons.push('Broader mobility: Anywhere India');
+      }
+    }
+
+    if (!normalized.location?.name && geo.radiusKm && worker.distanceKm !== null && worker.distanceKm !== undefined) {
+      const distance = Number(worker.distanceKm);
+      const radius = geo.radiusKm;
+      if (distance <= radius * 0.25) breakdown.location = 20;
+      else if (distance <= radius * 0.5) breakdown.location = 15;
+      else if (distance <= radius * 0.75) breakdown.location = 10;
+      else breakdown.location = 5;
+      reasons.push(`${distance.toFixed(1)} km from employer location`);
     }
 
     if (normalized.minimumExperienceYears === null || worker.experienceYears >= normalized.minimumExperienceYears) {

@@ -1,4 +1,5 @@
 import {
+  IsArray,
   IsBoolean,
   IsIn,
   IsInt,
@@ -52,6 +53,12 @@ export class WorkersQueryDto {
   @IsString()
   skill?: string;
 
+  /** Internal canonical skill IDs used by AI matching to rank candidates before pagination. */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  skillIds?: string[];
+
   /** Backward-compatible single-language filter. */
   @IsOptional()
   @IsString()
@@ -84,17 +91,32 @@ export class WorkersQueryDto {
   @IsString()
   city?: string;
 
+  /** Employer/job latitude used for geographic worker matching. */
   @IsOptional()
-  @IsIn(MOBILITY_VALUES)
-  @Transform(({ value }) => typeof value === 'string' ? value.trim().toUpperCase() : value)
-  mobility?: (typeof MOBILITY_VALUES)[number];
+  @Type(() => Number)
+  @Min(-90)
+  @Max(90)
+  latitude?: number;
 
+  /** Employer/job longitude used for geographic worker matching. */
+  @IsOptional()
+  @Type(() => Number)
+  @Min(-180)
+  @Max(180)
+  longitude?: number;
+
+  /** Maximum geographic distance from the employer/job location. */
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
   @Max(500)
   radiusKm?: number;
+
+  @IsOptional()
+  @IsIn(MOBILITY_VALUES)
+  @Transform(({ value }) => typeof value === 'string' ? value.trim().toUpperCase() : value)
+  mobility?: (typeof MOBILITY_VALUES)[number];
 
   @IsOptional()
   @Type(() => Number)
