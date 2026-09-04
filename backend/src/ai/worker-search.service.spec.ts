@@ -103,6 +103,69 @@ describe('WorkerSearchService matching', () => {
     expect(result.results!.items[0].matchScore).toBeGreaterThan(result.results!.items[1].matchScore);
   });
 
+  it('gives the full skill score when no specific skills are requested', async () => {
+    const normalized = requirement({ skills: [] });
+    parser.parse.mockResolvedValue({ clarificationRequired: false });
+    normalizer.normalize.mockResolvedValue(normalized);
+    discovery.findAll.mockResolvedValue({ items: [worker()], total: 1 });
+
+    const result = await service.search('electrician without skill requirements');
+    const match = result.results!.items[0];
+
+    expect(match.matchBreakdown.skills).toBe(25);
+    expect(match.matchDetails.skills).toEqual([]);
+    expect(match.matchReasons).toContain('No specific skill requested');
+  });
+
+  it('does not award skill points for a completely unmatched skill requirement', async () => {
+    const normalized = requirement({ skills: [{ id: 'skill-x', name: 'Masonry' }] });
+    parser.parse.mockResolvedValue({ clarificationRequired: false });
+    normalizer.normalize.mockResolvedValue(normalized);
+    discovery.findAll.mockResolvedValue({ items: [worker()], total: 1 });
+
+    const result = await service.search('electrician with masonry');
+    const match = result.results!.items[0];
+
+    expect(match.matchBreakdown.skills).toBe(0);
+    expect(match.matchDetails.skills).toEqual([{
+      required: 'Masonry',
+      matched: false,
+      experienceYears: null,
+      skillLevel: null,
+      verified: false,
+    }]);
+    expect(match.matchReasons).toContain('No required skills matched');
+  });
+
+  it('caps worker verification contribution at 5 points', async () => {
+    const normalized = requirement();
+    parser.parse.mockResolvedValue({ clarificationRequired: false });
+    normalizer.normalize.mockResolvedValue(normalized);
+    discovery.findAll.mockResolvedValue({ items: [worker({ verificationScore: 100 })], total: 1 });
+
+    const result = await service.search('verified electrician');
+    const match = result.results!.items[0];
+
+    expect(match.matchBreakdown.verificationScore).toBe(5);
+  });
+
+  it('does not apply radius location scoring when the worker has no distance', async () => {
+    const normalized = requirement({ location: null });
+    parser.parse.mockResolvedValue({ clarificationRequired: false });
+    normalizer.normalize.mockResolvedValue(normalized);
+    discovery.findAll.mockResolvedValue({ items: [worker({ distanceKm: null })], total: 1 });
+
+    const result = await service.search('electrician search', {
+      latitude: 13.0827,
+      longitude: 80.2707,
+      radiusKm: 25,
+    });
+    const match = result.results!.items[0];
+
+    expect(match.matchBreakdown.location).toBe(0);
+    expect(match.matchReasons).not.toContain(expect.stringContaining('km from employer location'));
+  });
+
   it('uses employer coordinates and radius for location scoring when semantic location is absent', async () => {
     const normalized = requirement({ location: null });
     parser.parse.mockResolvedValue({ clarificationRequired: false });
@@ -114,7 +177,7 @@ describe('WorkerSearchService matching', () => {
 
     const result = await service.search('electrician search', {
       latitude: 13.0827,
-      longitude: 80.2707,
+      longitude: 13.0827,
       radiusKm: 25,
     });
 
@@ -124,6 +187,19 @@ describe('WorkerSearchService matching', () => {
     expect(far.matchBreakdown.location).toBe(5);
     expect(near.matchReasons).toContain('4.0 km from employer location');
     expect(far.matchReasons).toContain('20.0 km from employer location');
+  });
+
+  it('matches state-level semantic locations', async () => {
+    const normalized = requirement({ location: { name: 'Tamil Nadu', type: 'STATE' } });
+    parser.parse.mockResolvedValue({ clarificationRequired: false });
+    normalizer.normalize.mockResolvedValue(normalized);
+    discovery.findAll.mockResolvedValue({ items: [worker()], total: 1 });
+
+    const result = await service.search('electrician in Tamil Nadu');
+    const match = result.results!.items[0];
+
+    expect(match.matchBreakdown.location).toBe(20);
+    expect(match.matchReasons).toContain('Exact location match: Chennai');
   });
 
   it('returns clarification without querying master data or workers', async () => {
