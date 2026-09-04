@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { WorkersQueryDto } from './dto/workers-query.dto';
@@ -22,10 +22,20 @@ export class EmployerWorkerDiscoveryService {
     const profession = query.profession?.trim() || null;
     const mobility = query.mobility?.trim().toUpperCase() || null;
     const minimumExperienceYears = query.minimumExperienceYears ?? null;
+    const latitude = query.latitude ?? null;
+    const longitude = query.longitude ?? null;
+    const radiusKm = query.radiusKm ?? null;
     const requestedLanguages = [
       ...(query.language ? [query.language] : []),
       ...(query.languages ? query.languages.split(',') : []),
     ].map((value) => value.trim()).filter(Boolean);
+
+    if ((latitude === null) !== (longitude === null)) {
+      throw new BadRequestException('latitude and longitude must be provided together');
+    }
+    if (radiusKm !== null && latitude === null) {
+      throw new BadRequestException('latitude and longitude are required when radiusKm is provided');
+    }
 
     const filters: Prisma.Sql[] = [];
 
@@ -54,6 +64,24 @@ export class EmployerWorkerDiscoveryService {
         WHERE wl."workerId" = w."id"
           AND (${Prisma.join(languagePatterns.map((pattern) => Prisma.sql`l."name" ILIKE ${pattern}`), ' OR ')})
       ) = ${requestedLanguages.length}`);
+    }
+
+    if (radiusKm !== null && latitude !== null && longitude !== null) {
+      filters.push(Prisma.sql`EXISTS (
+        SELECT 1
+        FROM "WorkerAddress" wa_radius
+        WHERE wa_radius."workerId" = w."id"
+          AND wa_radius."isCurrent" = true
+          AND wa_radius."latitude" IS NOT NULL
+          AND wa_radius."longitude" IS NOT NULL
+          AND (
+            6371.0 * ACOS(LEAST(1.0, GREATEST(-1.0,
+              COS(RADIANS(${latitude})) * COS(RADIANS(wa_radius."latitude"::double precision)) *
+              COS(RADIANS(wa_radius."longitude"::double precision) - RADIANS(${longitude})) +
+              SIN(RADIANS(${latitude})) * SIN(RADIANS(wa_radius."latitude"::double precision))
+            )))
+          ) <= ${radiusKm}
+      )`);
     }
 
     const currentAddressMatches = (parts: Prisma.Sql[]) => Prisma.sql`EXISTS (
@@ -126,9 +154,26 @@ export class EmployerWorkerDiscoveryService {
         )`
       : Prisma.sql`0`;
 
+    const distanceExpression = latitude !== null && longitude !== null
+      ? Prisma.sql`(
+          SELECT MIN(
+            6371.0 * ACOS(LEAST(1.0, GREATEST(-1.0,
+              COS(RADIANS(${latitude})) * COS(RADIANS(wa_distance."latitude"::double precision)) *
+              COS(RADIANS(wa_distance."longitude"::double precision) - RADIANS(${longitude})) +
+              SIN(RADIANS(${latitude})) * SIN(RADIANS(wa_distance."latitude"::double precision))
+            )))
+          )
+          FROM "WorkerAddress" wa_distance
+          WHERE wa_distance."workerId" = w."id"
+            AND wa_distance."isCurrent" = true
+            AND wa_distance."latitude" IS NOT NULL
+            AND wa_distance."longitude" IS NOT NULL
+        )`
+      : Prisma.sql`NULL`;
+
     const rows = await this.prisma.$queryRaw<Array<{
       id: string; workerCode: string; firstName: string; lastName: string | null; profileImageUrl: string | null;
-      primarySkill: string | null; workerSkills: unknown; skillMatchCount: number;
+      primarySkill: string | null; workerSkills: unknown; skillMatchCount: number; distanceKm: number | null;
       professionCategory: string | null; profession: string | null;
       experienceYears: unknown; city: string | null; district: string | null; state: string | null;
       verificationScore: number | null; verificationStatus: string; availability: string; mobility: string | null;
@@ -138,6 +183,7 @@ export class EmployerWorkerDiscoveryService {
         skill."name" AS "primarySkill",
         COALESCE((SELECT json_agg(sk_all."name" ORDER BY sk_all."name") FROM "WorkerSkill" ws_all JOIN "Skill" sk_all ON sk_all."id" = ws_all."skillId" WHERE ws_all."workerId" = w."id"), '[]'::json) AS "workerSkills",
         ${skillMatchExpression} AS "skillMatchCount",
+        ${distanceExpression} AS "distanceKm",
         w."professionCategory", w."profession", w."experienceYears", addr."city", addr."district", addr."state",
         w."verificationScore", w."verificationStatus", w."availabilityStatus" AS "availability", wp."mobility",
         wp."willingToRelocate", wp."willingToTravel",
@@ -155,6 +201,7 @@ export class EmployerWorkerDiscoveryService {
           WHEN ${rankingPattern}::text IS NOT NULL AND EXISTS (SELECT 1 FROM "worker_preferred_locations" pl3 WHERE pl3."workerId" = w."id" AND (pl3."city" ILIKE ${rankingPattern} OR COALESCE(pl3."district", '') ILIKE ${rankingPattern} OR pl3."state" ILIKE ${rankingPattern})) THEN 1
           WHEN wp."mobility" = 'ANYWHERE_INDIA' THEN 2 ELSE 3
         END,
+        CASE WHEN ${latitude !== null && longitude !== null} AND "distanceKm" IS NOT NULL THEN "distanceKm" ELSE 0 END ASC,
         CASE WHEN w."verificationStatus" = 'VERIFIED' THEN 0 ELSE 1 END,
         CASE WHEN w."availabilityStatus" = 'AVAILABLE' THEN 0 ELSE 1 END,
         COALESCE(w."verificationScore", 0) DESC,
@@ -181,6 +228,7 @@ export class EmployerWorkerDiscoveryService {
         availability: worker.availability, mobility: worker.mobility ?? 'LOCAL',
         willingToRelocate: worker.willingToRelocate ?? false, willingToTravel: worker.willingToTravel ?? false,
         preferredLocations: Array.isArray(worker.preferredLocations) ? worker.preferredLocations : [],
+        distanceKm: worker.distanceKm === null ? null : Number(worker.distanceKm),
       })),
       page, limit, total, totalPages: Math.ceil(total / limit),
     };
