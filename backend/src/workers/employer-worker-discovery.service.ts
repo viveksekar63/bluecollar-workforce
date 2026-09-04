@@ -17,6 +17,7 @@ export class EmployerWorkerDiscoveryService {
     const district = query.district?.trim() || null;
     const state = query.state?.trim() || null;
     const skill = query.skill?.trim() || null;
+    const skillIds = [...new Set((query.skillIds ?? []).map((id) => id.trim()).filter(Boolean))];
     const professionCategory = query.professionCategory?.trim() || null;
     const profession = query.profession?.trim() || null;
     const mobility = query.mobility?.trim().toUpperCase() || null;
@@ -116,10 +117,19 @@ export class EmployerWorkerDiscoveryService {
     const where = filters.length ? Prisma.sql`WHERE ${Prisma.join(filters, ' AND ')}` : Prisma.empty;
     const rankingLocation = city || district || state || freeTextLocation;
     const rankingPattern = rankingLocation ? `%${rankingLocation}%` : null;
+    const skillMatchExpression = skillIds.length
+      ? Prisma.sql`(
+          SELECT COUNT(DISTINCT ws_rank."skillId")
+          FROM "WorkerSkill" ws_rank
+          WHERE ws_rank."workerId" = w."id"
+            AND ws_rank."skillId" IN (${Prisma.join(skillIds)})
+        )`
+      : Prisma.sql`0`;
 
     const rows = await this.prisma.$queryRaw<Array<{
       id: string; workerCode: string; firstName: string; lastName: string | null; profileImageUrl: string | null;
-      primarySkill: string | null; workerSkills: unknown; professionCategory: string | null; profession: string | null;
+      primarySkill: string | null; workerSkills: unknown; skillMatchCount: number;
+      professionCategory: string | null; profession: string | null;
       experienceYears: unknown; city: string | null; district: string | null; state: string | null;
       verificationScore: number | null; verificationStatus: string; availability: string; mobility: string | null;
       willingToRelocate: boolean | null; willingToTravel: boolean | null; preferredLocations: unknown;
@@ -127,6 +137,7 @@ export class EmployerWorkerDiscoveryService {
       SELECT w."id", w."workerCode", u."firstName", u."lastName", u."profilePhotoUrl",
         skill."name" AS "primarySkill",
         COALESCE((SELECT json_agg(sk_all."name" ORDER BY sk_all."name") FROM "WorkerSkill" ws_all JOIN "Skill" sk_all ON sk_all."id" = ws_all."skillId" WHERE ws_all."workerId" = w."id"), '[]'::json) AS "workerSkills",
+        ${skillMatchExpression} AS "skillMatchCount",
         w."professionCategory", w."profession", w."experienceYears", addr."city", addr."district", addr."state",
         w."verificationScore", w."verificationStatus", w."availabilityStatus" AS "availability", wp."mobility",
         wp."willingToRelocate", wp."willingToTravel",
@@ -138,6 +149,7 @@ export class EmployerWorkerDiscoveryService {
       LEFT JOIN "worker_work_preferences" wp ON wp."workerId" = w."id"
       ${where}
       ORDER BY
+        "skillMatchCount" DESC,
         CASE
           WHEN ${rankingPattern}::text IS NOT NULL AND EXISTS (SELECT 1 FROM "WorkerAddress" wa3 WHERE wa3."workerId" = w."id" AND wa3."isCurrent" = true AND (wa3."city" ILIKE ${rankingPattern} OR COALESCE(wa3."district", '') ILIKE ${rankingPattern} OR wa3."state" ILIKE ${rankingPattern})) THEN 0
           WHEN ${rankingPattern}::text IS NOT NULL AND EXISTS (SELECT 1 FROM "worker_preferred_locations" pl3 WHERE pl3."workerId" = w."id" AND (pl3."city" ILIKE ${rankingPattern} OR COALESCE(pl3."district", '') ILIKE ${rankingPattern} OR pl3."state" ILIKE ${rankingPattern})) THEN 1
@@ -146,7 +158,9 @@ export class EmployerWorkerDiscoveryService {
         CASE WHEN w."verificationStatus" = 'VERIFIED' THEN 0 ELSE 1 END,
         CASE WHEN w."availabilityStatus" = 'AVAILABLE' THEN 0 ELSE 1 END,
         COALESCE(w."verificationScore", 0) DESC,
-        w."createdAt" DESC
+        w."experienceYears" DESC,
+        w."createdAt" DESC,
+        w."id" ASC
       LIMIT ${limit} OFFSET ${skip}
     `);
 
