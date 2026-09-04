@@ -52,6 +52,15 @@ export class WorkersQueryDto {
   @IsString()
   skill?: string;
 
+  @IsOptional()
+  @IsString()
+  language?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @Min(0)
+  minimumExperienceYears?: number;
+
   /** Backward-compatible free-text location search. */
   @IsOptional()
   @IsString()
