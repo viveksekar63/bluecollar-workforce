@@ -34,6 +34,22 @@ export class MockAiService implements AiProvider {
     if (query.includes('kannada')) languages.push('Kannada');
     if (query.includes('malayalam')) languages.push('Malayalam');
     if (query.includes('hindi')) languages.push('Hindi');
+    if (query.includes('english')) languages.push('English');
+
+    const skills: string[] = [];
+    const skillPatterns: Array<[RegExp, string]> = [
+      [/electrical\s+wiring/i, 'Electrical Wiring'],
+      [/panel\s+installation/i, 'Panel Installation'],
+      [/industrial\s+electrical(?:\s+work)?/i, 'Industrial Electrical'],
+      [/plumbing\s+installation/i, 'Plumbing Installation'],
+      [/pipe\s+fitting/i, 'Pipe Fitting'],
+      [/carpentry/i, 'Carpentry'],
+      [/welding/i, 'Welding'],
+    ];
+
+    for (const [pattern, skill] of skillPatterns) {
+      if (pattern.test(userPrompt)) skills.push(skill);
+    }
 
     const cityMatch = query.match(
       /\bin\s+([a-z]+(?:\s+[a-z]+)*?)(?=\s+(?:with|who|that|and|for|having|speaking|speak|available|availability|accommodation)\b|[,.]|$)/i,
@@ -52,7 +68,7 @@ export class MockAiService implements AiProvider {
     return {
       profession,
       professionCategory: null,
-      skills: [],
+      skills,
       workerCount: workerCountMatch ? Number(workerCountMatch[1]) : null,
       location: {
         city: cityMatch ? this.normalizeCity(cityMatch[1]) : null,
