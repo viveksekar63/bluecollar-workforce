@@ -57,7 +57,11 @@ export class EmployerWorkerDiscoveryService {
     }
     if (freeTextLocation) {
       const locationPattern = `%${freeTextLocation}%`;
-      filters.push(Prisma.sql`(EXISTS (SELECT 1 FROM "WorkerAddress" wa WHERE wa."workerId" = w."id" AND wa."isCurrent" = true AND (wa."city" ILIKE ${locationPattern} OR COALESCE(wa."district", '') ILIKE ${locationPattern} OR wa."state" ILIKE ${locationPattern} OR wa."pincode" ILIKE ${locationPattern})) OR EXISTS (SELECT 1 FROM "worker_preferred_locations" pl WHERE pl."workerId" = w."id" AND (pl."city" ILIKE ${locationPattern} OR COALESCE(pl."district", '') ILIKE ${locationPattern} OR pl."state" ILIKE ${locationPattern}) OR EXISTS (SELECT 1 FROM "worker_work_preferences" wp_anywhere WHERE wp_anywhere."workerId" = w."id" AND wp_anywhere."mobility" = 'ANYWHERE_INDIA'))`);
+      filters.push(Prisma.sql`(
+        EXISTS (SELECT 1 FROM "WorkerAddress" wa WHERE wa."workerId" = w."id" AND wa."isCurrent" = true AND (wa."city" ILIKE ${locationPattern} OR COALESCE(wa."district", '') ILIKE ${locationPattern} OR wa."state" ILIKE ${locationPattern} OR wa."pincode" ILIKE ${locationPattern}))
+        OR EXISTS (SELECT 1 FROM "worker_preferred_locations" pl WHERE pl."workerId" = w."id" AND (pl."city" ILIKE ${locationPattern} OR COALESCE(pl."district", '') ILIKE ${locationPattern} OR pl."state" ILIKE ${locationPattern}))
+        OR EXISTS (SELECT 1 FROM "worker_work_preferences" wp_anywhere WHERE wp_anywhere."workerId" = w."id" AND wp_anywhere."mobility" = 'ANYWHERE_INDIA')
+      )`);
     }
     if (mobility) {
       switch (mobility) {
