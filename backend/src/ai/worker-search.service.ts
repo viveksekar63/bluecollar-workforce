@@ -43,8 +43,6 @@ export class WorkerSearchService {
       languages: normalized.languages.map((language) => language.name).join(','),
       minimumExperienceYears: normalized.minimumExperienceYears ?? undefined,
       availability: this.toAvailabilityFilter(normalized.availability),
-      // Mobility is intentionally scored as a preference instead of being a hard
-      // discovery filter. Relocation/travel also makes the semantic destination soft.
       latitude: geo.latitude, longitude: geo.longitude, radiusKm: geo.radiusKm,
       page: 1, limit: 100,
     };
@@ -55,12 +53,13 @@ export class WorkerSearchService {
       return {
         ...worker,
         matchScore: match.score,
+        preferenceScore: match.preferenceScore,
         matchBreakdown: match.breakdown,
         matchReasons: match.reasons,
-        matchDetails: { skills: match.skillDetails, languages: match.languageDetails, preferences: match.preferenceMatch },
+        matchDetails: { skills: match.skillDetails, languages: match.languageDetails, preferences: match.preferenceMatch, preferenceScore: match.preferenceScore },
         preferenceMatch: match.preferenceMatch,
       };
-    }).sort((a, b) => b.matchScore - a.matchScore || b.verificationScore - a.verificationScore || b.experienceYears - a.experienceYears || a.id.localeCompare(b.id));
+    }).sort((a, b) => b.matchScore - a.matchScore || b.preferenceScore - a.preferenceScore || b.verificationScore - a.verificationScore || b.experienceYears - a.experienceYears || a.id.localeCompare(b.id));
 
     const selectedItems = scoredItems.slice(0, requestedCount);
     return { status: 'MATCHED' as const, query, requirement: parsed, normalizedRequirement: normalized, results: { items: selectedItems, page: 1, limit: requestedCount, total: scoredItems.length, totalPages: scoredItems.length ? 1 : 0, candidateTotal: candidateResults.total } };
@@ -120,9 +119,9 @@ export class WorkerSearchService {
     const languageDetails: MatchLanguageDetail[] = normalized.languages.map((language: any) => ({ required: language.name, matched: true }));
     if (languageDetails.length) reasons.push(`All ${languageDetails.length} required languages matched`);
 
-    const preferenceMatch = this.calculatePreferenceMatch(worker, normalized, geo, locationMatched, reasons);
+    const preference = this.calculatePreferenceMatch(worker, normalized, geo, locationMatched, reasons);
     const score = Math.round(Object.values(breakdown).reduce((sum, value) => sum + value, 0) * 100) / 100;
-    return { score, breakdown, reasons, skillDetails, languageDetails, preferenceMatch };
+    return { score, breakdown, reasons, skillDetails, languageDetails, preferenceMatch: preference.match, preferenceScore: preference.score };
   }
 
   private scoreLocation(worker: any, normalized: any, geo: WorkerSearchGeoContext, breakdown: MatchBreakdown, reasons: string[]) {
@@ -143,7 +142,7 @@ export class WorkerSearchService {
     return false;
   }
 
-  private calculatePreferenceMatch(worker: any, normalized: any, geo: WorkerSearchGeoContext, locationMatched: boolean, reasons: string[]): PreferenceMatch {
+  private calculatePreferenceMatch(worker: any, normalized: any, geo: WorkerSearchGeoContext, locationMatched: boolean, reasons: string[]) {
     const requestedMobility = normalized.mobility as string | null;
     let mobility: PreferenceMatchStatus = 'NOT_REQUESTED';
     if (requestedMobility) {
@@ -176,7 +175,14 @@ export class WorkerSearchService {
       accommodation = 'NOT_REQUESTED';
     }
 
-    return { mobility, relocation, travel, accommodation };
+    // Preference score is deliberately separate from the 100-point match score.
+    // It is used only as a deterministic tie-breaker and never changes matchScore.
+    let score = 0;
+    if (relocation === 'MATCHED') score += 1;
+    if (travel === 'MATCHED') score += 1;
+    if (mobility === 'MATCHED') score += 1;
+
+    return { match: { mobility, relocation, travel, accommodation } as PreferenceMatch, score };
   }
 
   private toAvailabilityFilter(value: string | null) {
