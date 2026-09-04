@@ -1,6 +1,23 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { WorkerSearchRequirement } from './requirement-parser.types';
+
+export type MissingMasterType =
+  | 'PROFESSION'
+  | 'PROFESSION_CATEGORY'
+  | 'LOCATION'
+  | 'SKILL'
+  | 'LANGUAGE';
+
+export class MasterDataNotFoundError extends Error {
+  constructor(
+    public readonly masterType: MissingMasterType,
+    public readonly value: string,
+  ) {
+    super(`Master data not found: ${masterType}=${value}`);
+    this.name = 'MasterDataNotFoundError';
+  }
+}
 
 export interface NormalizedWorkerRequirement {
   workerCount: number | null;
@@ -60,6 +77,7 @@ export class WorkerRequirementNormalizerService {
   }
 
   private async resolveProfession(value: string) {
+    const normalized = value.trim();
     const rows = await this.prisma.$queryRaw<Array<{
       id: string; name: string; categoryId: string; categoryName: string;
     }>>`
@@ -67,28 +85,29 @@ export class WorkerRequirementNormalizerService {
       FROM "work_professions" p
       JOIN "work_categories" c ON c."id" = p."categoryId"
       WHERE p."isActive" = true
-        AND (p."name" ILIKE ${value.trim()} OR p."code" ILIKE ${value.trim()})
-      ORDER BY CASE WHEN LOWER(p."name") = LOWER(${value.trim()}) THEN 0 ELSE 1 END
+        AND (p."name" ILIKE ${normalized} OR p."code" ILIKE ${normalized})
+      ORDER BY CASE WHEN LOWER(p."name") = LOWER(${normalized}) THEN 0 ELSE 1 END
       LIMIT 1`;
 
     if (!rows[0]) {
-      throw new NotFoundException(`Profession not found in master data: ${value}`);
+      throw new MasterDataNotFoundError('PROFESSION', normalized);
     }
 
     return rows[0];
   }
 
   private async resolveCategory(value: string) {
+    const normalized = value.trim();
     const rows = await this.prisma.$queryRaw<Array<{ id: string; name: string }>>`
       SELECT "id", "name"
       FROM "work_categories"
       WHERE "isActive" = true
-        AND ("name" ILIKE ${value.trim()} OR "code" ILIKE ${value.trim()})
-      ORDER BY CASE WHEN LOWER("name") = LOWER(${value.trim()}) THEN 0 ELSE 1 END
+        AND ("name" ILIKE ${normalized} OR "code" ILIKE ${normalized})
+      ORDER BY CASE WHEN LOWER("name") = LOWER(${normalized}) THEN 0 ELSE 1 END
       LIMIT 1`;
 
     if (!rows[0]) {
-      throw new NotFoundException(`Profession category not found in master data: ${value}`);
+      throw new MasterDataNotFoundError('PROFESSION_CATEGORY', normalized);
     }
 
     return rows[0];
@@ -119,7 +138,7 @@ export class WorkerRequirementNormalizerService {
       LIMIT 1`;
 
     if (!rows[0]) {
-      throw new NotFoundException(`Location not found in master data: ${value}`);
+      throw new MasterDataNotFoundError('LOCATION', value.trim());
     }
 
     return rows[0];
@@ -130,12 +149,13 @@ export class WorkerRequirementNormalizerService {
     const resolved: Array<{ id: string; name: string }> = [];
 
     for (const value of values) {
+      const normalized = value.trim();
       const rows = await this.prisma.$queryRaw<Array<{ id: string; name: string }>>`
         SELECT "id", "name" FROM "Skill"
-        WHERE "name" ILIKE ${value.trim()}
-        ORDER BY CASE WHEN LOWER("name") = LOWER(${value.trim()}) THEN 0 ELSE 1 END
+        WHERE "name" ILIKE ${normalized}
+        ORDER BY CASE WHEN LOWER("name") = LOWER(${normalized}) THEN 0 ELSE 1 END
         LIMIT 1`;
-      if (!rows[0]) throw new NotFoundException(`Skill not found in master data: ${value}`);
+      if (!rows[0]) throw new MasterDataNotFoundError('SKILL', normalized);
       resolved.push(rows[0]);
     }
 
@@ -147,12 +167,13 @@ export class WorkerRequirementNormalizerService {
     const resolved: Array<{ id: string; name: string }> = [];
 
     for (const value of values) {
+      const normalized = value.trim();
       const rows = await this.prisma.$queryRaw<Array<{ id: string; name: string }>>`
         SELECT "id", "name" FROM "Language"
-        WHERE "name" ILIKE ${value.trim()}
-        ORDER BY CASE WHEN LOWER("name") = LOWER(${value.trim()}) THEN 0 ELSE 1 END
+        WHERE "name" ILIKE ${normalized}
+        ORDER BY CASE WHEN LOWER("name") = LOWER(${normalized}) THEN 0 ELSE 1 END
         LIMIT 1`;
-      if (!rows[0]) throw new NotFoundException(`Language not found in master data: ${value}`);
+      if (!rows[0]) throw new MasterDataNotFoundError('LANGUAGE', normalized);
       resolved.push(rows[0]);
     }
 
