@@ -1,4 +1,5 @@
 import { WorkerSearchService } from './worker-search.service';
+import { MasterDataNotFoundError } from './worker-requirement-normalizer.service';
 
 describe('WorkerSearchService matching', () => {
   const parser = { parse: jest.fn() };
@@ -44,9 +45,9 @@ describe('WorkerSearchService matching', () => {
     distanceKm: 5,
     skills: ['Electrical Wiring', 'Panel Installation', 'Industrial Electrical'],
     skillDetails: [
-      { id: 'skill-1', name: 'Electrical Wiring', experienceYears: 8, skillLevel: 'EXPERT', verified: true },
-      { id: 'skill-2', name: 'Panel Installation', experienceYears: 6, skillLevel: 'ADVANCED', verified: true },
-      { id: 'skill-3', name: 'Industrial Electrical', experienceYears: 5, skillLevel: 'ADVANCED', verified: true },
+      { id: 'skill-1', name: 'Electrical Wiring', experienceYears: 10, skillLevel: 'EXPERT', verified: true },
+      { id: 'skill-2', name: 'Panel Installation', experienceYears: 10, skillLevel: 'EXPERT', verified: true },
+      { id: 'skill-3', name: 'Industrial Electrical', experienceYears: 10, skillLevel: 'EXPERT', verified: true },
     ],
     ...overrides,
   });
@@ -67,9 +68,9 @@ describe('WorkerSearchService matching', () => {
       experience: 10,
       availability: 5,
       verified: 5,
-      verificationScore: 4,
+      verificationScore: 5,
     });
-    expect(match.matchScore).toBe(99);
+    expect(match.matchScore).toBe(100);
     expect(match.matchDetails.skills).toHaveLength(3);
     expect(match.matchReasons).toEqual(expect.arrayContaining([
       'All 3 required skills matched',
@@ -138,16 +139,20 @@ describe('WorkerSearchService matching', () => {
 
   it('returns master-data-not-found without querying workers', async () => {
     parser.parse.mockResolvedValue({ clarificationRequired: false });
-    const error = Object.assign(new Error('Electrician not found'), {
-      masterType: 'PROFESSION',
-      value: 'Electrician',
-    });
+
+    const error = new MasterDataNotFoundError(
+      'PROFESSION',
+      'Electrician',
+    );
+
     normalizer.normalize.mockRejectedValue(error);
 
     const result = await service.search('I need electricians');
 
     expect(result.status).toBe('MASTER_DATA_NOT_FOUND');
-    expect(result.missingMasterData).toEqual([{ type: 'PROFESSION', value: 'Electrician' }]);
+    expect(result.missingMasterData).toEqual([
+      { type: 'PROFESSION', value: 'Electrician' },
+    ]);
     expect(discovery.findAll).not.toHaveBeenCalled();
   });
 });
