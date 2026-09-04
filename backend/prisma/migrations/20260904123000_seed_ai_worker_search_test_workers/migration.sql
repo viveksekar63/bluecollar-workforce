@@ -121,9 +121,9 @@ BEGIN
       category_name,
       profession_name,
       80,
-      verification_value,
+      verification_value::"VerificationStatus",
       CASE WHEN verification_value = 'VERIFIED' THEN 85 + (i % 15) ELSE NULL END,
-      availability_value,
+      availability_value::"AvailabilityStatus",
       NOW(),
       NOW()
     );
@@ -157,7 +157,7 @@ BEGIN
       VALUES (worker_id, lang_hindi, 'BASIC');
     END IF;
 
-    INSERT INTO "WorkerWorkPreference" (
+    INSERT INTO worker_work_preferences (
       "id", "workerId", "mobility", "willingToRelocate", "willingToTravel", "createdAt", "updatedAt"
     ) VALUES (
       gen_random_uuid(),
