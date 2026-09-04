@@ -20,6 +20,8 @@ DECLARE
   verification_value TEXT;
   first_name TEXT;
   last_name TEXT;
+  test_phone TEXT;
+  test_email TEXT;
 BEGIN
   SELECT "id" INTO lang_tamil FROM "Language" WHERE LOWER("name") = 'tamil' LIMIT 1;
   SELECT "id" INTO lang_english FROM "Language" WHERE LOWER("name") = 'english' LIMIT 1;
@@ -32,6 +34,8 @@ BEGIN
   FOR i IN 1..50 LOOP
     worker_id := gen_random_uuid();
     user_id := gen_random_uuid();
+    test_phone := '99100' || LPAD(i::TEXT, 5, '0');
+    test_email := 'ai-test-worker-' || i || '@example.com';
 
     -- First 20 workers are strong matches for:
     -- "electricians in Chennai with at least 3 years, Tamil, immediately available"
@@ -82,8 +86,13 @@ BEGIN
       last_name := 'Labour';
     END IF;
 
-    -- Avoid duplicates if this migration is manually re-applied.
+    -- Never modify an existing production/test worker.
     IF EXISTS (SELECT 1 FROM "Worker" WHERE "workerCode" = 'AI-TEST-' || LPAD(i::TEXT, 4, '0')) THEN
+      CONTINUE;
+    END IF;
+
+    -- If either generated identity already exists, skip this fixture safely.
+    IF EXISTS (SELECT 1 FROM "User" WHERE "phone" = test_phone OR "email" = test_email) THEN
       CONTINUE;
     END IF;
 
@@ -91,8 +100,8 @@ BEGIN
       "id", "phone", "email", "firstName", "lastName", "status", "createdAt", "updatedAt"
     ) VALUES (
       user_id,
-      '90000' || LPAD(i::TEXT, 5, '0'),
-      'ai-test-worker-' || i || '@example.com',
+      test_phone,
+      test_email,
       first_name,
       last_name,
       'ACTIVE',
