@@ -21,7 +21,7 @@ export class MockAiService implements AiProvider {
               : null;
 
     const workerCountMatch = query.match(
-      /\b(\d+)\s+(?:workers?|people|persons?|electricians?|plumbers?|carpenters?|welders?)\b/i,
+      /\b(\d+)\s+(?:(?:experienced|skilled|qualified|professional|trained)\s+)?(?:workers?|people|persons?|electricians?|plumbers?|carpenters?|welders?)\b/i,
     );
 
     const experienceMatch = query.match(
@@ -29,29 +29,14 @@ export class MockAiService implements AiProvider {
     );
 
     const languages: string[] = [];
-
-    if (query.includes('tamil')) {
-      languages.push('Tamil');
-    }
-
-    if (query.includes('telugu')) {
-      languages.push('Telugu');
-    }
-
-    if (query.includes('kannada')) {
-      languages.push('Kannada');
-    }
-
-    if (query.includes('malayalam')) {
-      languages.push('Malayalam');
-    }
-
-    if (query.includes('hindi')) {
-      languages.push('Hindi');
-    }
+    if (query.includes('tamil')) languages.push('Tamil');
+    if (query.includes('telugu')) languages.push('Telugu');
+    if (query.includes('kannada')) languages.push('Kannada');
+    if (query.includes('malayalam')) languages.push('Malayalam');
+    if (query.includes('hindi')) languages.push('Hindi');
 
     const cityMatch = query.match(
-      /\bin\s+([a-z]+(?:\s+[a-z]+)?)\b/i,
+      /\bin\s+([a-z]+(?:\s+[a-z]+)*?)(?=\s+(?:with|who|that|and|for|having|speaking|speak|available|availability|accommodation)\b|[,.]|$)/i,
     );
 
     const accommodationAvailable =
@@ -68,18 +53,14 @@ export class MockAiService implements AiProvider {
       profession,
       professionCategory: null,
       skills: [],
-      workerCount: workerCountMatch
-        ? Number(workerCountMatch[1])
-        : null,
+      workerCount: workerCountMatch ? Number(workerCountMatch[1]) : null,
       location: {
         city: cityMatch ? this.normalizeCity(cityMatch[1]) : null,
         district: null,
         state: null,
         pincode: null,
       },
-      minimumExperienceYears: experienceMatch
-        ? Number(experienceMatch[1])
-        : null,
+      minimumExperienceYears: experienceMatch ? Number(experienceMatch[1]) : null,
       languages,
       availability: immediate ? 'IMMEDIATE' : null,
       mobility: null,
@@ -87,16 +68,14 @@ export class MockAiService implements AiProvider {
       willingToTravel: null,
       accommodationAvailable,
       clarificationRequired: profession === null,
-      clarificationQuestion:
-        profession === null
-          ? 'Which type of worker do you need?'
-          : null,
+      clarificationQuestion: profession === null
+        ? 'Which type of worker do you need?'
+        : null,
     };
   }
 
   private normalizeCity(city: string): string | null {
     const normalized = city.trim().toLowerCase();
-
     const cities: Record<string, string> = {
       chennai: 'Chennai',
       coimbatore: 'Coimbatore',
@@ -106,18 +85,13 @@ export class MockAiService implements AiProvider {
       salem: 'Salem',
       thanjavur: 'Thanjavur',
     };
-
     return cities[normalized] || this.capitalizeWords(city);
   }
 
   private capitalizeWords(value: string): string {
     return value
       .split(/\s+/)
-      .map(
-        (word) =>
-          word.charAt(0).toUpperCase() +
-          word.slice(1).toLowerCase(),
-      )
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
       .join(' ');
   }
 }
