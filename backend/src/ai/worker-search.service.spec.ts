@@ -177,7 +177,7 @@ describe('WorkerSearchService matching', () => {
 
     const result = await service.search('electrician search', {
       latitude: 13.0827,
-      longitude: 13.0827,
+      longitude: 80.2707,
       radiusKm: 25,
     });
 
