@@ -9,6 +9,16 @@ import {
   WorkerRequirementNormalizerService,
 } from './worker-requirement-normalizer.service';
 
+interface MatchBreakdown {
+  profession: number;
+  skills: number;
+  location: number;
+  experience: number;
+  availability: number;
+  verified: number;
+  verificationScore: number;
+}
+
 @Injectable()
 export class WorkerSearchService {
   constructor(
@@ -53,10 +63,8 @@ export class WorkerSearchService {
       throw error;
     }
 
-    // The existing discovery service remains the source of deterministic
-    // profession/location/skill/availability matching. We fetch a candidate
-    // pool first, then apply the additional AI-normalized constraints that are
-    // not yet part of its legacy query contract.
+    // The existing discovery service remains responsible for deterministic
+    // candidate filtering. The AI layer only supplies normalized requirements.
     const discoveryQuery: WorkersQueryDto = {
       profession: normalized.profession?.name ?? undefined,
       professionCategory: normalized.professionCategory?.name ?? undefined,
@@ -89,8 +97,26 @@ export class WorkerSearchService {
       items = items.filter((worker) => languageWorkerIds.has(worker.id));
     }
 
+    const scoredItems = items
+      .map((worker) => {
+        const match = this.calculateMatchScore(worker, normalized);
+        return {
+          ...worker,
+          matchScore: match.score,
+          matchBreakdown: match.breakdown,
+          matchReasons: match.reasons,
+        };
+      })
+      .sort((a, b) => {
+        if (b.matchScore !== a.matchScore) return b.matchScore - a.matchScore;
+        if (b.verificationScore !== a.verificationScore) {
+          return b.verificationScore - a.verificationScore;
+        }
+        return b.experienceYears - a.experienceYears;
+      });
+
     const requestedCount = Math.min(Math.max(normalized.workerCount ?? 20, 1), 100);
-    items = items.slice(0, requestedCount);
+    const selectedItems = scoredItems.slice(0, requestedCount);
 
     return {
       status: 'MATCHED' as const,
@@ -98,14 +124,107 @@ export class WorkerSearchService {
       requirement: parsed,
       normalizedRequirement: normalized,
       results: {
-        items,
+        items: selectedItems,
         page: 1,
         limit: requestedCount,
-        total: items.length,
-        totalPages: items.length ? 1 : 0,
+        total: scoredItems.length,
+        totalPages: scoredItems.length ? 1 : 0,
         candidateTotal: candidateResults.total,
       },
     };
+  }
+
+  private calculateMatchScore(worker: any, normalized: any) {
+    const breakdown: MatchBreakdown = {
+      profession: 0,
+      skills: 0,
+      location: 0,
+      experience: 0,
+      availability: 0,
+      verified: 0,
+      verificationScore: 0,
+    };
+
+    const reasons: string[] = [];
+
+    // 30 points: exact normalized profession match.
+    if (
+      normalized.profession?.name &&
+      worker.profession?.trim().toLowerCase() === normalized.profession.name.trim().toLowerCase()
+    ) {
+      breakdown.profession = 30;
+      reasons.push(`Exact profession match: ${worker.profession}`);
+    }
+
+    // 25 points: all explicitly requested skills must be present.
+    // The current discovery contract exposes the primary skill, so one
+    // required skill is fully scored today; multi-skill scoring can be added
+    // without changing the scoring contract later.
+    if (normalized.skills.length === 0) {
+      breakdown.skills = 25;
+      reasons.push('No specific skill requested');
+    } else if (
+      normalized.skills.length === 1 &&
+      worker.primarySkill?.toLowerCase() === normalized.skills[0].name.toLowerCase()
+    ) {
+      breakdown.skills = 25;
+      reasons.push(`Required skill match: ${worker.primarySkill}`);
+    }
+
+    // 20 points: exact requested location. Workers with broader mobility are
+    // still eligible through discovery, but receive a lower location score.
+    if (normalized.location?.name) {
+      const requested = normalized.location.name.trim().toLowerCase();
+      const city = worker.city?.trim().toLowerCase();
+      const district = worker.district?.trim().toLowerCase();
+      const state = worker.state?.trim().toLowerCase();
+
+      if (city === requested || district === requested || state === requested) {
+        breakdown.location = 20;
+        reasons.push(`Exact location match: ${worker.city}`);
+      } else if (worker.mobility === 'ANYWHERE_INDIA') {
+        breakdown.location = 10;
+        reasons.push('Broader mobility: Anywhere India');
+      }
+    }
+
+    // 10 points: minimum experience requirement.
+    if (
+      normalized.minimumExperienceYears === null ||
+      worker.experienceYears >= normalized.minimumExperienceYears
+    ) {
+      breakdown.experience = 10;
+      reasons.push(
+        normalized.minimumExperienceYears === null
+          ? `${worker.experienceYears} years experience`
+          : `${worker.experienceYears} years experience meets minimum ${normalized.minimumExperienceYears}`,
+      );
+    }
+
+    // 5 points: availability requirement.
+    if (
+      normalized.availability === null ||
+      (normalized.availability === 'IMMEDIATE' && worker.availability === 'AVAILABLE') ||
+      normalized.availability === worker.availability
+    ) {
+      breakdown.availability = 5;
+      if (worker.availability === 'AVAILABLE') reasons.push('Currently available');
+    }
+
+    // 5 points: verified worker.
+    if (worker.verificationStatus === 'VERIFIED') {
+      breakdown.verified = 5;
+      reasons.push('Identity/background verification completed');
+    }
+
+    // 5 points: normalized verification score (0-100 -> 0-5).
+    if (worker.verificationScore > 0) {
+      breakdown.verificationScore = Math.min(5, Math.round(worker.verificationScore / 20));
+    }
+
+    const score = Object.values(breakdown).reduce((sum, value) => sum + value, 0);
+
+    return { score, breakdown, reasons };
   }
 
   private toAvailabilityFilter(value: string | null) {
