@@ -4,7 +4,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { EmployerWorkerDiscoveryService } from '../workers/employer-worker-discovery.service';
 import { WorkersQueryDto } from '../workers/dto/workers-query.dto';
 import { RequirementParserService } from './requirement-parser.service';
-import { WorkerRequirementNormalizerService } from './worker-requirement-normalizer.service';
+import {
+  MasterDataNotFoundError,
+  WorkerRequirementNormalizerService,
+} from './worker-requirement-normalizer.service';
 
 @Injectable()
 export class WorkerSearchService {
@@ -27,7 +30,28 @@ export class WorkerSearchService {
       };
     }
 
-    const normalized = await this.normalizer.normalize(parsed);
+    let normalized;
+
+    try {
+      normalized = await this.normalizer.normalize(parsed);
+    } catch (error) {
+      if (error instanceof MasterDataNotFoundError) {
+        return {
+          status: 'MASTER_DATA_NOT_FOUND' as const,
+          query,
+          requirement: parsed,
+          results: null,
+          missingMasterData: [
+            {
+              type: error.masterType,
+              value: error.value,
+            },
+          ],
+        };
+      }
+
+      throw error;
+    }
 
     // The existing discovery service remains the source of deterministic
     // profession/location/skill/availability matching. We fetch a candidate
