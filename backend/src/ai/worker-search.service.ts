@@ -19,6 +19,16 @@ export interface MatchBreakdown {
   verificationScore: number;
 }
 
+export interface MatchSkillDetail {
+  required: string;
+  matched: boolean;
+}
+
+export interface MatchLanguageDetail {
+  required: string;
+  matched: boolean;
+}
+
 @Injectable()
 export class WorkerSearchService {
   constructor(
@@ -63,8 +73,6 @@ export class WorkerSearchService {
       throw error;
     }
 
-    // The existing discovery service remains responsible for deterministic
-    // candidate filtering. The AI layer only supplies normalized requirements.
     const discoveryQuery: WorkersQueryDto = {
       profession: normalized.profession?.name ?? undefined,
       professionCategory: normalized.professionCategory?.name ?? undefined,
@@ -87,24 +95,60 @@ export class WorkerSearchService {
       );
     }
 
+    const languageIds = normalized.languages.map((language) => language.id);
+    const languageRows = languageIds.length
+      ? await this.prisma.$queryRaw<Array<{ workerId: string; languageId: string; languageName: string }>>`
+          SELECT DISTINCT wl."workerId", wl."languageId", l."name" AS "languageName"
+          FROM "WorkerLanguage" wl
+          INNER JOIN "Language" l ON l.id = wl."languageId"
+          WHERE wl."languageId" IN (${Prisma.join(languageIds)})`
+      : [];
+
+    const languagesByWorker = new Map<string, Set<string>>();
+    for (const row of languageRows) {
+      if (!languagesByWorker.has(row.workerId)) languagesByWorker.set(row.workerId, new Set());
+      languagesByWorker.get(row.workerId)!.add(row.languageId);
+    }
+
+    // A worker must speak every explicitly requested language to remain an eligible result.
     if (normalized.languages.length) {
-      const languageIds = normalized.languages.map((language) => language.id);
-      const languageRows = await this.prisma.$queryRaw<Array<{ workerId: string }>>`
-        SELECT DISTINCT "workerId"
-        FROM "WorkerLanguage"
-        WHERE "languageId" IN (${Prisma.join(languageIds)})`;
-      const languageWorkerIds = new Set(languageRows.map((row) => row.workerId));
-      items = items.filter((worker) => languageWorkerIds.has(worker.id));
+      items = items.filter((worker) => {
+        const workerLanguages = languagesByWorker.get(worker.id) ?? new Set<string>();
+        return normalized.languages.every((language) => workerLanguages.has(language.id));
+      });
+    }
+
+    const workerSkillRows = normalized.skills.length
+      ? await this.prisma.$queryRaw<Array<{ workerId: string; skillId: string; skillName: string }>>`
+          SELECT DISTINCT ws."workerId", ws."skillId", s."name" AS "skillName"
+          FROM "WorkerSkill" ws
+          INNER JOIN "Skill" s ON s.id = ws."skillId"
+          WHERE ws."skillId" IN (${Prisma.join(normalized.skills.map((skill) => skill.id))})`
+      : [];
+
+    const skillsByWorker = new Map<string, Set<string>>();
+    for (const row of workerSkillRows) {
+      if (!skillsByWorker.has(row.workerId)) skillsByWorker.set(row.workerId, new Set());
+      skillsByWorker.get(row.workerId)!.add(row.skillId);
     }
 
     const scoredItems = items
       .map((worker) => {
-        const match = this.calculateMatchScore(worker, normalized);
+        const match = this.calculateMatchScore(
+          worker,
+          normalized,
+          skillsByWorker.get(worker.id) ?? new Set<string>(),
+          languagesByWorker.get(worker.id) ?? new Set<string>(),
+        );
         return {
           ...worker,
           matchScore: match.score,
           matchBreakdown: match.breakdown,
           matchReasons: match.reasons,
+          matchDetails: {
+            skills: match.skillDetails,
+            languages: match.languageDetails,
+          },
         };
       })
       .sort((a, b) => {
@@ -134,7 +178,12 @@ export class WorkerSearchService {
     };
   }
 
-  private calculateMatchScore(worker: any, normalized: any) {
+  private calculateMatchScore(
+    worker: any,
+    normalized: any,
+    matchedSkillIds: Set<string>,
+    matchedLanguageIds: Set<string>,
+  ) {
     const breakdown: MatchBreakdown = {
       profession: 0,
       skills: 0,
@@ -147,7 +196,6 @@ export class WorkerSearchService {
 
     const reasons: string[] = [];
 
-    // 30 points: exact normalized profession match.
     if (
       normalized.profession?.name &&
       worker.profession?.trim().toLowerCase() === normalized.profession.name.trim().toLowerCase()
@@ -156,23 +204,28 @@ export class WorkerSearchService {
       reasons.push(`Exact profession match: ${worker.profession}`);
     }
 
-    // 25 points: all explicitly requested skills must be present.
-    // The current discovery contract exposes the primary skill, so one
-    // required skill is fully scored today; multi-skill scoring can be added
-    // without changing the scoring contract later.
+    const skillDetails: MatchSkillDetail[] = normalized.skills.map((skill: any) => ({
+      required: skill.name,
+      matched: matchedSkillIds.has(skill.id),
+    }));
+
     if (normalized.skills.length === 0) {
+      // No skill requirement means the criterion is not applicable. Keep the
+      // 100-point model normalized by treating the available 25 points as satisfied.
       breakdown.skills = 25;
       reasons.push('No specific skill requested');
-    } else if (
-      normalized.skills.length === 1 &&
-      worker.primarySkill?.toLowerCase() === normalized.skills[0].name.toLowerCase()
-    ) {
-      breakdown.skills = 25;
-      reasons.push(`Required skill match: ${worker.primarySkill}`);
+    } else {
+      const matchedCount = skillDetails.filter((skill) => skill.matched).length;
+      breakdown.skills = Math.round((matchedCount / normalized.skills.length) * 25 * 100) / 100;
+      if (matchedCount === normalized.skills.length) {
+        reasons.push(`All ${matchedCount} required skills matched`);
+      } else if (matchedCount > 0) {
+        reasons.push(`${matchedCount} of ${normalized.skills.length} required skills matched`);
+      } else {
+        reasons.push('No required skills matched');
+      }
     }
 
-    // 20 points: exact requested location. Workers with broader mobility are
-    // still eligible through discovery, but receive a lower location score.
     if (normalized.location?.name) {
       const requested = normalized.location.name.trim().toLowerCase();
       const city = worker.city?.trim().toLowerCase();
@@ -188,7 +241,6 @@ export class WorkerSearchService {
       }
     }
 
-    // 10 points: minimum experience requirement.
     if (
       normalized.minimumExperienceYears === null ||
       worker.experienceYears >= normalized.minimumExperienceYears
@@ -201,7 +253,6 @@ export class WorkerSearchService {
       );
     }
 
-    // 5 points: availability requirement.
     if (
       normalized.availability === null ||
       (normalized.availability === 'IMMEDIATE' && worker.availability === 'AVAILABLE') ||
@@ -211,20 +262,30 @@ export class WorkerSearchService {
       if (worker.availability === 'AVAILABLE') reasons.push('Currently available');
     }
 
-    // 5 points: verified worker.
     if (worker.verificationStatus === 'VERIFIED') {
       breakdown.verified = 5;
       reasons.push('Identity/background verification completed');
     }
 
-    // 5 points: normalized verification score (0-100 -> 0-5).
     if (worker.verificationScore > 0) {
       breakdown.verificationScore = Math.min(5, Math.round(worker.verificationScore / 20));
     }
 
+    const languageDetails: MatchLanguageDetail[] = normalized.languages.map((language: any) => ({
+      required: language.name,
+      matched: matchedLanguageIds.has(language.id),
+    }));
+
+    if (normalized.languages.length) {
+      const matchedCount = languageDetails.filter((language) => language.matched).length;
+      if (matchedCount === normalized.languages.length) {
+        reasons.push(`All ${matchedCount} required languages matched`);
+      }
+    }
+
     const score = Object.values(breakdown).reduce((sum, value) => sum + value, 0);
 
-    return { score, breakdown, reasons };
+    return { score, breakdown, reasons, skillDetails, languageDetails };
   }
 
   private toAvailabilityFilter(value: string | null) {
