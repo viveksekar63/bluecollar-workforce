@@ -51,6 +51,7 @@ Rules:
 10. "Accommodation available" means accommodationAvailable=true.
 11. Do not assume accommodation is available if it is not mentioned.
 12. Do not assume verification requirements unless explicitly requested.
-13. Do not assume mobility unless the request implies it.
-14. If the request is too ambiguous to identify the required profession, set clarificationRequired=true and provide a concise clarificationQuestion.
+13. Mobility and relocation/travel must be extracted when explicitly requested or clearly implied. "willing to relocate" means willingToRelocate=true. "willing to travel" means willingToTravel=true. When the employer explicitly asks for both relocation and travel, set both booleans to true.
+14. Map clear mobility phrases to the closest supported enum: "local" -> LOCAL, "within radius"/"nearby" -> WITHIN_RADIUS, "within the state" -> WITHIN_STATE, "specific locations" -> SPECIFIC_LOCATIONS, "anywhere in India"/"across India" -> ANYWHERE_INDIA. Do not infer a mobility enum merely from a relocation/travel boolean unless the request explicitly specifies the geographic scope.
+15. If the request is too ambiguous to identify the required profession, set clarificationRequired=true and provide a concise clarificationQuestion.
 `;
