@@ -59,7 +59,7 @@ export class EmployerWorkerDiscoveryService {
       const locationPattern = `%${freeTextLocation}%`;
       filters.push(Prisma.sql`(
         EXISTS (SELECT 1 FROM "WorkerAddress" wa WHERE wa."workerId" = w."id" AND wa."isCurrent" = true AND (wa."city" ILIKE ${locationPattern} OR COALESCE(wa."district", '') ILIKE ${locationPattern} OR wa."state" ILIKE ${locationPattern} OR wa."pincode" ILIKE ${locationPattern}))
-        OR EXISTS (SELECT 1 FROM "worker_preferred_locations" pl WHERE pl."workerId" = w."id" AND (pl."city" ILIKE ${locationPattern} OR COALESCE(pl."district", '') ILIKE ${locationPattern}))
+        OR EXISTS (SELECT 1 FROM "worker_preferred_locations" pl WHERE pl."workerId" = w."id" AND (pl."city" ILIKE ${locationPattern} OR COALESCE(pl."district", '') ILIKE ${locationPattern} OR pl."state" ILIKE ${locationPattern}))
         OR EXISTS (SELECT 1 FROM "worker_work_preferences" wp_anywhere WHERE wp_anywhere."workerId" = w."id" AND wp_anywhere."mobility" = 'ANYWHERE_INDIA')
       )`);
     }
@@ -107,7 +107,7 @@ export class EmployerWorkerDiscoveryService {
       LEFT JOIN LATERAL (SELECT wa."city", wa."district", wa."state" FROM "WorkerAddress" wa WHERE wa."workerId" = w."id" AND wa."isCurrent" = true ORDER BY wa."createdAt" DESC LIMIT 1) addr ON true
       LEFT JOIN "worker_work_preferences" wp ON wp."workerId" = w."id" ${where}
       ORDER BY ${skillMatchExpression} DESC,
-        CASE WHEN ${rankingPattern}::text IS NOT NULL AND EXISTS (SELECT 1 FROM "WorkerAddress" wa3 WHERE wa3."workerId" = w."id" AND wa3."isCurrent" = true AND (wa3."city" ILIKE ${rankingPattern} OR COALESCE(wa3."district", '') ILIKE ${rankingPattern} OR wa3."state" ILIKE ${rankingPattern})) THEN 0 WHEN ${rankingPattern}::text IS NOT NULL AND EXISTS (SELECT 1 FROM "worker_preferred_locations" pl3 WHERE pl3."workerId" = w."id" AND (pl3."city" ILIKE ${rankingPattern} OR COALESCE(pl3."district", '') ILIKE ${rankingPattern})) THEN 1 WHEN wp."mobility" = 'ANYWHERE_INDIA' THEN 2 ELSE 3 END,
+        CASE WHEN ${rankingPattern}::text IS NOT NULL AND EXISTS (SELECT 1 FROM "WorkerAddress" wa3 WHERE wa3."workerId" = w."id" AND wa3."isCurrent" = true AND (wa3."city" ILIKE ${rankingPattern} OR COALESCE(wa3."district", '') ILIKE ${rankingPattern} OR wa3."state" ILIKE ${rankingPattern})) THEN 0 WHEN ${rankingPattern}::text IS NOT NULL AND EXISTS (SELECT 1 FROM "worker_preferred_locations" pl3 WHERE pl3."workerId" = w."id" AND (pl3."city" ILIKE ${rankingPattern} OR COALESCE(pl3."district", '') ILIKE ${rankingPattern} OR pl3."state" ILIKE ${rankingPattern})) THEN 1 WHEN wp."mobility" = 'ANYWHERE_INDIA' THEN 2 ELSE 3 END,
         CASE WHEN ${latitude !== null && longitude !== null} AND (${distanceExpression}) IS NOT NULL THEN (${distanceExpression}) ELSE 0 END ASC,
         CASE WHEN w."verificationStatus" = 'VERIFIED' THEN 0 ELSE 1 END, CASE WHEN w."availabilityStatus" = 'AVAILABLE' THEN 0 ELSE 1 END,
         COALESCE(w."verificationScore", 0) DESC, w."experienceYears" DESC, w."createdAt" DESC, w."id" ASC LIMIT ${limit} OFFSET ${skip}`);
