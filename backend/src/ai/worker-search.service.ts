@@ -7,25 +7,9 @@ import {
   WorkerRequirementNormalizerService,
 } from './worker-requirement-normalizer.service';
 
-export interface MatchBreakdown {
-  profession: number;
-  skills: number;
-  location: number;
-  experience: number;
-  availability: number;
-  verified: number;
-  verificationScore: number;
-}
-
-export interface MatchSkillDetail {
-  required: string;
-  matched: boolean;
-}
-
-export interface MatchLanguageDetail {
-  required: string;
-  matched: boolean;
-}
+export interface MatchBreakdown { profession: number; skills: number; location: number; experience: number; availability: number; verified: number; verificationScore: number; }
+export interface MatchSkillDetail { required: string; matched: boolean; }
+export interface MatchLanguageDetail { required: string; matched: boolean; }
 
 @Injectable()
 export class WorkerSearchService {
@@ -37,35 +21,19 @@ export class WorkerSearchService {
 
   async search(query: string) {
     const parsed = await this.parser.parse(query);
-
-    if (parsed.clarificationRequired) {
-      return {
-        status: 'CLARIFICATION_REQUIRED' as const,
-        query,
-        requirement: parsed,
-        results: null,
-      };
-    }
+    if (parsed.clarificationRequired) return { status: 'CLARIFICATION_REQUIRED' as const, query, requirement: parsed, results: null };
 
     let normalized;
-
     try {
       normalized = await this.normalizer.normalize(parsed);
     } catch (error) {
       if (error instanceof MasterDataNotFoundError) {
-        return {
-          status: 'MASTER_DATA_NOT_FOUND' as const,
-          query,
-          requirement: parsed,
-          results: null,
-          missingMasterData: [{ type: error.masterType, value: error.value }],
-        };
+        return { status: 'MASTER_DATA_NOT_FOUND' as const, query, requirement: parsed, results: null, missingMasterData: [{ type: error.masterType, value: error.value }] };
       }
       throw error;
     }
 
     const requestedCount = Math.min(Math.max(normalized.workerCount ?? 20, 1), 100);
-
     const discoveryQuery: WorkersQueryDto = {
       profession: normalized.profession?.name ?? undefined,
       professionCategory: normalized.professionCategory?.name ?? undefined,
@@ -78,91 +46,41 @@ export class WorkerSearchService {
       availability: this.toAvailabilityFilter(normalized.availability),
       mobility: normalized.mobility ?? undefined,
       page: 1,
-      // Fetch the complete eligible set up to the API safety limit so skill
-      // matching can rank partial matches correctly.
       limit: 100,
     };
 
     const candidateResults = await this.discovery.findAll(discoveryQuery);
-    const items = candidateResults.items;
-
-    const scoredItems = items
-      .map((worker) => {
-        const match = this.calculateMatchScore(worker, normalized);
-        return {
-          ...worker,
-          matchScore: match.score,
-          matchBreakdown: match.breakdown,
-          matchReasons: match.reasons,
-          matchDetails: {
-            skills: match.skillDetails,
-            languages: match.languageDetails,
-          },
-        };
-      })
-      .sort((a, b) => {
-        if (b.matchScore !== a.matchScore) return b.matchScore - a.matchScore;
-        if (b.verificationScore !== a.verificationScore) return b.verificationScore - a.verificationScore;
-        return b.experienceYears - a.experienceYears;
-      });
+    const scoredItems = candidateResults.items.map((worker) => {
+      const match = this.calculateMatchScore(worker, normalized);
+      return { ...worker, matchScore: match.score, matchBreakdown: match.breakdown, matchReasons: match.reasons, matchDetails: { skills: match.skillDetails, languages: match.languageDetails } };
+    }).sort((a, b) => b.matchScore - a.matchScore || b.verificationScore - a.verificationScore || b.experienceYears - a.experienceYears);
 
     const selectedItems = scoredItems.slice(0, requestedCount);
-
     return {
       status: 'MATCHED' as const,
       query,
       requirement: parsed,
       normalizedRequirement: normalized,
-      results: {
-        items: selectedItems,
-        page: 1,
-        limit: requestedCount,
-        total: scoredItems.length,
-        totalPages: scoredItems.length ? 1 : 0,
-        candidateTotal: candidateResults.total,
-      },
+      results: { items: selectedItems, page: 1, limit: requestedCount, total: scoredItems.length, totalPages: scoredItems.length ? 1 : 0, candidateTotal: candidateResults.total },
     };
   }
 
   private calculateMatchScore(worker: any, normalized: any) {
-    const breakdown: MatchBreakdown = {
-      profession: 0,
-      skills: 0,
-      location: 0,
-      experience: 0,
-      availability: 0,
-      verified: 0,
-      verificationScore: 0,
-    };
-
+    const breakdown: MatchBreakdown = { profession: 0, skills: 0, location: 0, experience: 0, availability: 0, verified: 0, verificationScore: 0 };
     const reasons: string[] = [];
 
-    if (
-      normalized.profession?.name &&
-      worker.profession?.trim().toLowerCase() === normalized.profession.name.trim().toLowerCase()
-    ) {
+    if (normalized.profession?.name && worker.profession?.trim().toLowerCase() === normalized.profession.name.trim().toLowerCase()) {
       breakdown.profession = 30;
       reasons.push(`Exact profession match: ${worker.profession}`);
     }
 
-    const skillDetails: MatchSkillDetail[] = normalized.skills.map((skill: any) => ({
-      required: skill.name,
-      matched: false,
-    }));
-
-    // Discovery currently returns the primary skill only. Until worker skill
-    // details are exposed in the discovery contract, use the primary skill for
-    // exact single-skill scoring and leave multi-skill matching explainable.
+    const workerSkills = new Set<string>((Array.isArray(worker.skills) ? worker.skills : []).map((skill: unknown) => String(skill).trim().toLowerCase()).filter(Boolean));
+    const skillDetails: MatchSkillDetail[] = normalized.skills.map((skill: any) => ({ required: skill.name, matched: workerSkills.has(skill.name.trim().toLowerCase()) }));
     if (normalized.skills.length === 0) {
       breakdown.skills = 25;
       reasons.push('No specific skill requested');
     } else {
-      const primary = worker.primarySkill?.trim().toLowerCase();
-      const matched = skillDetails.filter(
-        (skill) => skill.required.trim().toLowerCase() === primary,
-      );
-      matched.forEach((skill) => { skill.matched = true; });
-      const matchedCount = matched.length;
+      const matchedCount = skillDetails.filter((skill) => skill.matched).length;
       breakdown.skills = Math.round((matchedCount / normalized.skills.length) * 25 * 100) / 100;
       if (matchedCount === normalized.skills.length) reasons.push(`All ${matchedCount} required skills matched`);
       else if (matchedCount > 0) reasons.push(`${matchedCount} of ${normalized.skills.length} required skills matched`);
@@ -174,49 +92,24 @@ export class WorkerSearchService {
       const city = worker.city?.trim().toLowerCase();
       const district = worker.district?.trim().toLowerCase();
       const state = worker.state?.trim().toLowerCase();
-      if (city === requested || district === requested || state === requested) {
-        breakdown.location = 20;
-        reasons.push(`Exact location match: ${worker.city}`);
-      } else if (worker.mobility === 'ANYWHERE_INDIA') {
-        breakdown.location = 10;
-        reasons.push('Broader mobility: Anywhere India');
-      }
+      if (city === requested || district === requested || state === requested) { breakdown.location = 20; reasons.push(`Exact location match: ${worker.city}`); }
+      else if (worker.mobility === 'ANYWHERE_INDIA') { breakdown.location = 10; reasons.push('Broader mobility: Anywhere India'); }
     }
 
     if (normalized.minimumExperienceYears === null || worker.experienceYears >= normalized.minimumExperienceYears) {
       breakdown.experience = 10;
-      reasons.push(
-        normalized.minimumExperienceYears === null
-          ? `${worker.experienceYears} years experience`
-          : `${worker.experienceYears} years experience meets minimum ${normalized.minimumExperienceYears}`,
-      );
+      reasons.push(normalized.minimumExperienceYears === null ? `${worker.experienceYears} years experience` : `${worker.experienceYears} years experience meets minimum ${normalized.minimumExperienceYears}`);
     }
 
-    if (
-      normalized.availability === null ||
-      (normalized.availability === 'IMMEDIATE' && worker.availability === 'AVAILABLE') ||
-      normalized.availability === worker.availability
-    ) {
+    if (normalized.availability === null || (normalized.availability === 'IMMEDIATE' && worker.availability === 'AVAILABLE') || normalized.availability === worker.availability) {
       breakdown.availability = 5;
       if (worker.availability === 'AVAILABLE') reasons.push('Currently available');
     }
 
-    if (worker.verificationStatus === 'VERIFIED') {
-      breakdown.verified = 5;
-      reasons.push('Identity/background verification completed');
-    }
+    if (worker.verificationStatus === 'VERIFIED') { breakdown.verified = 5; reasons.push('Identity/background verification completed'); }
+    if (worker.verificationScore > 0) breakdown.verificationScore = Math.min(5, Math.round(worker.verificationScore / 20));
 
-    if (worker.verificationScore > 0) {
-      breakdown.verificationScore = Math.min(5, Math.round(worker.verificationScore / 20));
-    }
-
-    // Languages are hard eligibility filters in discovery. They therefore do
-    // not consume additional points in the existing 100-point score, but are
-    // returned as explicit match details/reasons.
-    const languageDetails: MatchLanguageDetail[] = normalized.languages.map((language: any) => ({
-      required: language.name,
-      matched: true,
-    }));
+    const languageDetails: MatchLanguageDetail[] = normalized.languages.map((language: any) => ({ required: language.name, matched: true }));
     if (languageDetails.length) reasons.push(`All ${languageDetails.length} required languages matched`);
 
     const score = Object.values(breakdown).reduce((sum, value) => sum + value, 0);
@@ -226,10 +119,8 @@ export class WorkerSearchService {
   private toAvailabilityFilter(value: string | null) {
     switch (value) {
       case 'IMMEDIATE':
-      case 'AVAILABLE':
-        return 'AVAILABLE';
-      default:
-        return undefined;
+      case 'AVAILABLE': return 'AVAILABLE';
+      default: return undefined;
     }
   }
 }
