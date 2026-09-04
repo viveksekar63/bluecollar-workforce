@@ -61,7 +61,7 @@ export class WorkerSearchService {
 
     const candidateResults = await this.discovery.findAll(discoveryQuery);
     const scoredItems = candidateResults.items.map((worker) => {
-      const match = this.calculateMatchScore(worker, normalized);
+      const match = this.calculateMatchScore(worker, normalized, geo);
       return { ...worker, matchScore: match.score, matchBreakdown: match.breakdown, matchReasons: match.reasons, matchDetails: { skills: match.skillDetails, languages: match.languageDetails } };
     }).sort((a, b) => b.matchScore - a.matchScore || b.verificationScore - a.verificationScore || b.experienceYears - a.experienceYears || a.id.localeCompare(b.id));
 
@@ -75,7 +75,7 @@ export class WorkerSearchService {
     };
   }
 
-  private calculateMatchScore(worker: any, normalized: any) {
+  private calculateMatchScore(worker: any, normalized: any, geo: WorkerSearchGeoContext) {
     const breakdown: MatchBreakdown = { profession: 0, skills: 0, location: 0, experience: 0, availability: 0, verified: 0, verificationScore: 0 };
     const reasons: string[] = [];
 
@@ -102,8 +102,23 @@ export class WorkerSearchService {
       const city = worker.city?.trim().toLowerCase();
       const district = worker.district?.trim().toLowerCase();
       const state = worker.state?.trim().toLowerCase();
-      if (city === requested || district === requested || state === requested) { breakdown.location = 20; reasons.push(`Exact location match: ${worker.city}`); }
-      else if (worker.mobility === 'ANYWHERE_INDIA') { breakdown.location = 10; reasons.push('Broader mobility: Anywhere India'); }
+      if (city === requested || district === requested || state === requested) {
+        breakdown.location = 20;
+        reasons.push(`Exact location match: ${worker.city}`);
+      } else if (worker.mobility === 'ANYWHERE_INDIA') {
+        breakdown.location = 10;
+        reasons.push('Broader mobility: Anywhere India');
+      }
+    }
+
+    if (!normalized.location?.name && geo.radiusKm && worker.distanceKm !== null && worker.distanceKm !== undefined) {
+      const distance = Number(worker.distanceKm);
+      const radius = geo.radiusKm;
+      if (distance <= radius * 0.25) breakdown.location = 20;
+      else if (distance <= radius * 0.5) breakdown.location = 15;
+      else if (distance <= radius * 0.75) breakdown.location = 10;
+      else breakdown.location = 5;
+      reasons.push(`${distance.toFixed(1)} km from employer location`);
     }
 
     if (normalized.minimumExperienceYears === null || worker.experienceYears >= normalized.minimumExperienceYears) {
