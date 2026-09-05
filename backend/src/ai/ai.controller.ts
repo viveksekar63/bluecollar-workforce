@@ -1,11 +1,11 @@
 import { Body, Controller, Post, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { JobsService } from '../jobs/jobs.service';
 import { CreateJobDraftDto } from './dto/create-job-draft.dto';
 import { ParseJobRequirementDto } from './dto/parse-job-requirement.dto';
 import { ParseWorkerRequirementDto } from './dto/parse-worker-requirement.dto';
 import { WorkerSearchDto } from './dto/worker-search.dto';
+import { AiJobRequirementPersistenceService } from './ai-job-requirement-persistence.service';
 import { JobRequirementService } from './job-requirement.service';
 import { RequirementParserService } from './requirement-parser.service';
 import { WorkerSearchService } from './worker-search.service';
@@ -16,7 +16,7 @@ export class AiController {
     private readonly requirementParserService: RequirementParserService,
     private readonly jobRequirementService: JobRequirementService,
     private readonly workerSearchService: WorkerSearchService,
-    private readonly jobsService: JobsService,
+    private readonly aiJobRequirementPersistenceService: AiJobRequirementPersistenceService,
   ) {}
 
   @Post('worker-search/parse')
@@ -63,40 +63,24 @@ export class AiController {
     @CurrentUser() user: { userId: string },
     @Body() dto: ParseJobRequirementDto & CreateJobDraftDto,
   ) {
-    const parsed = await this.jobRequirementService.parse(dto.query);
+    const result = await this.aiJobRequirementPersistenceService.createDraft(user.userId, dto);
 
-    if (parsed.status !== 'READY' || !parsed.suggestedJob) {
+    if (!result.job) {
       return {
         success: false,
-        ...parsed,
+        ...result.parsed,
       };
     }
-
-    const suggestedJob = parsed.suggestedJob;
-    const job = await this.jobsService.createEmployerJob(user.userId, {
-      title: dto.title?.trim() || suggestedJob.title,
-      description: dto.description?.trim() || suggestedJob.description,
-      city: suggestedJob.city,
-      district: suggestedJob.district,
-      state: suggestedJob.state,
-      pincode: suggestedJob.pincode,
-      salaryMin: dto.salaryMin,
-      salaryMax: dto.salaryMax,
-      salaryType: dto.salaryType,
-      openings: suggestedJob.openings,
-      startDate: dto.startDate,
-      endDate: dto.endDate,
-      skillNames: suggestedJob.skillNames,
-    });
 
     return {
       success: true,
       status: 'DRAFT_CREATED',
       query: dto.query,
-      requirement: parsed.requirement,
-      normalizedRequirement: parsed.normalizedRequirement,
-      suggestedJob,
-      job,
+      requirement: result.parsed.requirement,
+      normalizedRequirement: result.parsed.normalizedRequirement,
+      suggestedJob: result.parsed.suggestedJob,
+      job: result.job,
+      aiRequirements: result.aiRequirements,
     };
   }
 }
