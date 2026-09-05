@@ -20,6 +20,7 @@ Schema:
   "profession": string | null,
   "professionCategory": string | null,
   "skills": string[],
+  "minimumSkillLevel": "BEGINNER" | "INTERMEDIATE" | "ADVANCED" | "EXPERT" | null,
   "workerCount": number | null,
   "location": {
     "city": string | null,
@@ -48,10 +49,13 @@ Rules:
 7. Extract every explicitly requested language. For example, "Tamil and English speaking" must produce ["Tamil","English"].
 8. "Tamil speaking", "speaks Tamil", etc. should produce ["Tamil"].
 9. Preserve the employer's requested skill/language concepts without inventing synonyms or additional requirements.
-10. "Accommodation available" means accommodationAvailable=true.
-11. Do not assume accommodation is available if it is not mentioned.
-12. Do not assume verification requirements unless explicitly requested.
-13. Mobility and relocation/travel must be extracted when explicitly requested or clearly implied. "willing to relocate" means willingToRelocate=true. "willing to travel" means willingToTravel=true. When the employer explicitly asks for both relocation and travel, set both booleans to true.
-14. Map clear mobility phrases to the closest supported enum: "local" -> LOCAL, "within radius"/"nearby" -> WITHIN_RADIUS, "within the state" -> WITHIN_STATE, "specific locations" -> SPECIFIC_LOCATIONS, "anywhere in India"/"across India" -> ANYWHERE_INDIA. Do not infer a mobility enum merely from a relocation/travel boolean unless the request explicitly specifies the geographic scope.
-15. If the request is too ambiguous to identify the required profession, set clarificationRequired=true and provide a concise clarificationQuestion.
+10. When the employer explicitly describes the required worker/profession as beginner, intermediate, advanced, or expert, set minimumSkillLevel to the corresponding enum.
+11. Treat phrases such as "expert electrician", "expert worker", "expert in electrical wiring", "advanced electrician", "advanced in electrical wiring", "intermediate electrician", and "beginner electrician" as explicit proficiency requirements. Map expert -> EXPERT, advanced -> ADVANCED, intermediate -> INTERMEDIATE, beginner -> BEGINNER.
+12. If no proficiency level is explicitly requested, set minimumSkillLevel to null. Do not infer proficiency from years of experience, verification, or the word "skilled" alone.
+13. "Accommodation available" means accommodationAvailable=true.
+14. Do not assume accommodation is available if it is not mentioned.
+15. Do not assume verification requirements unless explicitly requested.
+16. Mobility and relocation/travel must be extracted when explicitly requested or clearly implied. "willing to relocate" means willingToRelocate=true. "willing to travel" means willingToTravel=true. When the employer explicitly asks for both relocation and travel, set both booleans to true.
+17. Map clear mobility phrases to the closest supported enum: "local" -> LOCAL, "within radius"/"nearby" -> WITHIN_RADIUS, "within the state" -> WITHIN_STATE, "specific locations" -> SPECIFIC_LOCATIONS, "anywhere in India"/"across India" -> ANYWHERE_INDIA. Do not infer a mobility enum merely from a relocation/travel boolean unless the request explicitly specifies the geographic scope.
+18. If the request is too ambiguous to identify the required profession, set clarificationRequired=true and provide a concise clarificationQuestion.
 `;
