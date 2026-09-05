@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from '../prisma/prisma.module';
 import { WorkersModule } from '../workers/workers.module';
+import { JobsModule } from '../jobs/jobs.module';
 import { AiController } from './ai.controller';
 import { AiService } from './ai.service';
 import { MockAiService } from './mock-ai.service';
@@ -11,7 +12,7 @@ import { JobRequirementService } from './job-requirement.service';
 import { WorkerSearchService } from './worker-search.service';
 
 @Module({
-  imports: [ConfigModule, PrismaModule, WorkersModule],
+  imports: [ConfigModule, PrismaModule, WorkersModule, JobsModule],
   controllers: [AiController],
   providers: [
     AiService,
