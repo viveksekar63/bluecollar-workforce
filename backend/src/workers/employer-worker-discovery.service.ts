@@ -45,23 +45,19 @@ export class EmployerWorkerDiscoveryService {
     const languagePredicate = languagePatterns.length
       ? Prisma.sql`(${Prisma.join(languagePatterns.map((pattern) => Prisma.sql`l."name" ILIKE ${pattern}`), ' OR ')})`
       : Prisma.empty;
-    if (requestedLanguages.length) {
-      filters.push(Prisma.sql`COALESCE(lm."matchedLanguageCount", 0) = ${requestedLanguages.length}`);
-    }
 
     let geoFilter = Prisma.empty;
-    let geoBoundingBox = Prisma.empty;
     if (radiusKm !== null && latitude !== null && longitude !== null) {
       const latDelta = radiusKm / 111.32;
       const cosLatitude = Math.max(0.01, Math.abs(Math.cos(latitude * Math.PI / 180)));
       const lonDelta = radiusKm / (111.32 * cosLatitude);
-      geoBoundingBox = Prisma.sql`AND wa_radius."latitude" BETWEEN ${latitude - latDelta} AND ${latitude + latDelta} AND wa_radius."longitude" BETWEEN ${longitude - lonDelta} AND ${longitude + lonDelta}`;
       geoFilter = Prisma.sql`EXISTS (
         SELECT 1 FROM "WorkerAddress" wa_radius
         WHERE wa_radius."workerId" = w."id"
           AND wa_radius."isCurrent" = true
           AND wa_radius."latitude" IS NOT NULL AND wa_radius."longitude" IS NOT NULL
-          ${geoBoundingBox}
+          AND wa_radius."latitude" BETWEEN ${latitude - latDelta} AND ${latitude + latDelta}
+          AND wa_radius."longitude" BETWEEN ${longitude - lonDelta} AND ${longitude + lonDelta}
           AND (6371.0 * ACOS(LEAST(1.0, GREATEST(-1.0,
             COS(RADIANS(${latitude})) * COS(RADIANS(wa_radius."latitude"::double precision)) *
             COS(RADIANS(wa_radius."longitude"::double precision) - RADIANS(${longitude})) +
@@ -104,7 +100,7 @@ export class EmployerWorkerDiscoveryService {
       filters.push(Prisma.sql`(w."workerCode" ILIKE ${pattern} OR u."firstName" ILIKE ${pattern} OR COALESCE(u."lastName", '') ILIKE ${pattern} OR COALESCE(u."email", '') ILIKE ${pattern} OR u."phone" ILIKE ${pattern} OR COALESCE(w."bio", '') ILIKE ${pattern} OR COALESCE(w."profession", '') ILIKE ${pattern} OR COALESCE(w."professionCategory", '') ILIKE ${pattern} OR EXISTS (SELECT 1 FROM "WorkerSkill" ws2 JOIN "Skill" sk2 ON sk2."id" = ws2."skillId" WHERE ws2."workerId" = w."id" AND sk2."name" ILIKE ${pattern}) OR EXISTS (SELECT 1 FROM "WorkerAddress" wa2 WHERE wa2."workerId" = w."id" AND wa2."isCurrent" = true AND (wa2."city" ILIKE ${pattern} OR wa2."state" ILIKE ${pattern})) OR EXISTS (SELECT 1 FROM "worker_preferred_locations" pl2 WHERE pl2."workerId" = w."id" AND (pl2."city" ILIKE ${pattern} OR pl2."state" ILIKE ${pattern})) )`);
     }
 
-    const where = filters.length ? Prisma.sql`WHERE ${Prisma.join(filters, ' AND ')}` : Prisma.empty;
+    const baseWhere = filters.length ? Prisma.sql`WHERE ${Prisma.join(filters, ' AND ')}` : Prisma.empty;
     const rankingLocation = city || district || state || freeTextLocation;
     const rankingPattern = rankingLocation ? `%${rankingLocation}%` : null;
     const skillMatchExpression = skillIds.length ? Prisma.sql`COALESCE(sm."matchedSkillCount", 0)` : Prisma.sql`0`;
@@ -122,7 +118,7 @@ export class EmployerWorkerDiscoveryService {
       : Prisma.sql`NULL`;
 
     const skillCte = skillIds.length
-      ? Prisma.sql`, skill_matches AS (
+      ? Prisma.sql`skill_matches AS (
           SELECT ws."workerId", COUNT(DISTINCT ws."skillId")::int AS "matchedSkillCount"
           FROM "WorkerSkill" ws
           WHERE ws."skillId" IN (${Prisma.join(skillIds)})
@@ -130,7 +126,7 @@ export class EmployerWorkerDiscoveryService {
         )`
       : Prisma.empty;
     const languageCte = requestedLanguages.length
-      ? Prisma.sql`, language_matches AS (
+      ? Prisma.sql`language_matches AS (
           SELECT wl."workerId", COUNT(DISTINCT l."id")::int AS "matchedLanguageCount"
           FROM "WorkerLanguage" wl
           JOIN "Language" l ON l."id" = wl."languageId"
@@ -138,36 +134,46 @@ export class EmployerWorkerDiscoveryService {
           GROUP BY wl."workerId"
         )`
       : Prisma.empty;
+    const ctePrefix = skillIds.length && requestedLanguages.length
+      ? Prisma.sql`WITH ${skillCte}, ${languageCte}`
+      : skillIds.length
+        ? Prisma.sql`WITH ${skillCte}`
+        : requestedLanguages.length
+          ? Prisma.sql`WITH ${languageCte}`
+          : Prisma.empty;
+    const aggregateJoins = Prisma.sql`
+      ${skillIds.length ? Prisma.sql`LEFT JOIN skill_matches sm ON sm."workerId" = w."id"` : Prisma.empty}
+      ${requestedLanguages.length ? Prisma.sql`LEFT JOIN language_matches lm ON lm."workerId" = w."id"` : Prisma.empty}`;
+    const languageFilter = requestedLanguages.length ? Prisma.sql` AND COALESCE(lm."matchedLanguageCount", 0) = ${requestedLanguages.length}` : Prisma.empty;
 
     const rows = await this.prisma.$queryRaw<Array<{ id: string; workerCode: string; firstName: string; lastName: string | null; profileImageUrl: string | null; primarySkill: string | null; workerSkills: unknown; workerSkillDetails: unknown; skillMatchCount: number; distanceKm: number | null; professionCategory: string | null; profession: string | null; experienceYears: unknown; city: string | null; district: string | null; state: string | null; verificationScore: number | null; verificationStatus: string; availability: string; mobility: string | null; willingToRelocate: boolean | null; willingToTravel: boolean | null; preferredLocations: unknown; }>>(Prisma.sql`
-      WITH worker_base AS (
-        SELECT w."id"
-        FROM "Worker" w
-        JOIN "User" u ON u."id" = w."userId"
-        LEFT JOIN "worker_work_preferences" wp_base ON wp_base."workerId" = w."id"
-        ${skillCte}${languageCte}
-        ${where}
-      )
+      ${ctePrefix}
       SELECT w."id", w."workerCode", u."firstName", u."lastName", u."profilePhotoUrl" AS "profileImageUrl", skill."name" AS "primarySkill",
         COALESCE((SELECT json_agg(sk_all."name" ORDER BY sk_all."name") FROM "WorkerSkill" ws_all JOIN "Skill" sk_all ON sk_all."id" = ws_all."skillId" WHERE ws_all."workerId" = w."id"), '[]'::json) AS "workerSkills",
         COALESCE((SELECT json_agg(json_build_object('id', sk_detail."id", 'name', sk_detail."name", 'experienceYears', ws_detail."experienceYears", 'skillLevel', ws_detail."skillLevel"::text, 'verified', ws_detail."verified") ORDER BY sk_detail."name") FROM "WorkerSkill" ws_detail JOIN "Skill" sk_detail ON sk_detail."id" = ws_detail."skillId" WHERE ws_detail."workerId" = w."id"), '[]'::json) AS "workerSkillDetails",
         ${skillMatchExpression} AS "skillMatchCount", ${distanceExpression} AS "distanceKm", w."professionCategory", w."profession", w."experienceYears", addr."city", addr."district", addr."state", w."verificationScore", w."verificationStatus", w."availabilityStatus" AS "availability", wp."mobility", wp."willingToRelocate", wp."willingToTravel",
         COALESCE((SELECT json_agg(json_build_object('city', pl."city", 'district', pl."district", 'state', pl."state", 'country', pl."country") ORDER BY pl."city") FROM "worker_preferred_locations" pl WHERE pl."workerId" = w."id"), '[]'::json) AS "preferredLocations"
-      FROM worker_base wb
-      JOIN "Worker" w ON w."id" = wb."id"
+      FROM "Worker" w
       JOIN "User" u ON u."id" = w."userId"
-      LEFT JOIN skill_matches sm ON sm."workerId" = w."id"
-      LEFT JOIN language_matches lm ON lm."workerId" = w."id"
+      ${aggregateJoins}
       LEFT JOIN LATERAL (SELECT sk."name" FROM "WorkerSkill" ws JOIN "Skill" sk ON sk."id" = ws."skillId" WHERE ws."workerId" = w."id" ORDER BY sk."name" ASC LIMIT 1) skill ON true
       LEFT JOIN LATERAL (SELECT wa."city", wa."district", wa."state" FROM "WorkerAddress" wa WHERE wa."workerId" = w."id" AND wa."isCurrent" = true ORDER BY wa."createdAt" DESC LIMIT 1) addr ON true
       LEFT JOIN "worker_work_preferences" wp ON wp."workerId" = w."id"
+      ${baseWhere}${languageFilter}
       ORDER BY ${skillMatchExpression} DESC,
         CASE WHEN ${rankingPattern}::text IS NOT NULL AND EXISTS (SELECT 1 FROM "WorkerAddress" wa3 WHERE wa3."workerId" = w."id" AND wa3."isCurrent" = true AND (wa3."city" ILIKE ${rankingPattern} OR COALESCE(wa3."district", '') ILIKE ${rankingPattern} OR wa3."state" ILIKE ${rankingPattern})) THEN 0 WHEN ${rankingPattern}::text IS NOT NULL AND EXISTS (SELECT 1 FROM "worker_preferred_locations" pl3 WHERE pl3."workerId" = w."id" AND (pl3."city" ILIKE ${rankingPattern} OR COALESCE(pl3."district", '') ILIKE ${rankingPattern} OR pl3."state" ILIKE ${rankingPattern})) THEN 1 WHEN wp."mobility" = 'ANYWHERE_INDIA' THEN 2 ELSE 3 END,
         CASE WHEN ${latitude !== null && longitude !== null} AND (${distanceExpression}) IS NOT NULL THEN (${distanceExpression}) ELSE 0 END ASC,
         CASE WHEN w."verificationStatus" = 'VERIFIED' THEN 0 ELSE 1 END, CASE WHEN w."availabilityStatus" = 'AVAILABLE' THEN 0 ELSE 1 END,
         COALESCE(w."verificationScore", 0) DESC, w."experienceYears" DESC, w."createdAt" DESC, w."id" ASC LIMIT ${limit} OFFSET ${skip}`);
 
-    const [{ count }] = await this.prisma.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`SELECT COUNT(*)::bigint AS count FROM "Worker" w JOIN "User" u ON u."id" = w."userId" ${where}`);
+    const [{ count }] = await this.prisma.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`
+      ${ctePrefix}
+      SELECT COUNT(*)::bigint AS count
+      FROM "Worker" w
+      JOIN "User" u ON u."id" = w."userId"
+      ${aggregateJoins}
+      LEFT JOIN "worker_work_preferences" wp ON wp."workerId" = w."id"
+      ${baseWhere}${languageFilter}`);
     const total = Number(count);
     return { items: rows.map((worker) => ({ id: worker.id, workerCode: worker.workerCode, firstName: worker.firstName, lastName: worker.lastName ?? '', profileImageUrl: worker.profileImageUrl, primarySkill: worker.primarySkill ?? 'Not specified', skills: Array.isArray(worker.workerSkills) ? worker.workerSkills : [], skillDetails: Array.isArray(worker.workerSkillDetails) ? worker.workerSkillDetails : [], professionCategory: worker.professionCategory, profession: worker.profession, experienceYears: Number(worker.experienceYears ?? 0), city: worker.city ?? 'Not specified', district: worker.district ?? 'Not specified', state: worker.state ?? 'Not specified', verificationScore: worker.verificationScore ?? 0, verificationStatus: worker.verificationStatus, availability: worker.availability, mobility: worker.mobility ?? 'LOCAL', willingToRelocate: worker.willingToRelocate ?? false, willingToTravel: worker.willingToTravel ?? false, preferredLocations: Array.isArray(worker.preferredLocations) ? worker.preferredLocations : [], distanceKm: worker.distanceKm === null ? null : Number(worker.distanceKm) })), page, limit, total, totalPages: Math.ceil(total / limit) };
   }
