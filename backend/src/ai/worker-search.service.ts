@@ -5,7 +5,7 @@ import { RequirementParserService } from './requirement-parser.service';
 import { MasterDataNotFoundError, WorkerRequirementNormalizerService } from './worker-requirement-normalizer.service';
 
 export interface MatchBreakdown { profession: number; skills: number; location: number; experience: number; availability: number; verified: number; verificationScore: number; }
-export interface MatchSkillDetail { required: string; matched: boolean; experienceYears: number | null; skillLevel: string | null; verified: boolean; }
+export interface MatchSkillDetail { required: string; matched: boolean; minimumLevelMet: boolean | null; experienceYears: number | null; skillLevel: string | null; verified: boolean; }
 export interface MatchLanguageDetail { required: string; matched: boolean; }
 export type PreferenceMatchStatus = 'MATCHED' | 'PARTIAL' | 'NOT_MATCHED' | 'NOT_REQUESTED' | 'NOT_SPECIFIED' | 'OFFERED';
 export interface PreferenceMatch { mobility: PreferenceMatchStatus; relocation: PreferenceMatchStatus; travel: PreferenceMatchStatus; accommodation: PreferenceMatchStatus; }
@@ -36,9 +36,6 @@ export class WorkerSearchService {
     const rankingOffset = (page - 1) * limit;
     const candidateLimit = Math.min(Math.max(100, rankingOffset + limit, requestedCount), WorkerSearchService.MAX_RANKING_CANDIDATES);
 
-    // A semantic destination is normally a hard discovery filter. When the employer
-    // explicitly accepts relocation/travel, however, the destination becomes a soft
-    // ranking preference so capable workers from other cities remain eligible.
     const flexibleLocation = normalized.willingToRelocate === true || normalized.willingToTravel === true;
     const discoveryQuery: WorkersQueryDto = {
       profession: normalized.profession?.name ?? undefined,
@@ -85,9 +82,14 @@ export class WorkerSearchService {
 
     const workerSkillDetails = Array.isArray(worker.skillDetails) ? worker.skillDetails : [];
     const workerSkillsByName = new Map<string, any>(workerSkillDetails.map((skill: any) => [String(skill.name).trim().toLowerCase(), skill]));
+    const minimumSkillLevel = normalized.minimumSkillLevel as string | null;
+    const skillLevelRank: Record<string, number> = { BEGINNER: 1, INTERMEDIATE: 2, ADVANCED: 3, EXPERT: 4 };
+    const requiredLevelRank = minimumSkillLevel ? skillLevelRank[minimumSkillLevel] : null;
     const skillDetails: MatchSkillDetail[] = normalized.skills.map((required: any) => {
       const matched = workerSkillsByName.get(required.name.trim().toLowerCase());
-      return { required: required.name, matched: Boolean(matched), experienceYears: matched?.experienceYears == null ? null : Number(matched.experienceYears), skillLevel: matched?.skillLevel ?? null, verified: Boolean(matched?.verified) };
+      const matchedRank = matched?.skillLevel ? skillLevelRank[String(matched.skillLevel).toUpperCase()] : undefined;
+      const minimumLevelMet = matched ? (requiredLevelRank === null ? null : matchedRank !== undefined && matchedRank >= requiredLevelRank) : (requiredLevelRank === null ? null : false);
+      return { required: required.name, matched: Boolean(matched), minimumLevelMet, experienceYears: matched?.experienceYears == null ? null : Number(matched.experienceYears), skillLevel: matched?.skillLevel ?? null, verified: Boolean(matched?.verified) };
     });
 
     if (normalized.skills.length === 0) {
@@ -95,18 +97,29 @@ export class WorkerSearchService {
       reasons.push('No specific skill requested');
     } else {
       const matched = skillDetails.filter((skill) => skill.matched);
-      const coverageScore = (matched.length / normalized.skills.length) * 15;
+      const qualifiedMatched = minimumSkillLevel
+        ? skillDetails.filter((skill) => skill.matched && skill.minimumLevelMet === true)
+        : matched;
+      const coverageScore = (qualifiedMatched.length / normalized.skills.length) * 15;
       const levelWeights: Record<string, number> = { BEGINNER: 0.25, INTERMEDIATE: 0.5, ADVANCED: 0.75, EXPERT: 1 };
-      const proficiencyScore = matched.length ? (matched.reduce((sum, skill) => sum + (levelWeights[skill.skillLevel ?? 'BEGINNER'] ?? 0.25), 0) / matched.length) * 3 : 0;
-      const experienceScore = matched.length ? (matched.reduce((sum, skill) => sum + Math.min(Math.max(skill.experienceYears ?? 0, 0), 10) / 10, 0) / matched.length) * 2 : 0;
-      const skillVerificationScore = (matched.filter((skill) => skill.verified).length / normalized.skills.length) * 5;
+      const proficiencyScore = qualifiedMatched.length ? (qualifiedMatched.reduce((sum, skill) => sum + (levelWeights[skill.skillLevel ?? 'BEGINNER'] ?? 0.25), 0) / qualifiedMatched.length) * 3 : 0;
+      const experienceScore = qualifiedMatched.length ? (qualifiedMatched.reduce((sum, skill) => sum + Math.min(Math.max(skill.experienceYears ?? 0, 0), 10) / 10, 0) / qualifiedMatched.length) * 2 : 0;
+      const skillVerificationScore = (qualifiedMatched.filter((skill) => skill.verified).length / normalized.skills.length) * 5;
       breakdown.skills = Math.round((coverageScore + proficiencyScore + experienceScore + skillVerificationScore) * 100) / 100;
-      if (matched.length === normalized.skills.length) reasons.push(`All ${matched.length} required skills matched`);
+
+      if (minimumSkillLevel) {
+        if (qualifiedMatched.length === normalized.skills.length) reasons.push(`All ${qualifiedMatched.length} required skills matched at or above ${minimumSkillLevel} level`);
+        else if (qualifiedMatched.length > 0) reasons.push(`${qualifiedMatched.length} of ${normalized.skills.length} required skills matched at or above ${minimumSkillLevel} level`);
+        else reasons.push(`No required skills matched at or above ${minimumSkillLevel} level`);
+        const belowMinimum = matched.filter((skill) => skill.minimumLevelMet === false).length;
+        if (belowMinimum) reasons.push(`${belowMinimum} matched skill${belowMinimum === 1 ? '' : 's'} below minimum ${minimumSkillLevel} level`);
+      } else if (matched.length === normalized.skills.length) reasons.push(`All ${matched.length} required skills matched`);
       else if (matched.length > 0) reasons.push(`${matched.length} of ${normalized.skills.length} required skills matched`);
       else reasons.push('No required skills matched');
-      const verifiedSkills = matched.filter((skill) => skill.verified).length;
+
+      const verifiedSkills = qualifiedMatched.filter((skill) => skill.verified).length;
       if (verifiedSkills) reasons.push(`${verifiedSkills} required skill${verifiedSkills === 1 ? '' : 's'} verified`);
-      const advancedSkills = matched.filter((skill) => skill.skillLevel === 'ADVANCED' || skill.skillLevel === 'EXPERT').length;
+      const advancedSkills = qualifiedMatched.filter((skill) => skill.skillLevel === 'ADVANCED' || skill.skillLevel === 'EXPERT').length;
       if (advancedSkills) reasons.push(`${advancedSkills} matched skill${advancedSkills === 1 ? '' : 's'} at advanced/expert level`);
     }
 
