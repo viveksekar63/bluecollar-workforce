@@ -10,6 +10,7 @@ import { RequirementParserService } from './requirement-parser.service';
 import { WorkerRequirementNormalizerService } from './worker-requirement-normalizer.service';
 import { JobRequirementService } from './job-requirement.service';
 import { WorkerSearchService } from './worker-search.service';
+import { AiJobRequirementPersistenceService } from './ai-job-requirement-persistence.service';
 
 @Module({
   imports: [ConfigModule, PrismaModule, WorkersModule, JobsModule],
@@ -21,6 +22,7 @@ import { WorkerSearchService } from './worker-search.service';
     WorkerRequirementNormalizerService,
     JobRequirementService,
     WorkerSearchService,
+    AiJobRequirementPersistenceService,
   ],
   exports: [
     AiService,
@@ -28,6 +30,7 @@ import { WorkerSearchService } from './worker-search.service';
     WorkerRequirementNormalizerService,
     JobRequirementService,
     WorkerSearchService,
+    AiJobRequirementPersistenceService,
   ],
 })
 export class AiModule {}
