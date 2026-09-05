@@ -33,6 +33,9 @@ export class AiController {
       latitude: dto.latitude,
       longitude: dto.longitude,
       radiusKm: dto.radiusKm,
+    }, {
+      page: dto.page,
+      limit: dto.limit,
     });
 
     return {
