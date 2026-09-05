@@ -28,6 +28,7 @@ export class WorkerSearchDto extends ParseWorkerRequirementDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(10)
   page?: number;
 
   @IsOptional()
