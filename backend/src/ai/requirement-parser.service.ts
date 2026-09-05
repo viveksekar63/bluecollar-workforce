@@ -29,6 +29,12 @@ export class RequirementParserService {
       professionCategory: this.stringOrNull(input.professionCategory),
 
       skills: this.stringArray(input.skills),
+      minimumSkillLevel: this.enumOrNull(input.minimumSkillLevel, [
+        'BEGINNER',
+        'INTERMEDIATE',
+        'ADVANCED',
+        'EXPERT',
+      ]),
 
       workerCount: this.numberOrNull(input.workerCount),
 

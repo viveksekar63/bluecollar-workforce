@@ -51,6 +51,16 @@ export class MockAiService implements AiProvider {
       if (pattern.test(userPrompt)) skills.push(skill);
     }
 
+    const minimumSkillLevel = /\bexpert\b/i.test(query)
+      ? 'EXPERT'
+      : /\badvanced\b/i.test(query)
+        ? 'ADVANCED'
+        : /\bintermediate\b/i.test(query)
+          ? 'INTERMEDIATE'
+          : /\bbeginner\b/i.test(query)
+            ? 'BEGINNER'
+            : null;
+
     const cityMatch = query.match(
       /\bin\s+([a-z]+(?:\s+[a-z]+)*?)(?=\s+(?:with|who|that|and|for|having|speaking|speak|available|availability|accommodation|willing|must|should)\b|[,.]|$)/i,
     );
@@ -83,6 +93,7 @@ export class MockAiService implements AiProvider {
       profession,
       professionCategory: null,
       skills,
+      minimumSkillLevel,
       workerCount: workerCountMatch ? Number(workerCountMatch[1]) : null,
       location: {
         city: cityMatch ? this.normalizeCity(cityMatch[1]) : null,
