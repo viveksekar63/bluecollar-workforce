@@ -46,12 +46,11 @@ export class EmployerWorkerDiscoveryService {
       ? Prisma.sql`(${Prisma.join(languagePatterns.map((pattern) => Prisma.sql`l."name" ILIKE ${pattern}`), ' OR ')})`
       : Prisma.empty;
 
-    let geoFilter = Prisma.empty;
     if (radiusKm !== null && latitude !== null && longitude !== null) {
       const latDelta = radiusKm / 111.32;
       const cosLatitude = Math.max(0.01, Math.abs(Math.cos(latitude * Math.PI / 180)));
       const lonDelta = radiusKm / (111.32 * cosLatitude);
-      geoFilter = Prisma.sql`EXISTS (
+      filters.push(Prisma.sql`EXISTS (
         SELECT 1 FROM "WorkerAddress" wa_radius
         WHERE wa_radius."workerId" = w."id"
           AND wa_radius."isCurrent" = true
@@ -63,8 +62,7 @@ export class EmployerWorkerDiscoveryService {
             COS(RADIANS(wa_radius."longitude"::double precision) - RADIANS(${longitude})) +
             SIN(RADIANS(${latitude})) * SIN(RADIANS(wa_radius."latitude"::double precision))
           )))) <= ${radiusKm}
-      )`;
-      filters.push(geoFilter);
+      )`);
     }
 
     const currentAddressMatches = (parts: Prisma.Sql[]) => Prisma.sql`EXISTS (SELECT 1 FROM "WorkerAddress" wa WHERE wa."workerId" = w."id" AND wa."isCurrent" = true AND (${Prisma.join(parts, ' AND ')}))`;
@@ -91,7 +89,9 @@ export class EmployerWorkerDiscoveryService {
     if (mobility) {
       switch (mobility) {
         case 'LOCAL': filters.push(Prisma.sql`EXISTS (SELECT 1 FROM "worker_work_preferences" wp_local WHERE wp_local."workerId" = w."id" AND wp_local."mobility" = 'LOCAL')`); break;
-        case 'WITHIN_RADIUS': case 'WITHIN_STATE': case 'SPECIFIC_LOCATIONS': filters.push(Prisma.sql`EXISTS (SELECT 1 FROM "worker_work_preferences" wp_mobility WHERE wp_mobility."workerId" = w."id" AND wp_mobility."mobility" IN (${mobility}, 'ANYWHERE_INDIA'))`); break;
+        case 'WITHIN_RADIUS':
+        case 'WITHIN_STATE':
+        case 'SPECIFIC_LOCATIONS': filters.push(Prisma.sql`EXISTS (SELECT 1 FROM "worker_work_preferences" wp_mobility WHERE wp_mobility."workerId" = w."id" AND wp_mobility."mobility" IN (${mobility}, 'ANYWHERE_INDIA'))`); break;
         case 'ANYWHERE_INDIA': filters.push(Prisma.sql`EXISTS (SELECT 1 FROM "worker_work_preferences" wp_any WHERE wp_any."workerId" = w."id" AND wp_any."mobility" = 'ANYWHERE_INDIA')`); break;
       }
     }
@@ -103,7 +103,6 @@ export class EmployerWorkerDiscoveryService {
     const baseWhere = filters.length ? Prisma.sql`WHERE ${Prisma.join(filters, ' AND ')}` : Prisma.empty;
     const rankingLocation = city || district || state || freeTextLocation;
     const rankingPattern = rankingLocation ? `%${rankingLocation}%` : null;
-    const skillMatchExpression = skillIds.length ? Prisma.sql`COALESCE(sm."matchedSkillCount", 0)` : Prisma.sql`0`;
     const distanceExpression = latitude !== null && longitude !== null
       ? Prisma.sql`(
           SELECT MIN(6371.0 * ACOS(LEAST(1.0, GREATEST(-1.0,
@@ -121,6 +120,7 @@ export class EmployerWorkerDiscoveryService {
       ? Prisma.sql`skill_matches AS (
           SELECT ws."workerId", COUNT(DISTINCT ws."skillId")::int AS "matchedSkillCount"
           FROM "WorkerSkill" ws
+          JOIN worker_base wb_skill ON wb_skill."id" = ws."workerId"
           WHERE ws."skillId" IN (${Prisma.join(skillIds)})
           GROUP BY ws."workerId"
         )`
@@ -129,19 +129,27 @@ export class EmployerWorkerDiscoveryService {
       ? Prisma.sql`language_matches AS (
           SELECT wl."workerId", COUNT(DISTINCT l."id")::int AS "matchedLanguageCount"
           FROM "WorkerLanguage" wl
+          JOIN worker_base wb_language ON wb_language."id" = wl."workerId"
           JOIN "Language" l ON l."id" = wl."languageId"
           WHERE ${languagePredicate}
           GROUP BY wl."workerId"
         )`
       : Prisma.empty;
-    const ctePrefix = skillIds.length && requestedLanguages.length
-      ? Prisma.sql`WITH ${skillCte}, ${languageCte}`
-      : skillIds.length
-        ? Prisma.sql`WITH ${skillCte}`
-        : requestedLanguages.length
-          ? Prisma.sql`WITH ${languageCte}`
-          : Prisma.empty;
+
+    const cteParts = [
+      Prisma.sql`worker_base AS (
+        SELECT w."id"
+        FROM "Worker" w
+        JOIN "User" u ON u."id" = w."userId"
+        ${baseWhere}
+      )`,
+      skillCte,
+      languageCte,
+    ].filter((part) => part !== Prisma.empty);
+    const ctePrefix = Prisma.sql`WITH ${Prisma.join(cteParts, ', ')}`;
+    const skillMatchExpression = skillIds.length ? Prisma.sql`COALESCE(sm."matchedSkillCount", 0)` : Prisma.sql`0`;
     const aggregateJoins = Prisma.sql`
+      LEFT JOIN worker_base wb ON wb."id" = w."id"
       ${skillIds.length ? Prisma.sql`LEFT JOIN skill_matches sm ON sm."workerId" = w."id"` : Prisma.empty}
       ${requestedLanguages.length ? Prisma.sql`LEFT JOIN language_matches lm ON lm."workerId" = w."id"` : Prisma.empty}`;
     const languageFilter = requestedLanguages.length ? Prisma.sql` AND COALESCE(lm."matchedLanguageCount", 0) = ${requestedLanguages.length}` : Prisma.empty;
@@ -159,7 +167,7 @@ export class EmployerWorkerDiscoveryService {
       LEFT JOIN LATERAL (SELECT sk."name" FROM "WorkerSkill" ws JOIN "Skill" sk ON sk."id" = ws."skillId" WHERE ws."workerId" = w."id" ORDER BY sk."name" ASC LIMIT 1) skill ON true
       LEFT JOIN LATERAL (SELECT wa."city", wa."district", wa."state" FROM "WorkerAddress" wa WHERE wa."workerId" = w."id" AND wa."isCurrent" = true ORDER BY wa."createdAt" DESC LIMIT 1) addr ON true
       LEFT JOIN "worker_work_preferences" wp ON wp."workerId" = w."id"
-      ${baseWhere}${languageFilter}
+      WHERE wb."id" IS NOT NULL${languageFilter}
       ORDER BY ${skillMatchExpression} DESC,
         CASE WHEN ${rankingPattern}::text IS NOT NULL AND EXISTS (SELECT 1 FROM "WorkerAddress" wa3 WHERE wa3."workerId" = w."id" AND wa3."isCurrent" = true AND (wa3."city" ILIKE ${rankingPattern} OR COALESCE(wa3."district", '') ILIKE ${rankingPattern} OR wa3."state" ILIKE ${rankingPattern})) THEN 0 WHEN ${rankingPattern}::text IS NOT NULL AND EXISTS (SELECT 1 FROM "worker_preferred_locations" pl3 WHERE pl3."workerId" = w."id" AND (pl3."city" ILIKE ${rankingPattern} OR COALESCE(pl3."district", '') ILIKE ${rankingPattern} OR pl3."state" ILIKE ${rankingPattern})) THEN 1 WHEN wp."mobility" = 'ANYWHERE_INDIA' THEN 2 ELSE 3 END,
         CASE WHEN ${latitude !== null && longitude !== null} AND (${distanceExpression}) IS NOT NULL THEN (${distanceExpression}) ELSE 0 END ASC,
@@ -169,11 +177,9 @@ export class EmployerWorkerDiscoveryService {
     const [{ count }] = await this.prisma.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`
       ${ctePrefix}
       SELECT COUNT(*)::bigint AS count
-      FROM "Worker" w
-      JOIN "User" u ON u."id" = w."userId"
-      ${aggregateJoins}
-      LEFT JOIN "worker_work_preferences" wp ON wp."workerId" = w."id"
-      ${baseWhere}${languageFilter}`);
+      FROM worker_base wb
+      ${requestedLanguages.length ? Prisma.sql`LEFT JOIN language_matches lm ON lm."workerId" = wb."id"` : Prisma.empty}
+      ${languageFilter.replace ? Prisma.empty : Prisma.empty}`);
     const total = Number(count);
     return { items: rows.map((worker) => ({ id: worker.id, workerCode: worker.workerCode, firstName: worker.firstName, lastName: worker.lastName ?? '', profileImageUrl: worker.profileImageUrl, primarySkill: worker.primarySkill ?? 'Not specified', skills: Array.isArray(worker.workerSkills) ? worker.workerSkills : [], skillDetails: Array.isArray(worker.workerSkillDetails) ? worker.workerSkillDetails : [], professionCategory: worker.professionCategory, profession: worker.profession, experienceYears: Number(worker.experienceYears ?? 0), city: worker.city ?? 'Not specified', district: worker.district ?? 'Not specified', state: worker.state ?? 'Not specified', verificationScore: worker.verificationScore ?? 0, verificationStatus: worker.verificationStatus, availability: worker.availability, mobility: worker.mobility ?? 'LOCAL', willingToRelocate: worker.willingToRelocate ?? false, willingToTravel: worker.willingToTravel ?? false, preferredLocations: Array.isArray(worker.preferredLocations) ? worker.preferredLocations : [], distanceKm: worker.distanceKm === null ? null : Number(worker.distanceKm) })), page, limit, total, totalPages: Math.ceil(total / limit) };
   }
