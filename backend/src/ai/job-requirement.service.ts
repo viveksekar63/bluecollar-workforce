@@ -36,11 +36,14 @@ export class JobRequirementService {
         title: `${openings > 1 ? `${openings} ` : ''}${profession} Required`,
         description: query.trim(),
         city: location?.type === 'CITY' ? location.name : '',
-        district: location?.type === 'DISTRICT' ? location.name : location?.parentName ?? '',
+        district:
+          location?.type === 'DISTRICT'
+            ? location.name
+            : location?.districtName ?? '',
         state:
           location?.type === 'STATE'
             ? location.name
-            : location?.parentName ?? '',
+            : location?.stateName ?? '',
         pincode: location?.pincode ?? '',
         openings,
         skillNames: normalizedRequirement.skills.map((skill) => skill.name),

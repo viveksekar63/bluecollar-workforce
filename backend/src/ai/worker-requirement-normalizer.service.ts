@@ -29,6 +29,8 @@ export interface NormalizedWorkerRequirement {
     name: string;
     parentId: string | null;
     parentName: string | null;
+    districtName: string | null;
+    stateName: string | null;
     pincode: string | null;
   } | null;
   minimumExperienceYears: number | null;
@@ -122,12 +124,36 @@ export class WorkerRequirementNormalizerService {
 
     const type = city ? 'CITY' : district ? 'DISTRICT' : state ? 'STATE' : 'CITY';
     const rows = await this.prisma.$queryRaw<Array<{
-      id: string; type: 'CITY' | 'DISTRICT' | 'STATE'; name: string;
-      parentId: string | null; parentName: string | null; pincode: string | null;
+      id: string;
+      type: 'CITY' | 'DISTRICT' | 'STATE';
+      name: string;
+      parentId: string | null;
+      parentName: string | null;
+      districtName: string | null;
+      stateName: string | null;
+      pincode: string | null;
     }>>`
-      SELECT l."id", l."type", l."name", l."parentId", p."name" AS "parentName", l."pincode"
+      SELECT
+        l."id",
+        l."type",
+        l."name",
+        l."parentId",
+        p."name" AS "parentName",
+        CASE
+          WHEN l."type" = 'CITY' THEN p."name"
+          WHEN l."type" = 'DISTRICT' THEN l."name"
+          ELSE NULL
+        END AS "districtName",
+        CASE
+          WHEN l."type" = 'STATE' THEN l."name"
+          WHEN l."type" = 'DISTRICT' THEN p."name"
+          WHEN l."type" = 'CITY' THEN g."name"
+          ELSE NULL
+        END AS "stateName",
+        l."pincode"
       FROM "work_locations" l
       LEFT JOIN "work_locations" p ON p."id" = l."parentId"
+      LEFT JOIN "work_locations" g ON g."id" = p."parentId"
       WHERE l."isActive" = true
         AND l."type" = ${type}
         AND (
