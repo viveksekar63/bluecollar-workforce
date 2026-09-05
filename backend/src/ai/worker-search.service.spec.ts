@@ -19,6 +19,7 @@ describe('WorkerSearchService matching', () => {
       { id: 'skill-2', name: 'Panel Installation' },
       { id: 'skill-3', name: 'Industrial Electrical' },
     ],
+    minimumSkillLevel: null,
     languages: [{ id: 'lang-1', name: 'Tamil' }],
     location: { name: 'Chennai', type: 'CITY' },
     minimumExperienceYears: 5,
@@ -87,6 +88,32 @@ describe('WorkerSearchService matching', () => {
     expect(result.results!.items[0].matchScore).toBeGreaterThan(result.results!.items[1].matchScore);
   });
 
+  it('requires the requested minimum skill level for skill scoring', async () => {
+    const normalized = requirement({ minimumSkillLevel: 'EXPERT' });
+    parser.parse.mockResolvedValue({ clarificationRequired: false });
+    normalizer.normalize.mockResolvedValue(normalized);
+    const beginner = worker({ id: 'beginner', skillDetails: [
+      { id: 'skill-1', name: 'Electrical Wiring', experienceYears: 8, skillLevel: 'BEGINNER', verified: true },
+      { id: 'skill-2', name: 'Panel Installation', experienceYears: 8, skillLevel: 'BEGINNER', verified: true },
+      { id: 'skill-3', name: 'Industrial Electrical', experienceYears: 8, skillLevel: 'BEGINNER', verified: true },
+    ] });
+    const expert = worker({ id: 'expert' });
+    discovery.findAll.mockResolvedValue({ items: [beginner, expert], total: 2 });
+
+    const result = await service.search('expert electrician');
+    const beginnerMatch = result.results!.items.find((item) => item.id === 'beginner')!;
+    const expertMatch = result.results!.items.find((item) => item.id === 'expert')!;
+
+    expect(beginnerMatch.matchBreakdown.skills).toBe(0);
+    expect(beginnerMatch.matchReasons).toEqual(expect.arrayContaining([
+      'No required skills matched at or above EXPERT level',
+      '3 matched skills below minimum EXPERT level',
+    ]));
+    expect(beginnerMatch.matchDetails.skills.every((skill) => skill.minimumLevelMet === false)).toBe(true);
+    expect(expertMatch.matchBreakdown.skills).toBe(25);
+    expect(expertMatch.matchScore).toBeGreaterThan(beginnerMatch.matchScore);
+  });
+
   it('gives the full skill score when no specific skills are requested', async () => {
     const normalized = requirement({ skills: [] });
     parser.parse.mockResolvedValue({ clarificationRequired: false });
@@ -107,7 +134,7 @@ describe('WorkerSearchService matching', () => {
     const result = await service.search('electrician with masonry');
     const match = result.results!.items[0];
     expect(match.matchBreakdown.skills).toBe(0);
-    expect(match.matchDetails.skills).toEqual([{ required: 'Masonry', matched: false, experienceYears: null, skillLevel: null, verified: false }]);
+    expect(match.matchDetails.skills).toEqual([{ required: 'Masonry', matched: false, minimumLevelMet: null, experienceYears: null, skillLevel: null, verified: false }]);
     expect(match.matchReasons).toContain('No required skills matched');
   });
 
