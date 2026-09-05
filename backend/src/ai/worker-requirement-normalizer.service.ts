@@ -32,6 +32,7 @@ export interface NormalizedWorkerRequirement {
     pincode: string | null;
   } | null;
   minimumExperienceYears: number | null;
+  minimumSkillLevel: WorkerSearchRequirement['minimumSkillLevel'];
   skills: Array<{ id: string; name: string }>;
   languages: Array<{ id: string; name: string }>;
   availability: WorkerSearchRequirement['availability'];
@@ -66,6 +67,7 @@ export class WorkerRequirementNormalizerService {
       professionCategory,
       location,
       minimumExperienceYears: requirement.minimumExperienceYears,
+      minimumSkillLevel: requirement.minimumSkillLevel,
       skills,
       languages,
       availability: requirement.availability,
