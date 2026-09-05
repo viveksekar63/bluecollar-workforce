@@ -14,9 +14,11 @@ interface WorkerSearchGeoContext { latitude?: number; longitude?: number; radius
 
 @Injectable()
 export class WorkerSearchService {
+  private static readonly MAX_RANKING_CANDIDATES = 500;
+
   constructor(private readonly parser: RequirementParserService, private readonly normalizer: WorkerRequirementNormalizerService, private readonly discovery: EmployerWorkerDiscoveryService) {}
 
-  async search(query: string, geo: WorkerSearchGeoContext = {}) {
+  async search(query: string, geo: WorkerSearchGeoContext = {}, pagination: { page?: number; limit?: number } = {}) {
     const parsed = await this.parser.parse(query);
     if (parsed.clarificationRequired) return { status: 'CLARIFICATION_REQUIRED' as const, query, requirement: parsed, results: null };
 
@@ -29,6 +31,11 @@ export class WorkerSearchService {
     }
 
     const requestedCount = Math.min(Math.max(normalized.workerCount ?? 20, 1), 100);
+    const page = Math.max(pagination.page ?? 1, 1);
+    const limit = Math.min(Math.max(pagination.limit ?? requestedCount, 1), 50);
+    const rankingOffset = (page - 1) * limit;
+    const candidateLimit = Math.min(Math.max(100, rankingOffset + limit, requestedCount), WorkerSearchService.MAX_RANKING_CANDIDATES);
+
     // A semantic destination is normally a hard discovery filter. When the employer
     // explicitly accepts relocation/travel, however, the destination becomes a soft
     // ranking preference so capable workers from other cities remain eligible.
@@ -44,7 +51,7 @@ export class WorkerSearchService {
       minimumExperienceYears: normalized.minimumExperienceYears ?? undefined,
       availability: this.toAvailabilityFilter(normalized.availability),
       latitude: geo.latitude, longitude: geo.longitude, radiusKm: geo.radiusKm,
-      page: 1, limit: 100,
+      page: 1, limit: candidateLimit,
     };
 
     const candidateResults = await this.discovery.findAll(discoveryQuery);
@@ -61,8 +68,10 @@ export class WorkerSearchService {
       };
     }).sort((a, b) => b.matchScore - a.matchScore || b.preferenceScore - a.preferenceScore || b.verificationScore - a.verificationScore || b.experienceYears - a.experienceYears || a.id.localeCompare(b.id));
 
-    const selectedItems = scoredItems.slice(0, requestedCount);
-    return { status: 'MATCHED' as const, query, requirement: parsed, normalizedRequirement: normalized, results: { items: selectedItems, page: 1, limit: requestedCount, total: scoredItems.length, totalPages: scoredItems.length ? 1 : 0, candidateTotal: candidateResults.total } };
+    const selectedItems = scoredItems.slice(rankingOffset, rankingOffset + limit);
+    const total = candidateResults.total;
+    const totalPages = total ? Math.ceil(total / limit) : 0;
+    return { status: 'MATCHED' as const, query, requirement: parsed, normalizedRequirement: normalized, results: { items: selectedItems, page, limit, total, totalPages, candidateTotal: candidateResults.total, rankingCandidateLimit: candidateResults.items.length, hasNext: page < totalPages } };
   }
 
   private calculateMatchScore(worker: any, normalized: any, geo: WorkerSearchGeoContext) {
@@ -175,8 +184,6 @@ export class WorkerSearchService {
       accommodation = 'NOT_REQUESTED';
     }
 
-    // Preference score is deliberately separate from the 100-point match score.
-    // It is used only as a deterministic tie-breaker and never changes matchScore.
     let score = 0;
     if (relocation === 'MATCHED') score += 1;
     if (travel === 'MATCHED') score += 1;

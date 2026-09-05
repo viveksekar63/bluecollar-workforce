@@ -23,4 +23,18 @@ export class WorkerSearchDto extends ParseWorkerRequirementDto {
   @Min(1)
   @Max(500)
   radiusKm?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(10)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  limit?: number;
 }
