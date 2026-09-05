@@ -61,7 +61,7 @@ async function seed(client: any, size: number) {
         'perf-test-worker-' || n::text || '@example.com',
         'Perf' || n::text,
         'Worker',
-        'ACTIVE', now(), now()
+        'ACTIVE'::"UserStatus", now(), now()
       FROM generated
     `, [size]);
 
@@ -71,19 +71,16 @@ async function seed(client: any, size: number) {
           gs AS n,
           md5('perf-user-' || gs::text)::uuid AS user_id,
           md5('perf-worker-' || gs::text)::uuid AS worker_id,
-          CASE WHEN gs % 10 < 7 THEN 'Electrician' WHEN gs % 10 < 9 THEN 'Plumber' ELSE 'Carpenter' END AS profession,
-          CASE WHEN gs % 10 < 7 THEN 'Chennai' ELSE 'Coimbatore' END AS city,
-          CASE WHEN gs % 10 < 7 THEN 13.0827 + (((gs % 200) - 100) * 0.001) ELSE 11.0168 + (((gs % 100) - 50) * 0.001) END AS latitude,
-          CASE WHEN gs % 10 < 7 THEN 80.2707 + (((gs % 200) - 100) * 0.001) ELSE 76.9558 + (((gs % 100) - 50) * 0.001) END AS longitude
+          CASE WHEN gs % 10 < 7 THEN 'Electrician' WHEN gs % 10 < 9 THEN 'Plumber' ELSE 'Carpenter' END AS profession
         FROM generate_series(1, $1::int) gs
       )
       INSERT INTO "Worker" (id, "userId", "workerCode", bio, "experienceYears", "professionCategory", profession, "profileCompletion", "verificationStatus", "verificationScore", "availabilityStatus", "createdAt", "updatedAt")
       SELECT
         worker_id, user_id, $2 || lpad(n::text, 7, '0'), 'Scale benchmark worker',
         (3 + (n % 10))::numeric, 'Electrical', profession, 100,
-        CASE WHEN n % 5 = 0 THEN 'VERIFIED' ELSE 'PENDING' END,
+        (CASE WHEN n % 5 = 0 THEN 'VERIFIED' ELSE 'PENDING' END)::"VerificationStatus",
         CASE WHEN n % 5 = 0 THEN 90 ELSE 50 END,
-        CASE WHEN n % 6 = 0 THEN 'WORKING' ELSE 'AVAILABLE' END,
+        (CASE WHEN n % 6 = 0 THEN 'WORKING' ELSE 'AVAILABLE' END)::"AvailabilityStatus",
         now(), now()
       FROM generated
     `, [size, PREFIX]);
@@ -97,7 +94,7 @@ async function seed(client: any, size: number) {
       )
       INSERT INTO "WorkerAddress" (id, "workerId", type, "addressLine1", city, district, state, pincode, latitude, longitude, "isCurrent", "createdAt")
       SELECT
-        md5('perf-address-' || n::text)::uuid, worker_id, 'CURRENT', 'Benchmark Address',
+        md5('perf-address-' || n::text)::uuid, worker_id, 'CURRENT'::"AddressType", 'Benchmark Address',
         CASE WHEN n % 10 < 7 THEN 'Chennai' ELSE 'Coimbatore' END,
         CASE WHEN n % 10 < 7 THEN 'Chennai' ELSE 'Coimbatore' END,
         'Tamil Nadu', '600001',
@@ -130,7 +127,7 @@ async function seed(client: any, size: number) {
       INSERT INTO "WorkerSkill" ("workerId", "skillId", "experienceYears", "skillLevel", verified)
       SELECT g.worker_id, s.id,
         (3 + (g.n % 10))::numeric,
-        CASE WHEN g.n % 7 = 0 THEN 'EXPERT' WHEN g.n % 3 = 0 THEN 'ADVANCED' ELSE 'INTERMEDIATE' END,
+        (CASE WHEN g.n % 7 = 0 THEN 'EXPERT' WHEN g.n % 3 = 0 THEN 'ADVANCED' ELSE 'INTERMEDIATE' END)::"SkillLevel",
         g.n % 5 = 0
       FROM generated g
       CROSS JOIN skills s
@@ -146,7 +143,7 @@ async function seed(client: any, size: number) {
         SELECT id, name FROM "Language" WHERE name IN ('Tamil', 'English')
       )
       INSERT INTO "WorkerLanguage" ("workerId", "languageId", proficiency)
-      SELECT g.worker_id, l.id, 'BASIC'
+      SELECT g.worker_id, l.id, 'BASIC'::"LanguageLevel"
       FROM generated g
       CROSS JOIN languages l
       WHERE g.n % 10 < 7
