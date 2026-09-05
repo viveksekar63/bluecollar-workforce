@@ -149,7 +149,7 @@ export class EmployerWorkerDiscoveryService {
     const ctePrefix = Prisma.sql`WITH ${Prisma.join(cteParts, ', ')}`;
     const skillMatchExpression = skillIds.length ? Prisma.sql`COALESCE(sm."matchedSkillCount", 0)` : Prisma.sql`0`;
     const aggregateJoins = Prisma.sql`
-      LEFT JOIN worker_base wb ON wb."id" = w."id"
+      INNER JOIN worker_base wb ON wb."id" = w."id"
       ${skillIds.length ? Prisma.sql`LEFT JOIN skill_matches sm ON sm."workerId" = w."id"` : Prisma.empty}
       ${requestedLanguages.length ? Prisma.sql`LEFT JOIN language_matches lm ON lm."workerId" = w."id"` : Prisma.empty}`;
     const languageFilter = requestedLanguages.length ? Prisma.sql` AND COALESCE(lm."matchedLanguageCount", 0) = ${requestedLanguages.length}` : Prisma.empty;
@@ -167,7 +167,7 @@ export class EmployerWorkerDiscoveryService {
       LEFT JOIN LATERAL (SELECT sk."name" FROM "WorkerSkill" ws JOIN "Skill" sk ON sk."id" = ws."skillId" WHERE ws."workerId" = w."id" ORDER BY sk."name" ASC LIMIT 1) skill ON true
       LEFT JOIN LATERAL (SELECT wa."city", wa."district", wa."state" FROM "WorkerAddress" wa WHERE wa."workerId" = w."id" AND wa."isCurrent" = true ORDER BY wa."createdAt" DESC LIMIT 1) addr ON true
       LEFT JOIN "worker_work_preferences" wp ON wp."workerId" = w."id"
-      WHERE wb."id" IS NOT NULL${languageFilter}
+      WHERE 1=1${languageFilter}
       ORDER BY ${skillMatchExpression} DESC,
         CASE WHEN ${rankingPattern}::text IS NOT NULL AND EXISTS (SELECT 1 FROM "WorkerAddress" wa3 WHERE wa3."workerId" = w."id" AND wa3."isCurrent" = true AND (wa3."city" ILIKE ${rankingPattern} OR COALESCE(wa3."district", '') ILIKE ${rankingPattern} OR wa3."state" ILIKE ${rankingPattern})) THEN 0 WHEN ${rankingPattern}::text IS NOT NULL AND EXISTS (SELECT 1 FROM "worker_preferred_locations" pl3 WHERE pl3."workerId" = w."id" AND (pl3."city" ILIKE ${rankingPattern} OR COALESCE(pl3."district", '') ILIKE ${rankingPattern} OR pl3."state" ILIKE ${rankingPattern})) THEN 1 WHEN wp."mobility" = 'ANYWHERE_INDIA' THEN 2 ELSE 3 END,
         CASE WHEN ${latitude !== null && longitude !== null} AND (${distanceExpression}) IS NOT NULL THEN (${distanceExpression}) ELSE 0 END ASC,
@@ -179,7 +179,7 @@ export class EmployerWorkerDiscoveryService {
       SELECT COUNT(*)::bigint AS count
       FROM worker_base wb
       ${requestedLanguages.length ? Prisma.sql`LEFT JOIN language_matches lm ON lm."workerId" = wb."id"` : Prisma.empty}
-      ${languageFilter.replace ? Prisma.empty : Prisma.empty}`);
+      WHERE 1=1${languageFilter}`);
     const total = Number(count);
     return { items: rows.map((worker) => ({ id: worker.id, workerCode: worker.workerCode, firstName: worker.firstName, lastName: worker.lastName ?? '', profileImageUrl: worker.profileImageUrl, primarySkill: worker.primarySkill ?? 'Not specified', skills: Array.isArray(worker.workerSkills) ? worker.workerSkills : [], skillDetails: Array.isArray(worker.workerSkillDetails) ? worker.workerSkillDetails : [], professionCategory: worker.professionCategory, profession: worker.profession, experienceYears: Number(worker.experienceYears ?? 0), city: worker.city ?? 'Not specified', district: worker.district ?? 'Not specified', state: worker.state ?? 'Not specified', verificationScore: worker.verificationScore ?? 0, verificationStatus: worker.verificationStatus, availability: worker.availability, mobility: worker.mobility ?? 'LOCAL', willingToRelocate: worker.willingToRelocate ?? false, willingToTravel: worker.willingToTravel ?? false, preferredLocations: Array.isArray(worker.preferredLocations) ? worker.preferredLocations : [], distanceKm: worker.distanceKm === null ? null : Number(worker.distanceKm) })), page, limit, total, totalPages: Math.ceil(total / limit) };
   }
