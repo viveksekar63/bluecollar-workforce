@@ -2,6 +2,7 @@ export interface WorkerSearchRequirement {
   profession: string | null;
   professionCategory: string | null;
   skills: string[];
+  minimumSkillLevel: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' | 'EXPERT' | null;
   workerCount: number | null;
 
   location: {
