@@ -220,6 +220,32 @@ describe('WorkerSearchService matching', () => {
     expect(discoveryQuery.mobility).toBeUndefined();
   });
 
+  it('paginates the deterministic ranking while keeping the discovery pool ahead of pagination', async () => {
+    const normalized = requirement({ workerCount: 2 });
+    parser.parse.mockResolvedValue({ clarificationRequired: false });
+    normalizer.normalize.mockResolvedValue(normalized);
+    const workers = Array.from({ length: 120 }, (_, index) => worker({
+      id: `worker-${String(index + 1).padStart(3, '0')}`,
+      experienceYears: index + 1,
+      verificationScore: index,
+    }));
+    discovery.findAll.mockResolvedValue({ items: workers, total: 120 });
+
+    const result = await service.search('electrician search', {}, { page: 2, limit: 10 });
+
+    const discoveryQuery = discovery.findAll.mock.calls[0][0];
+    expect(discoveryQuery.page).toBe(1);
+    expect(discoveryQuery.limit).toBe(100);
+    expect(result.results!.page).toBe(2);
+    expect(result.results!.limit).toBe(10);
+    expect(result.results!.total).toBe(120);
+    expect(result.results!.totalPages).toBe(12);
+    expect(result.results!.hasNext).toBe(true);
+    expect(result.results!.items).toHaveLength(10);
+    expect(result.results!.items[0].id).toBe('worker-110');
+    expect(result.results!.items[9].id).toBe('worker-101');
+  });
+
   it('returns clarification without querying master data or workers', async () => {
     parser.parse.mockResolvedValue({ clarificationRequired: true, clarificationQuestion: 'Which profession?' });
     const result = await service.search('I need workers');
