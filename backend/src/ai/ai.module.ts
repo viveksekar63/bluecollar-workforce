@@ -7,6 +7,7 @@ import { AiService } from './ai.service';
 import { MockAiService } from './mock-ai.service';
 import { RequirementParserService } from './requirement-parser.service';
 import { WorkerRequirementNormalizerService } from './worker-requirement-normalizer.service';
+import { JobRequirementService } from './job-requirement.service';
 import { WorkerSearchService } from './worker-search.service';
 
 @Module({
@@ -17,11 +18,14 @@ import { WorkerSearchService } from './worker-search.service';
     MockAiService,
     RequirementParserService,
     WorkerRequirementNormalizerService,
+    JobRequirementService,
     WorkerSearchService,
   ],
   exports: [
     AiService,
     RequirementParserService,
+    WorkerRequirementNormalizerService,
+    JobRequirementService,
     WorkerSearchService,
   ],
 })
