@@ -21,7 +21,7 @@ export class MockAiService implements AiProvider {
               : null;
 
     const workerCountMatch = query.match(
-      /\b(\d+)\s+(?:(?:experienced|skilled|qualified|professional|trained)\s+)?(?:workers?|people|persons?|electricians?|plumbers?|carpenters?|welders?)\b/i,
+      /\b(\d+)\s+(?:(?:experienced|skilled|qualified|professional|trained|expert|advanced|intermediate|beginner)\s+)?(?:workers?|people|persons?|electricians?|plumbers?|carpenters?|welders?)\b/i,
     );
 
     const experienceMatch = query.match(
