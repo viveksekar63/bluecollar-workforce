@@ -163,14 +163,9 @@ export class EmployerWorkerDiscoveryService {
         JOIN "User" u ON u."id" = w."userId"
         INNER JOIN worker_base wb ON wb."id" = w."id"
         WHERE 1=1 ${languageFilter}
-        ORDER BY ${skillMatchExpression} DESC,
-          CASE
-            WHEN ${rankingPattern}::text IS NOT NULL AND EXISTS (SELECT 1 FROM "WorkerAddress" wa3 WHERE wa3."workerId" = w."id" AND wa3."isCurrent" = true AND (wa3."city" ILIKE ${rankingPattern} OR COALESCE(wa3."district", '') ILIKE ${rankingPattern} OR wa3."state" ILIKE ${rankingPattern})) THEN 0
-            WHEN ${rankingPattern}::text IS NOT NULL AND EXISTS (SELECT 1 FROM "worker_preferred_locations" pl3 WHERE pl3."workerId" = w."id" AND (pl3."city" ILIKE ${rankingPattern} OR COALESCE(pl3."district", '') ILIKE ${rankingPattern} OR pl3."state" ILIKE ${rankingPattern})) THEN 1
-            WHEN EXISTS (SELECT 1 FROM "worker_work_preferences" wp3 WHERE wp3."workerId" = w."id" AND wp3."mobility" = 'ANYWHERE_INDIA') THEN 2
-            ELSE 3
-          END,
-          CASE WHEN (${distanceExpression}) IS NOT NULL THEN (${distanceExpression}) ELSE 0 END ASC,
+        ORDER BY "skillMatchCount" DESC,
+          "locationRank" ASC,
+          ${distanceExpression} ASC,
           CASE WHEN w."verificationStatus" = 'VERIFIED' THEN 0 ELSE 1 END,
           CASE WHEN w."availabilityStatus" = 'AVAILABLE' THEN 0 ELSE 1 END,
           COALESCE(w."verificationScore", 0) DESC,
