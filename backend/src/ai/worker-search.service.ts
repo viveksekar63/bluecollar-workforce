@@ -3,6 +3,7 @@ import { EmployerWorkerDiscoveryService } from '../workers/employer-worker-disco
 import { WorkersQueryDto } from '../workers/dto/workers-query.dto';
 import { RequirementParserService } from './requirement-parser.service';
 import { MasterDataNotFoundError, WorkerRequirementNormalizerService } from './worker-requirement-normalizer.service';
+import { calculateAccommodationMatch } from './accommodation-matching';
 
 export interface MatchBreakdown { profession: number; skills: number; location: number; experience: number; availability: number; verified: number; verificationScore: number; }
 export interface MatchSkillDetail { required: string; matched: boolean; minimumLevelMet: boolean | null; experienceYears: number | null; skillLevel: string | null; verified: boolean; }
@@ -166,13 +167,19 @@ export class WorkerSearchService {
     const travel = !travelRequested ? 'NOT_REQUESTED' : workerTravels || worker.mobility === 'ANYWHERE_INDIA' ? 'MATCHED' : 'NOT_MATCHED';
     if (relocation === 'MATCHED') reasons.push('Worker is willing to relocate'); else if (relocation === 'NOT_MATCHED') reasons.push('Worker is not marked willing to relocate');
     if (travel === 'MATCHED') reasons.push('Worker is willing to travel'); else if (travel === 'NOT_MATCHED') reasons.push('Worker is not marked willing to travel');
-    let accommodation: PreferenceMatchStatus = 'NOT_SPECIFIED';
-    if (normalized.accommodationAvailable === true) { accommodation = 'OFFERED'; reasons.push('Accommodation is available from the employer'); }
-    else if (normalized.accommodationAvailable === false) accommodation = 'NOT_REQUESTED';
+
+    const accommodationResult = calculateAccommodationMatch(
+      normalized.accommodationAvailable,
+      worker.requiresAccommodation,
+    );
+    const accommodation = accommodationResult.status as PreferenceMatchStatus;
+    reasons.push(accommodationResult.reason);
+
     let score = 0;
     if (relocation === 'MATCHED') score += 1;
     if (travel === 'MATCHED') score += 1;
     if (mobility === 'MATCHED') score += 1;
+    score += accommodationResult.score;
     return { match: { mobility, relocation, travel, accommodation } as PreferenceMatch, score };
   }
 
