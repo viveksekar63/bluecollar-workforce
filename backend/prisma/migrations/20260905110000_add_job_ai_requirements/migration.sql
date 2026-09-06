@@ -1,5 +1,5 @@
 CREATE TABLE "job_ai_requirements" (
-  "jobId" UUID NOT NULL,
+  "jobId" TEXT NOT NULL,
   "minimumExperienceYears" DECIMAL(5,2),
   "minimumSkillLevel" TEXT,
   "availability" TEXT,
@@ -17,8 +17,8 @@ CREATE TABLE "job_ai_requirements" (
 );
 
 CREATE TABLE "job_ai_requirement_languages" (
-  "jobId" UUID NOT NULL,
-  "languageId" UUID NOT NULL,
+  "jobId" TEXT NOT NULL,
+  "languageId" TEXT NOT NULL,
   CONSTRAINT "job_ai_requirement_languages_pkey" PRIMARY KEY ("jobId", "languageId"),
   CONSTRAINT "job_ai_requirement_languages_jobId_fkey" FOREIGN KEY ("jobId") REFERENCES "Job"("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "job_ai_requirement_languages_languageId_fkey" FOREIGN KEY ("languageId") REFERENCES "Language"("id") ON DELETE CASCADE ON UPDATE CASCADE
