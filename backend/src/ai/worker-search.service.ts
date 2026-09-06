@@ -6,7 +6,7 @@ import { MasterDataNotFoundError, WorkerRequirementNormalizerService } from './w
 
 export interface MatchBreakdown { profession: number; skills: number; location: number; experience: number; availability: number; verified: number; verificationScore: number; }
 export interface MatchSkillDetail { required: string; matched: boolean; minimumLevelMet: boolean | null; experienceYears: number | null; skillLevel: string | null; verified: boolean; }
-export interface MatchLanguageDetail { required: string; matched: boolean; }
+export interface MatchLanguageDetail { required: string; matched: boolean; matchedAs: string | null; }
 export type PreferenceMatchStatus = 'MATCHED' | 'PARTIAL' | 'NOT_MATCHED' | 'NOT_REQUESTED' | 'NOT_SPECIFIED' | 'OFFERED';
 export interface PreferenceMatch { mobility: PreferenceMatchStatus; relocation: PreferenceMatchStatus; travel: PreferenceMatchStatus; accommodation: PreferenceMatchStatus; }
 
@@ -21,15 +21,12 @@ export class WorkerSearchService {
   async search(query: string, geo: WorkerSearchGeoContext = {}, pagination: { page?: number; limit?: number } = {}) {
     const parsed = await this.parser.parse(query);
     if (parsed.clarificationRequired) return { status: 'CLARIFICATION_REQUIRED' as const, query, requirement: parsed, results: null };
-
     let normalized;
-    try {
-      normalized = await this.normalizer.normalize(parsed);
-    } catch (error) {
+    try { normalized = await this.normalizer.normalize(parsed); }
+    catch (error) {
       if (error instanceof MasterDataNotFoundError) return { status: 'MASTER_DATA_NOT_FOUND' as const, query, requirement: parsed, results: null, missingMasterData: [{ type: error.masterType, value: error.value }] };
       throw error;
     }
-
     const ranked = await this.searchNormalizedRequirement(normalized, query, geo, pagination);
     return { ...ranked, requirement: parsed };
   }
@@ -109,11 +106,27 @@ export class WorkerSearchService {
     if (normalized.availability === null || (normalized.availability === 'IMMEDIATE' && worker.availability === 'AVAILABLE') || normalized.availability === worker.availability) { breakdown.availability = 5; if (worker.availability === 'AVAILABLE') reasons.push('Currently available'); }
     if (worker.verificationStatus === 'VERIFIED') { breakdown.verified = 5; reasons.push('Identity/background verification completed'); }
     if (worker.verificationScore > 0) breakdown.verificationScore = Math.min(5, Math.round(worker.verificationScore / 20));
-    const languageDetails: MatchLanguageDetail[] = normalized.languages.map((language: any) => ({ required: language.name, matched: true }));
-    if (languageDetails.length) reasons.push(`All ${languageDetails.length} required languages matched`);
+
+    const workerLanguages = Array.isArray(worker.languages) ? worker.languages.map((value: unknown) => String(value).trim()).filter(Boolean) : [];
+    const workerLanguagesByName = new Map(workerLanguages.map((language: string) => [language.toLowerCase(), language]));
+    const languageDetails: MatchLanguageDetail[] = normalized.languages.map((language: any) => {
+      const required = String(language.name).trim();
+      const exact = workerLanguagesByName.get(required.toLowerCase());
+      if (exact) return { required, matched: true, matchedAs: exact };
+      const partial = workerLanguages.find((candidate: string) => candidate.toLowerCase().includes(required.toLowerCase()) || required.toLowerCase().includes(candidate.toLowerCase()));
+      return { required, matched: Boolean(partial), matchedAs: partial ?? null };
+    });
+    const matchedLanguages = languageDetails.filter((language) => language.matched).length;
+    const unmatchedLanguages = languageDetails.filter((language) => !language.matched).map((language) => language.required);
+    if (languageDetails.length === 0) reasons.push('No specific language requested');
+    else if (matchedLanguages === languageDetails.length) reasons.push(`All ${matchedLanguages} required languages matched`);
+    else if (matchedLanguages > 0) reasons.push(`${matchedLanguages} of ${languageDetails.length} required languages matched`);
+    else reasons.push('No required languages matched');
+    if (unmatchedLanguages.length) reasons.push(`Unmatched languages: ${unmatchedLanguages.join(', ')}`);
+
     const preference = this.calculatePreferenceMatch(worker, normalized, geo, locationMatched, reasons);
     const score = Math.round(Object.values(breakdown).reduce((sum, value) => sum + value, 0) * 100) / 100;
-    return { score, breakdown, reasons, skillDetails, languageDetails, preferenceMatch: preference.match, preferenceScore: preference.score };
+    return { score, breakdown, reasons, skillDetails, languageDetails, matchedLanguages, unmatchedLanguages, languageScore: languageDetails.length ? Math.round((matchedLanguages / languageDetails.length) * 100) : 100, preferenceMatch: preference.match, preferenceScore: preference.score };
   }
 
   private scoreLocation(worker: any, normalized: any, geo: WorkerSearchGeoContext, breakdown: MatchBreakdown, reasons: string[]) {
