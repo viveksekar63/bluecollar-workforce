@@ -16,7 +16,7 @@ interface WorkerSearchGeoContext { latitude?: number; longitude?: number; radius
 export class WorkerSearchService {
   private static readonly MAX_RANKING_CANDIDATES = 500;
 
-  constructor(private readonly parser: RequirementParserService, private readonly normalizer: WorkerRequirementNormalizerService, private readonly discovery: EmployerWorkerDiscoveryService) {}
+  constructor(private readonly parser: RequirementParserService, private readonly normalizer: WorkerRequirementNormalizerService, private readonly discovery: EmployerWorkerDiscoveryService) { }
 
   async search(query: string, geo: WorkerSearchGeoContext = {}, pagination: { page?: number; limit?: number } = {}) {
     const parsed = await this.parser.parse(query);
@@ -54,7 +54,17 @@ export class WorkerSearchService {
     const candidateResults = await this.discovery.findAll(discoveryQuery);
     const scoredItems = candidateResults.items.map((worker: any) => {
       const match = this.calculateMatchScore(worker, normalized, geo);
-      return { ...worker, matchScore: match.score, preferenceScore: match.preferenceScore, matchBreakdown: match.breakdown, matchReasons: match.reasons, matchDetails: { skills: match.skillDetails, languages: match.languageDetails, preferences: match.preferenceMatch, preferenceScore: match.preferenceScore }, preferenceMatch: match.preferenceMatch };
+      return {
+        ...worker, matchScore: match.score, preferenceScore: match.preferenceScore, matchBreakdown: match.breakdown, matchReasons: match.reasons, matchDetails: {
+          skills: match.skillDetails,
+          languages: match.languageDetails,
+          matchedLanguages: match.matchedLanguages,
+          unmatchedLanguages: match.unmatchedLanguages,
+          languageScore: match.languageScore,
+          preferences: match.preferenceMatch,
+          preferenceScore: match.preferenceScore,
+        }, preferenceMatch: match.preferenceMatch
+      };
     }).sort((a: any, b: any) => b.matchScore - a.matchScore || b.preferenceScore - a.preferenceScore || b.verificationScore - a.verificationScore || b.experienceYears - a.experienceYears || a.id.localeCompare(b.id));
     const selectedItems = scoredItems.slice(rankingOffset, rankingOffset + limit);
     const total = candidateResults.total;
