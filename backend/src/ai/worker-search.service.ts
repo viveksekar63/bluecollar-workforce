@@ -119,9 +119,12 @@ export class WorkerSearchService {
   private scoreLocation(worker: any, normalized: any, geo: WorkerSearchGeoContext, breakdown: MatchBreakdown, reasons: string[]) {
     if (normalized.location?.name) {
       const requested = normalized.location.name.trim().toLowerCase();
-      const city = worker.city?.trim().toLowerCase(); const district = worker.district?.trim().toLowerCase(); const state = worker.state?.trim().toLowerCase();
+      const location = worker.location ?? {};
+      const city = String(worker.city ?? location.city ?? '').trim().toLowerCase();
+      const district = String(worker.district ?? location.district ?? '').trim().toLowerCase();
+      const state = String(worker.state ?? location.state ?? '').trim().toLowerCase();
       const exact = city === requested || district === requested || state === requested;
-      if (exact) { breakdown.location = 20; reasons.push(`Exact location match: ${worker.city}`); return true; }
+      if (exact) { breakdown.location = 20; reasons.push(`Exact location match: ${worker.city ?? location.city ?? requested}`); return true; }
       if (worker.mobility === 'ANYWHERE_INDIA') { breakdown.location = 10; reasons.push('Broader mobility: Anywhere India'); }
       return false;
     }
