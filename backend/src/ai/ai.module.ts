@@ -11,6 +11,7 @@ import { WorkerRequirementNormalizerService } from './worker-requirement-normali
 import { JobRequirementService } from './job-requirement.service';
 import { WorkerSearchService } from './worker-search.service';
 import { AiJobRequirementPersistenceService } from './ai-job-requirement-persistence.service';
+import { JobWorkerSearchService } from './job-worker-search.service';
 
 @Module({
   imports: [ConfigModule, PrismaModule, WorkersModule, JobsModule],
@@ -23,6 +24,7 @@ import { AiJobRequirementPersistenceService } from './ai-job-requirement-persist
     JobRequirementService,
     WorkerSearchService,
     AiJobRequirementPersistenceService,
+    JobWorkerSearchService,
   ],
   exports: [
     AiService,
@@ -31,6 +33,7 @@ import { AiJobRequirementPersistenceService } from './ai-job-requirement-persist
     JobRequirementService,
     WorkerSearchService,
     AiJobRequirementPersistenceService,
+    JobWorkerSearchService,
   ],
 })
 export class AiModule {}

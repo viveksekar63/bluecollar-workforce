@@ -116,36 +116,16 @@ export class EmployerWorkerDiscoveryService {
         )`
       : null;
 
-    const cteParts = [
-      Prisma.sql`worker_base AS (
-        SELECT w."id"
-        FROM "Worker" w
-        JOIN "User" u ON u."id" = w."userId"
-        ${baseWhere}
-      )`,
-    ];
+    const cteParts = [Prisma.sql`worker_base AS (SELECT w."id" FROM "Worker" w JOIN "User" u ON u."id" = w."userId" ${baseWhere})`];
     const ctePrefix = Prisma.sql`WITH ${Prisma.join(cteParts, ', ')}`;
 
     const skillMatchExpression = skillIds.length
-      ? Prisma.sql`(
-          SELECT COUNT(DISTINCT ws_match."skillId")::int
-          FROM "WorkerSkill" ws_match
-          WHERE ws_match."workerId" = w."id"
-            AND ws_match."skillId" IN (${Prisma.join(skillIds)})
-        )`
+      ? Prisma.sql`(SELECT COUNT(DISTINCT ws_match."skillId")::int FROM "WorkerSkill" ws_match WHERE ws_match."workerId" = w."id" AND ws_match."skillId" IN (${Prisma.join(skillIds)}))`
       : null;
     const languageMatchExpression = requestedLanguages.length
-      ? Prisma.sql`(
-          SELECT COUNT(DISTINCT l_match."id")::int
-          FROM "WorkerLanguage" wl_match
-          JOIN "Language" l_match ON l_match."id" = wl_match."languageId"
-          WHERE wl_match."workerId" = w."id"
-            AND (${Prisma.join(languagePatterns.map((pattern) => Prisma.sql`l_match."name" ILIKE ${pattern}`), ' OR ')})
-        )`
+      ? Prisma.sql`(SELECT COUNT(DISTINCT l_match."id")::int FROM "WorkerLanguage" wl_match JOIN "Language" l_match ON l_match."id" = wl_match."languageId" WHERE wl_match."workerId" = w."id" AND (${Prisma.join(languagePatterns.map((pattern) => Prisma.sql`l_match."name" ILIKE ${pattern}`), ' OR ')}))`
       : null;
-    const languageFilter = requestedLanguages.length
-      ? Prisma.sql`AND ${languageMatchExpression} = ${requestedLanguages.length}`
-      : Prisma.empty;
+    const languageFilter = requestedLanguages.length ? Prisma.sql`AND ${languageMatchExpression} = ${requestedLanguages.length}` : Prisma.empty;
 
     const rankingLimit = Math.max(limit, skip + limit);
     const rankingSkillExpression = skillMatchExpression ?? Prisma.sql`0::int`;
@@ -153,102 +133,52 @@ export class EmployerWorkerDiscoveryService {
     const distanceOrder = distanceExpression ? Prisma.sql`, ${rankingDistanceExpression} ASC` : Prisma.empty;
     const candidateRows = await this.prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
       ${ctePrefix}, ranked_candidates AS (
-        SELECT w."id",
-          ${rankingSkillExpression} AS "skillMatchCount",
-          ${rankingDistanceExpression} AS "distanceKm",
+        SELECT w."id", ${rankingSkillExpression} AS "skillMatchCount", ${rankingDistanceExpression} AS "distanceKm",
           CASE
             WHEN ${rankingPattern}::text IS NOT NULL AND EXISTS (SELECT 1 FROM "WorkerAddress" wa3 WHERE wa3."workerId" = w."id" AND wa3."isCurrent" = true AND (wa3."city" ILIKE ${rankingPattern} OR COALESCE(wa3."district", '') ILIKE ${rankingPattern} OR wa3."state" ILIKE ${rankingPattern})) THEN 0
             WHEN ${rankingPattern}::text IS NOT NULL AND EXISTS (SELECT 1 FROM "worker_preferred_locations" pl3 WHERE pl3."workerId" = w."id" AND (pl3."city" ILIKE ${rankingPattern} OR COALESCE(pl3."district", '') ILIKE ${rankingPattern} OR pl3."state" ILIKE ${rankingPattern})) THEN 1
-            WHEN EXISTS (SELECT 1 FROM "worker_work_preferences" wp3 WHERE wp3."workerId" = w."id" AND wp3."mobility" = 'ANYWHERE_INDIA') THEN 2
-            ELSE 3
-          END AS "locationRank"
-        FROM "Worker" w
-        JOIN "User" u ON u."id" = w."userId"
-        INNER JOIN worker_base wb ON wb."id" = w."id"
+            WHEN EXISTS (SELECT 1 FROM "worker_work_preferences" wp3 WHERE wp3."workerId" = w."id" AND wp3."mobility" = 'ANYWHERE_INDIA') THEN 2 ELSE 3 END AS "locationRank"
+        FROM "Worker" w JOIN "User" u ON u."id" = w."userId" INNER JOIN worker_base wb ON wb."id" = w."id"
         WHERE 1=1 ${languageFilter}
-        ORDER BY "skillMatchCount" DESC,
-          "locationRank" ASC
-          ${distanceOrder},
-          CASE WHEN w."verificationStatus" = 'VERIFIED' THEN 0 ELSE 1 END,
-          CASE WHEN w."availabilityStatus" = 'AVAILABLE' THEN 0 ELSE 1 END,
-          COALESCE(w."verificationScore", 0) DESC,
-          w."experienceYears" DESC,
-          w."createdAt" DESC,
-          w."id" ASC
-        LIMIT ${rankingLimit}
-      )
-      SELECT "id" FROM ranked_candidates
-    `);
+        ORDER BY "skillMatchCount" DESC, "locationRank" ASC ${distanceOrder}, CASE WHEN w."verificationStatus" = 'VERIFIED' THEN 0 ELSE 1 END, CASE WHEN w."availabilityStatus" = 'AVAILABLE' THEN 0 ELSE 1 END, COALESCE(w."verificationScore", 0) DESC, w."experienceYears" DESC, w."createdAt" DESC, w."id" ASC
+        LIMIT ${rankingLimit}) SELECT "id" FROM ranked_candidates`);
 
     const [{ count }] = await this.prisma.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`
-      ${ctePrefix}
-      SELECT COUNT(*)::bigint AS count
-      FROM worker_base wb
-      WHERE 1=1
-        ${requestedLanguages.length ? Prisma.sql`AND (
-          SELECT COUNT(DISTINCT l_count."id")::int
-          FROM "WorkerLanguage" wl_count
-          JOIN "Language" l_count ON l_count."id" = wl_count."languageId"
-          WHERE wl_count."workerId" = wb."id"
-            AND (${Prisma.join(languagePatterns.map((pattern) => Prisma.sql`l_count."name" ILIKE ${pattern}`), ' OR ')})
-        ) = ${requestedLanguages.length}` : Prisma.empty}
-    `);
+      ${ctePrefix} SELECT COUNT(*)::bigint AS count FROM worker_base wb WHERE 1=1
+      ${requestedLanguages.length ? Prisma.sql`AND (SELECT COUNT(DISTINCT l_count."id")::int FROM "WorkerLanguage" wl_count JOIN "Language" l_count ON l_count."id" = wl_count."languageId" WHERE wl_count."workerId" = wb."id" AND (${Prisma.join(languagePatterns.map((pattern) => Prisma.sql`l_count."name" ILIKE ${pattern}`), ' OR ')})) = ${requestedLanguages.length}` : Prisma.empty}`);
 
     const total = Number(count);
     if (candidateRows.length === 0) return { items: [], page, limit, total, totalPages: Math.ceil(total / limit) };
-
     const candidateIds = candidateRows.map((row) => row.id);
     const candidateRank = new Map(candidateIds.map((id, index) => [id, index]));
     const detailSkillExpression = skillMatchExpression ?? Prisma.sql`0::int`;
     const detailDistanceExpression = distanceExpression ?? Prisma.sql`NULL::double precision`;
-    const rows = await this.prisma.$queryRaw<Array<{ id: string; workerCode: string; firstName: string; lastName: string | null; profileImageUrl: string | null; primarySkill: string | null; workerSkills: unknown; workerSkillDetails: unknown; skillMatchCount: number; distanceKm: number | null; professionCategory: string | null; profession: string | null; experienceYears: unknown; city: string | null; district: string | null; state: string | null; verificationScore: number | null; verificationStatus: string; availability: string; mobility: string | null; willingToRelocate: boolean | null; willingToTravel: boolean | null; preferredLocations: unknown; }>>(Prisma.sql`
+    const rows = await this.prisma.$queryRaw<Array<any>>(Prisma.sql`
       SELECT w."id", w."workerCode", u."firstName", u."lastName", u."profilePhotoUrl" AS "profileImageUrl", skill."name" AS "primarySkill",
         COALESCE((SELECT json_agg(sk_all."name" ORDER BY sk_all."name") FROM "WorkerSkill" ws_all JOIN "Skill" sk_all ON sk_all."id" = ws_all."skillId" WHERE ws_all."workerId" = w."id"), '[]'::json) AS "workerSkills",
         COALESCE((SELECT json_agg(json_build_object('id', sk_detail."id", 'name', sk_detail."name", 'experienceYears', ws_detail."experienceYears", 'skillLevel', ws_detail."skillLevel"::text, 'verified', ws_detail."verified") ORDER BY sk_detail."name") FROM "WorkerSkill" ws_detail JOIN "Skill" sk_detail ON sk_detail."id" = ws_detail."skillId" WHERE ws_detail."workerId" = w."id"), '[]'::json) AS "workerSkillDetails",
+        COALESCE((SELECT json_agg(l_all."name" ORDER BY l_all."name") FROM "WorkerLanguage" wl_all JOIN "Language" l_all ON l_all."id" = wl_all."languageId" WHERE wl_all."workerId" = w."id"), '[]'::json) AS "workerLanguages",
         ${detailSkillExpression} AS "skillMatchCount", ${detailDistanceExpression} AS "distanceKm", w."professionCategory", w."profession", w."experienceYears", addr."city", addr."district", addr."state", w."verificationScore", w."verificationStatus", w."availabilityStatus" AS "availability", wp."mobility", wp."willingToRelocate", wp."willingToTravel",
         COALESCE((SELECT json_agg(json_build_object('city', pl."city", 'district', pl."district", 'state', pl."state", 'country', pl."country") ORDER BY pl."city") FROM "worker_preferred_locations" pl WHERE pl."workerId" = w."id"), '[]'::json) AS "preferredLocations"
-      FROM "Worker" w
-      JOIN "User" u ON u."id" = w."userId"
+      FROM "Worker" w JOIN "User" u ON u."id" = w."userId"
       LEFT JOIN LATERAL (SELECT sk."name" FROM "WorkerSkill" ws JOIN "Skill" sk ON sk."id" = ws."skillId" WHERE ws."workerId" = w."id" ORDER BY sk."name" ASC LIMIT 1) skill ON true
       LEFT JOIN LATERAL (SELECT wa."city", wa."district", wa."state" FROM "WorkerAddress" wa WHERE wa."workerId" = w."id" AND wa."isCurrent" = true ORDER BY wa."createdAt" DESC LIMIT 1) addr ON true
       LEFT JOIN "worker_work_preferences" wp ON wp."workerId" = w."id"
-      WHERE w."id" IN (${Prisma.join(candidateIds)})
-    `);
+      WHERE w."id" IN (${Prisma.join(candidateIds)})`);
 
     rows.sort((a, b) => (candidateRank.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (candidateRank.get(b.id) ?? Number.MAX_SAFE_INTEGER));
     const pageRows = rows.slice(skip, skip + limit);
     const totalPages = Math.ceil(total / limit);
     return {
       items: pageRows.map((worker) => ({
-        id: worker.id,
-        workerCode: worker.workerCode,
-        firstName: worker.firstName,
-        lastName: worker.lastName ?? '',
-        profileImageUrl: worker.profileImageUrl,
-        primarySkill: worker.primarySkill ?? 'Not specified',
-        skills: Array.isArray(worker.workerSkills) ? worker.workerSkills : [],
-        skillDetails: Array.isArray(worker.workerSkillDetails) ? worker.workerSkillDetails : [],
-        professionCategory: worker.professionCategory,
-        profession: worker.profession,
-        experienceYears: Number(worker.experienceYears ?? 0),
-        location: { city: worker.city, district: worker.district, state: worker.state },
-        distanceKm: worker.distanceKm,
-        verificationStatus: worker.verificationStatus,
-        verificationScore: worker.verificationScore,
-        availability: worker.availability,
-        mobility: worker.mobility,
-        willingToRelocate: worker.willingToRelocate,
-        willingToTravel: worker.willingToTravel,
-        preferredLocations: Array.isArray(worker.preferredLocations) ? worker.preferredLocations : [],
-        skillMatchCount: Number(worker.skillMatchCount ?? 0),
+        id: worker.id, workerCode: worker.workerCode, firstName: worker.firstName, lastName: worker.lastName ?? '', profileImageUrl: worker.profileImageUrl,
+        primarySkill: worker.primarySkill ?? 'Not specified', skills: Array.isArray(worker.workerSkills) ? worker.workerSkills : [], skillDetails: Array.isArray(worker.workerSkillDetails) ? worker.workerSkillDetails : [],
+        languages: Array.isArray(worker.workerLanguages) ? worker.workerLanguages : [], professionCategory: worker.professionCategory, profession: worker.profession, experienceYears: Number(worker.experienceYears ?? 0),
+        location: { city: worker.city, district: worker.district, state: worker.state }, distanceKm: worker.distanceKm, verificationStatus: worker.verificationStatus, verificationScore: worker.verificationScore,
+        availability: worker.availability, mobility: worker.mobility, willingToRelocate: worker.willingToRelocate, willingToTravel: worker.willingToTravel,
+        preferredLocations: Array.isArray(worker.preferredLocations) ? worker.preferredLocations : [], skillMatchCount: Number(worker.skillMatchCount ?? 0),
       })),
-      page,
-      limit,
-      total,
-      totalPages,
-      hasNext: page < totalPages,
-      candidateTotal: candidateRows.length,
-      rankingCandidateLimit: rankingLimit,
+      page, limit, total, totalPages, hasNext: page < totalPages, candidateTotal: candidateRows.length, rankingCandidateLimit: rankingLimit,
     };
   }
 }
