@@ -3,6 +3,8 @@ import { EmployerWorkerDiscoveryService } from '../workers/employer-worker-disco
 import { WorkersQueryDto } from '../workers/dto/workers-query.dto';
 import { RequirementParserService } from './requirement-parser.service';
 import { MasterDataNotFoundError, WorkerRequirementNormalizerService } from './worker-requirement-normalizer.service';
+import { calculateAccommodationMatch } from './accommodation-matching';
+import { buildMatchExplanation, MatchTier } from './match-explanation';
 
 export interface MatchBreakdown { profession: number; skills: number; location: number; experience: number; availability: number; verified: number; verificationScore: number; }
 export interface MatchSkillDetail { required: string; matched: boolean; minimumLevelMet: boolean | null; experienceYears: number | null; skillLevel: string | null; verified: boolean; }
@@ -54,8 +56,19 @@ export class WorkerSearchService {
     const candidateResults = await this.discovery.findAll(discoveryQuery);
     const scoredItems = candidateResults.items.map((worker: any) => {
       const match = this.calculateMatchScore(worker, normalized, geo);
-      return { ...worker, matchScore: match.score, preferenceScore: match.preferenceScore, matchBreakdown: match.breakdown, matchReasons: match.reasons, matchDetails: { skills: match.skillDetails, languages: match.languageDetails, preferences: match.preferenceMatch, preferenceScore: match.preferenceScore }, preferenceMatch: match.preferenceMatch };
-    }).sort((a: any, b: any) => b.matchScore - a.matchScore || b.preferenceScore - a.preferenceScore || b.verificationScore - a.verificationScore || b.experienceYears - a.experienceYears || a.id.localeCompare(b.id));
+      return {
+        ...worker,
+        matchScore: match.score,
+        matchTier: match.matchTier,
+        preferenceScore: match.preferenceScore,
+        languageScore: match.languageScore,
+        matchBreakdown: match.breakdown,
+        matchReasons: match.reasons,
+        matchExplanation: match.explanation,
+        matchDetails: { skills: match.skillDetails, languages: match.languageDetails, preferences: match.preferenceMatch, preferenceScore: match.preferenceScore },
+        preferenceMatch: match.preferenceMatch,
+      };
+    }).sort((a: any, b: any) => b.matchScore - a.matchScore || b.preferenceScore - a.preferenceScore || b.languageScore - a.languageScore || b.verificationScore - a.verificationScore || b.experienceYears - a.experienceYears || a.id.localeCompare(b.id));
     const selectedItems = scoredItems.slice(rankingOffset, rankingOffset + limit);
     const total = candidateResults.total;
     const totalPages = total ? Math.ceil(total / limit) : 0;
@@ -118,6 +131,7 @@ export class WorkerSearchService {
     });
     const matchedLanguages = languageDetails.filter((language) => language.matched).length;
     const unmatchedLanguages = languageDetails.filter((language) => !language.matched).map((language) => language.required);
+    const languageScore = languageDetails.length ? Math.round((matchedLanguages / languageDetails.length) * 100) : 100;
     if (languageDetails.length === 0) reasons.push('No specific language requested');
     else if (matchedLanguages === languageDetails.length) reasons.push(`All ${matchedLanguages} required languages matched`);
     else if (matchedLanguages > 0) reasons.push(`${matchedLanguages} of ${languageDetails.length} required languages matched`);
@@ -126,7 +140,9 @@ export class WorkerSearchService {
 
     const preference = this.calculatePreferenceMatch(worker, normalized, geo, locationMatched, reasons);
     const score = Math.round(Object.values(breakdown).reduce((sum, value) => sum + value, 0) * 100) / 100;
-    return { score, breakdown, reasons, skillDetails, languageDetails, matchedLanguages, unmatchedLanguages, languageScore: languageDetails.length ? Math.round((matchedLanguages / languageDetails.length) * 100) : 100, preferenceMatch: preference.match, preferenceScore: preference.score };
+    const matchTier: MatchTier = score >= 90 ? 'BEST_MATCH' : score >= 75 ? 'STRONG_MATCH' : score >= 60 ? 'GOOD_MATCH' : score >= 40 ? 'PARTIAL_MATCH' : 'NOT_RECOMMENDED';
+    const explanation = buildMatchExplanation({ score, breakdown, skillDetails, languageDetails, preferenceMatch: preference.match, normalized });
+    return { score, matchTier, breakdown, reasons, skillDetails, languageDetails, matchedLanguages, unmatchedLanguages, languageScore, preferenceMatch: preference.match, preferenceScore: preference.score, explanation };
   }
 
   private scoreLocation(worker: any, normalized: any, geo: WorkerSearchGeoContext, breakdown: MatchBreakdown, reasons: string[]) {
@@ -166,13 +182,14 @@ export class WorkerSearchService {
     const travel = !travelRequested ? 'NOT_REQUESTED' : workerTravels || worker.mobility === 'ANYWHERE_INDIA' ? 'MATCHED' : 'NOT_MATCHED';
     if (relocation === 'MATCHED') reasons.push('Worker is willing to relocate'); else if (relocation === 'NOT_MATCHED') reasons.push('Worker is not marked willing to relocate');
     if (travel === 'MATCHED') reasons.push('Worker is willing to travel'); else if (travel === 'NOT_MATCHED') reasons.push('Worker is not marked willing to travel');
-    let accommodation: PreferenceMatchStatus = 'NOT_SPECIFIED';
-    if (normalized.accommodationAvailable === true) { accommodation = 'OFFERED'; reasons.push('Accommodation is available from the employer'); }
-    else if (normalized.accommodationAvailable === false) accommodation = 'NOT_REQUESTED';
+    const accommodationResult = calculateAccommodationMatch(normalized.accommodationAvailable, worker.requiresAccommodation);
+    const accommodation = accommodationResult.status as PreferenceMatchStatus;
+    reasons.push(accommodationResult.reason);
     let score = 0;
     if (relocation === 'MATCHED') score += 1;
     if (travel === 'MATCHED') score += 1;
     if (mobility === 'MATCHED') score += 1;
+    score += accommodationResult.score;
     return { match: { mobility, relocation, travel, accommodation } as PreferenceMatch, score };
   }
 

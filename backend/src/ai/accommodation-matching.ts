@@ -5,10 +5,10 @@ export interface AccommodationMatchResult {
   score: number;
   reason: string;
 }
-
 /**
- * Accommodation is a preference signal, not a hard eligibility filter.
- * The employer requirement is authoritative only when explicitly specified.
+ * Accommodation is a preference signal, not a hard worker-search filter.
+ * A worker who requires accommodation should rank below an otherwise
+ * equivalent worker when the employer cannot provide it.
  */
 export function calculateAccommodationMatch(
   employerProvidesAccommodation: boolean | null | undefined,
@@ -16,17 +16,36 @@ export function calculateAccommodationMatch(
 ): AccommodationMatchResult {
   if (employerProvidesAccommodation === true) {
     if (workerRequiresAccommodation === true) {
-      return { status: 'MATCHED', score: 2, reason: 'Accommodation is available and matches the worker accommodation requirement' };
+      return {
+        status: 'MATCHED',
+        score: 2,
+        reason:
+          'Accommodation is available and matches the worker accommodation requirement',
+      };
     }
-    return { status: 'OFFERED', score: 1, reason: 'Accommodation is available from the employer' };
+
+    return {
+      status: 'OFFERED',
+      score: 1,
+      reason: 'Accommodation is available from the employer',
+    };
   }
 
-  if (employerProvidesAccommodation === false) {
-    if (workerRequiresAccommodation === true) {
-      return { status: 'NOT_MATCHED', score: -2, reason: 'Worker requires accommodation but the employer does not provide it' };
-    }
-    return { status: 'NOT_SPECIFIED', score: 0, reason: 'Accommodation is not required by the worker' };
+  if (
+    employerProvidesAccommodation === false &&
+    workerRequiresAccommodation === true
+  ) {
+    return {
+      status: 'NOT_MATCHED',
+      score: -2,
+      reason:
+        'Worker requires accommodation but the employer does not provide it',
+    };
   }
 
-  return { status: 'NOT_SPECIFIED', score: 0, reason: 'Accommodation requirement was not specified' };
+  return {
+    status: 'NOT_SPECIFIED',
+    score: 0,
+    reason: 'Accommodation requirement was not specified',
+  };
 }

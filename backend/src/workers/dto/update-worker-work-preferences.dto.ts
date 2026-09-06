@@ -51,6 +51,10 @@ export class UpdateWorkerWorkPreferencesDto {
   willingToTravel?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  requiresAccommodation?: boolean;
+
+  @IsOptional()
   @IsArray()
   @ArrayMaxSize(20)
   @ValidateNested({ each: true })

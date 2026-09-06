@@ -13,8 +13,9 @@ export class WorkerWorkPreferencesService {
       mobility: string;
       willingToRelocate: boolean;
       willingToTravel: boolean;
+      requiresAccommodation: boolean;
     }>>`
-      SELECT "id", "mobility", "willingToRelocate", "willingToTravel"
+      SELECT "id", "mobility", "willingToRelocate", "willingToTravel", "requiresAccommodation"
       FROM "worker_work_preferences"
       WHERE "workerId" = ${workerId}
       LIMIT 1
@@ -37,6 +38,7 @@ export class WorkerWorkPreferencesService {
       mobility: preference?.mobility ?? "LOCAL",
       willingToRelocate: preference?.willingToRelocate ?? false,
       willingToTravel: preference?.willingToTravel ?? false,
+      requiresAccommodation: preference?.requiresAccommodation ?? false,
       preferredLocations: locations,
     };
   }
@@ -81,15 +83,16 @@ export class WorkerWorkPreferencesService {
           SET "mobility" = ${dto.mobility},
               "willingToRelocate" = ${dto.willingToRelocate ?? false},
               "willingToTravel" = ${dto.willingToTravel ?? false},
+              "requiresAccommodation" = ${dto.requiresAccommodation ?? false},
               "updatedAt" = CURRENT_TIMESTAMP
           WHERE "id" = ${existing[0].id}
         `;
       } else {
         await tx.$executeRaw`
           INSERT INTO "worker_work_preferences"
-            ("id", "workerId", "mobility", "willingToRelocate", "willingToTravel", "createdAt", "updatedAt")
+            ("id", "workerId", "mobility", "willingToRelocate", "willingToTravel", "requiresAccommodation", "createdAt", "updatedAt")
           VALUES
-            (${randomUUID()}, ${worker.id}, ${dto.mobility}, ${dto.willingToRelocate ?? false}, ${dto.willingToTravel ?? false}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            (${randomUUID()}, ${worker.id}, ${dto.mobility}, ${dto.willingToRelocate ?? false}, ${dto.willingToTravel ?? false}, ${dto.requiresAccommodation ?? false}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         `;
       }
 
@@ -112,8 +115,9 @@ export class WorkerWorkPreferencesService {
         mobility: string;
         willingToRelocate: boolean;
         willingToTravel: boolean;
+        requiresAccommodation: boolean;
       }>>`
-        SELECT "mobility", "willingToRelocate", "willingToTravel"
+        SELECT "mobility", "willingToRelocate", "willingToTravel", "requiresAccommodation"
         FROM "worker_work_preferences"
         WHERE "workerId" = ${worker.id}
         LIMIT 1
@@ -136,6 +140,7 @@ export class WorkerWorkPreferencesService {
         mobility: preference?.mobility ?? dto.mobility,
         willingToRelocate: preference?.willingToRelocate ?? dto.willingToRelocate ?? false,
         willingToTravel: preference?.willingToTravel ?? dto.willingToTravel ?? false,
+        requiresAccommodation: preference?.requiresAccommodation ?? dto.requiresAccommodation ?? false,
         preferredLocations: savedLocations,
       };
     });
