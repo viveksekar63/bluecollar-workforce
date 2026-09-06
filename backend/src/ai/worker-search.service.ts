@@ -30,7 +30,8 @@ export class WorkerSearchService {
       throw error;
     }
 
-    return this.searchNormalizedRequirement(normalized, query, geo, pagination);
+    const ranked = await this.searchNormalizedRequirement(normalized, query, geo, pagination);
+    return { ...ranked, requirement: parsed };
   }
 
   async searchNormalizedRequirement(normalized: any, query: string, geo: WorkerSearchGeoContext = {}, pagination: { page?: number; limit?: number } = {}) {
@@ -39,7 +40,6 @@ export class WorkerSearchService {
     const limit = Math.min(Math.max(pagination.limit ?? requestedCount, 1), 50);
     const rankingOffset = (page - 1) * limit;
     const candidateLimit = Math.min(Math.max(100, rankingOffset + limit, requestedCount), WorkerSearchService.MAX_RANKING_CANDIDATES);
-
     const flexibleLocation = normalized.willingToRelocate === true || normalized.willingToTravel === true;
     const discoveryQuery: WorkersQueryDto = {
       profession: normalized.profession?.name ?? undefined,
@@ -51,56 +51,24 @@ export class WorkerSearchService {
       languages: normalized.languages.map((language: any) => language.name).join(','),
       minimumExperienceYears: normalized.minimumExperienceYears ?? undefined,
       availability: this.toAvailabilityFilter(normalized.availability),
-      latitude: geo.latitude,
-      longitude: geo.longitude,
-      radiusKm: geo.radiusKm,
-      page: 1,
-      limit: candidateLimit,
+      latitude: geo.latitude, longitude: geo.longitude, radiusKm: geo.radiusKm,
+      page: 1, limit: candidateLimit,
     };
-
     const candidateResults = await this.discovery.findAll(discoveryQuery);
     const scoredItems = candidateResults.items.map((worker: any) => {
       const match = this.calculateMatchScore(worker, normalized, geo);
-      return {
-        ...worker,
-        matchScore: match.score,
-        preferenceScore: match.preferenceScore,
-        matchBreakdown: match.breakdown,
-        matchReasons: match.reasons,
-        matchDetails: { skills: match.skillDetails, languages: match.languageDetails, preferences: match.preferenceMatch, preferenceScore: match.preferenceScore },
-        preferenceMatch: match.preferenceMatch,
-      };
+      return { ...worker, matchScore: match.score, preferenceScore: match.preferenceScore, matchBreakdown: match.breakdown, matchReasons: match.reasons, matchDetails: { skills: match.skillDetails, languages: match.languageDetails, preferences: match.preferenceMatch, preferenceScore: match.preferenceScore }, preferenceMatch: match.preferenceMatch };
     }).sort((a: any, b: any) => b.matchScore - a.matchScore || b.preferenceScore - a.preferenceScore || b.verificationScore - a.verificationScore || b.experienceYears - a.experienceYears || a.id.localeCompare(b.id));
-
     const selectedItems = scoredItems.slice(rankingOffset, rankingOffset + limit);
     const total = candidateResults.total;
     const totalPages = total ? Math.ceil(total / limit) : 0;
-    return {
-      status: 'MATCHED' as const,
-      query,
-      normalizedRequirement: normalized,
-      results: {
-        items: selectedItems,
-        page,
-        limit,
-        total,
-        totalPages,
-        candidateTotal: candidateResults.total,
-        rankingCandidateLimit: candidateResults.items.length,
-        hasNext: page < totalPages,
-      },
-    };
+    return { status: 'MATCHED' as const, query, normalizedRequirement: normalized, results: { items: selectedItems, page, limit, total, totalPages, candidateTotal: candidateResults.total, rankingCandidateLimit: candidateResults.items.length, hasNext: page < totalPages } };
   }
 
   private calculateMatchScore(worker: any, normalized: any, geo: WorkerSearchGeoContext) {
     const breakdown: MatchBreakdown = { profession: 0, skills: 0, location: 0, experience: 0, availability: 0, verified: 0, verificationScore: 0 };
     const reasons: string[] = [];
-
-    if (normalized.profession?.name && worker.profession?.trim().toLowerCase() === normalized.profession.name.trim().toLowerCase()) {
-      breakdown.profession = 30;
-      reasons.push(`Exact profession match: ${worker.profession}`);
-    }
-
+    if (normalized.profession?.name && worker.profession?.trim().toLowerCase() === normalized.profession.name.trim().toLowerCase()) { breakdown.profession = 30; reasons.push(`Exact profession match: ${worker.profession}`); }
     const workerSkillDetails = Array.isArray(worker.skillDetails) ? worker.skillDetails : [];
     const workerSkillsByName = new Map<string, any>(workerSkillDetails.map((skill: any) => [String(skill.name).trim().toLowerCase(), skill]));
     const minimumSkillLevel = normalized.minimumSkillLevel as string | null;
@@ -112,11 +80,8 @@ export class WorkerSearchService {
       const minimumLevelMet = matched ? (requiredLevelRank === null ? null : matchedRank !== undefined && matchedRank >= requiredLevelRank) : (requiredLevelRank === null ? null : false);
       return { required: required.name, matched: Boolean(matched), minimumLevelMet, experienceYears: matched?.experienceYears == null ? null : Number(matched.experienceYears), skillLevel: matched?.skillLevel ?? null, verified: Boolean(matched?.verified) };
     });
-
-    if (normalized.skills.length === 0) {
-      breakdown.skills = 25;
-      reasons.push('No specific skill requested');
-    } else {
+    if (normalized.skills.length === 0) { breakdown.skills = 25; reasons.push('No specific skill requested'); }
+    else {
       const matched = skillDetails.filter((skill) => skill.matched);
       const qualifiedMatched = minimumSkillLevel ? skillDetails.filter((skill) => skill.matched && skill.minimumLevelMet === true) : matched;
       const coverageScore = (qualifiedMatched.length / normalized.skills.length) * 15;
@@ -125,7 +90,6 @@ export class WorkerSearchService {
       const experienceScore = qualifiedMatched.length ? (qualifiedMatched.reduce((sum, skill) => sum + Math.min(Math.max(skill.experienceYears ?? 0, 0), 10) / 10, 0) / qualifiedMatched.length) * 2 : 0;
       const skillVerificationScore = (qualifiedMatched.filter((skill) => skill.verified).length / normalized.skills.length) * 5;
       breakdown.skills = Math.round((coverageScore + proficiencyScore + experienceScore + skillVerificationScore) * 100) / 100;
-
       if (minimumSkillLevel) {
         if (qualifiedMatched.length === normalized.skills.length) reasons.push(`All ${qualifiedMatched.length} required skills matched at or above ${minimumSkillLevel} level`);
         else if (qualifiedMatched.length > 0) reasons.push(`${qualifiedMatched.length} of ${normalized.skills.length} required skills matched at or above ${minimumSkillLevel} level`);
@@ -135,31 +99,18 @@ export class WorkerSearchService {
       } else if (matched.length === normalized.skills.length) reasons.push(`All ${matched.length} required skills matched`);
       else if (matched.length > 0) reasons.push(`${matched.length} of ${normalized.skills.length} required skills matched`);
       else reasons.push('No required skills matched');
-
       const verifiedSkills = qualifiedMatched.filter((skill) => skill.verified).length;
       if (verifiedSkills) reasons.push(`${verifiedSkills} required skill${verifiedSkills === 1 ? '' : 's'} verified`);
       const advancedSkills = qualifiedMatched.filter((skill) => skill.skillLevel === 'ADVANCED' || skill.skillLevel === 'EXPERT').length;
       if (advancedSkills) reasons.push(`${advancedSkills} matched skill${advancedSkills === 1 ? '' : 's'} at advanced/expert level`);
     }
-
     const locationMatched = this.scoreLocation(worker, normalized, geo, breakdown, reasons);
-
-    if (normalized.minimumExperienceYears === null || worker.experienceYears >= normalized.minimumExperienceYears) {
-      breakdown.experience = 10;
-      reasons.push(normalized.minimumExperienceYears === null ? `${worker.experienceYears} years experience` : `${worker.experienceYears} years experience meets minimum ${normalized.minimumExperienceYears}`);
-    }
-
-    if (normalized.availability === null || (normalized.availability === 'IMMEDIATE' && worker.availability === 'AVAILABLE') || normalized.availability === worker.availability) {
-      breakdown.availability = 5;
-      if (worker.availability === 'AVAILABLE') reasons.push('Currently available');
-    }
-
+    if (normalized.minimumExperienceYears === null || worker.experienceYears >= normalized.minimumExperienceYears) { breakdown.experience = 10; reasons.push(normalized.minimumExperienceYears === null ? `${worker.experienceYears} years experience` : `${worker.experienceYears} years experience meets minimum ${normalized.minimumExperienceYears}`); }
+    if (normalized.availability === null || (normalized.availability === 'IMMEDIATE' && worker.availability === 'AVAILABLE') || normalized.availability === worker.availability) { breakdown.availability = 5; if (worker.availability === 'AVAILABLE') reasons.push('Currently available'); }
     if (worker.verificationStatus === 'VERIFIED') { breakdown.verified = 5; reasons.push('Identity/background verification completed'); }
     if (worker.verificationScore > 0) breakdown.verificationScore = Math.min(5, Math.round(worker.verificationScore / 20));
-
     const languageDetails: MatchLanguageDetail[] = normalized.languages.map((language: any) => ({ required: language.name, matched: true }));
     if (languageDetails.length) reasons.push(`All ${languageDetails.length} required languages matched`);
-
     const preference = this.calculatePreferenceMatch(worker, normalized, geo, locationMatched, reasons);
     const score = Math.round(Object.values(breakdown).reduce((sum, value) => sum + value, 0) * 100) / 100;
     return { score, breakdown, reasons, skillDetails, languageDetails, preferenceMatch: preference.match, preferenceScore: preference.score };
@@ -177,8 +128,7 @@ export class WorkerSearchService {
     if (geo.radiusKm && worker.distanceKm !== null && worker.distanceKm !== undefined) {
       const distance = Number(worker.distanceKm); const radius = geo.radiusKm;
       if (distance <= radius * 0.25) breakdown.location = 20; else if (distance <= radius * 0.5) breakdown.location = 15; else if (distance <= radius * 0.75) breakdown.location = 10; else breakdown.location = 5;
-      reasons.push(`${distance.toFixed(1)} km from employer location`);
-      return distance <= radius;
+      reasons.push(`${distance.toFixed(1)} km from employer location`); return distance <= radius;
     }
     return false;
   }
@@ -190,31 +140,23 @@ export class WorkerSearchService {
       const workerMobility = String(worker.mobility ?? 'LOCAL').toUpperCase();
       const mobilityCompatible = requestedMobility === workerMobility || workerMobility === 'ANYWHERE_INDIA' || (requestedMobility === 'WITHIN_RADIUS' && workerMobility === 'WITHIN_STATE') || (requestedMobility === 'SPECIFIC_LOCATIONS' && workerMobility === 'WITHIN_STATE');
       mobility = mobilityCompatible ? 'MATCHED' : 'PARTIAL';
-      if (mobility === 'MATCHED') reasons.push(`Mobility preference matched: ${workerMobility}`);
-      else reasons.push(`Mobility preference differs: requested ${requestedMobility}, worker ${workerMobility}`);
+      if (mobility === 'MATCHED') reasons.push(`Mobility preference matched: ${workerMobility}`); else reasons.push(`Mobility preference differs: requested ${requestedMobility}, worker ${workerMobility}`);
     }
-
     const relocationRequested = normalized.willingToRelocate === true;
     const travelRequested = normalized.willingToTravel === true;
     const workerRelocates = Boolean(worker.willingToRelocate);
     const workerTravels = Boolean(worker.willingToTravel);
     const relocation = !relocationRequested ? 'NOT_REQUESTED' : workerRelocates || worker.mobility === 'ANYWHERE_INDIA' ? 'MATCHED' : locationMatched ? 'PARTIAL' : 'NOT_MATCHED';
     const travel = !travelRequested ? 'NOT_REQUESTED' : workerTravels || worker.mobility === 'ANYWHERE_INDIA' ? 'MATCHED' : 'NOT_MATCHED';
-
-    if (relocation === 'MATCHED') reasons.push('Worker is willing to relocate');
-    else if (relocation === 'NOT_MATCHED') reasons.push('Worker is not marked willing to relocate');
-    if (travel === 'MATCHED') reasons.push('Worker is willing to travel');
-    else if (travel === 'NOT_MATCHED') reasons.push('Worker is not marked willing to travel');
-
+    if (relocation === 'MATCHED') reasons.push('Worker is willing to relocate'); else if (relocation === 'NOT_MATCHED') reasons.push('Worker is not marked willing to relocate');
+    if (travel === 'MATCHED') reasons.push('Worker is willing to travel'); else if (travel === 'NOT_MATCHED') reasons.push('Worker is not marked willing to travel');
     let accommodation: PreferenceMatchStatus = 'NOT_SPECIFIED';
     if (normalized.accommodationAvailable === true) { accommodation = 'OFFERED'; reasons.push('Accommodation is available from the employer'); }
     else if (normalized.accommodationAvailable === false) accommodation = 'NOT_REQUESTED';
-
     let score = 0;
     if (relocation === 'MATCHED') score += 1;
     if (travel === 'MATCHED') score += 1;
     if (mobility === 'MATCHED') score += 1;
-
     return { match: { mobility, relocation, travel, accommodation } as PreferenceMatch, score };
   }
 
