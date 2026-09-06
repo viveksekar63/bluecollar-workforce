@@ -20,6 +20,10 @@ export class MockAiService implements AiProvider {
               ? 'Welder'
               : null;
 
+    const professionCategory = profession
+      ? 'Construction'
+      : null;
+
     const workerCountMatch = query.match(
       /\b(\d+)\s+(?:(?:experienced|skilled|qualified|professional|trained|expert|advanced|intermediate|beginner)\s+)?(?:workers?|people|persons?|electricians?|plumbers?|carpenters?|welders?)\b/i,
     );
@@ -91,7 +95,7 @@ export class MockAiService implements AiProvider {
 
     return {
       profession,
-      professionCategory: null,
+      professionCategory,
       skills,
       minimumSkillLevel,
       workerCount: workerCountMatch ? Number(workerCountMatch[1]) : null,
