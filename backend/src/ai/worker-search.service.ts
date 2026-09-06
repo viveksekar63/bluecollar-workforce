@@ -30,6 +30,10 @@ export class WorkerSearchService {
       throw error;
     }
 
+    return this.searchNormalizedRequirement(normalized, query, geo, pagination);
+  }
+
+  async searchNormalizedRequirement(normalized: any, query: string, geo: WorkerSearchGeoContext = {}, pagination: { page?: number; limit?: number } = {}) {
     const requestedCount = Math.min(Math.max(normalized.workerCount ?? 20, 1), 100);
     const page = Math.max(pagination.page ?? 1, 1);
     const limit = Math.min(Math.max(pagination.limit ?? requestedCount, 1), 50);
@@ -43,16 +47,19 @@ export class WorkerSearchService {
       city: !flexibleLocation && normalized.location?.type === 'CITY' ? normalized.location.name : undefined,
       district: !flexibleLocation && normalized.location?.type === 'DISTRICT' ? normalized.location.name : undefined,
       state: !flexibleLocation && normalized.location?.type === 'STATE' ? normalized.location.name : undefined,
-      skillIds: normalized.skills.map((skill) => skill.id),
-      languages: normalized.languages.map((language) => language.name).join(','),
+      skillIds: normalized.skills.map((skill: any) => skill.id),
+      languages: normalized.languages.map((language: any) => language.name).join(','),
       minimumExperienceYears: normalized.minimumExperienceYears ?? undefined,
       availability: this.toAvailabilityFilter(normalized.availability),
-      latitude: geo.latitude, longitude: geo.longitude, radiusKm: geo.radiusKm,
-      page: 1, limit: candidateLimit,
+      latitude: geo.latitude,
+      longitude: geo.longitude,
+      radiusKm: geo.radiusKm,
+      page: 1,
+      limit: candidateLimit,
     };
 
     const candidateResults = await this.discovery.findAll(discoveryQuery);
-    const scoredItems = candidateResults.items.map((worker) => {
+    const scoredItems = candidateResults.items.map((worker: any) => {
       const match = this.calculateMatchScore(worker, normalized, geo);
       return {
         ...worker,
@@ -63,12 +70,26 @@ export class WorkerSearchService {
         matchDetails: { skills: match.skillDetails, languages: match.languageDetails, preferences: match.preferenceMatch, preferenceScore: match.preferenceScore },
         preferenceMatch: match.preferenceMatch,
       };
-    }).sort((a, b) => b.matchScore - a.matchScore || b.preferenceScore - a.preferenceScore || b.verificationScore - a.verificationScore || b.experienceYears - a.experienceYears || a.id.localeCompare(b.id));
+    }).sort((a: any, b: any) => b.matchScore - a.matchScore || b.preferenceScore - a.preferenceScore || b.verificationScore - a.verificationScore || b.experienceYears - a.experienceYears || a.id.localeCompare(b.id));
 
     const selectedItems = scoredItems.slice(rankingOffset, rankingOffset + limit);
     const total = candidateResults.total;
     const totalPages = total ? Math.ceil(total / limit) : 0;
-    return { status: 'MATCHED' as const, query, requirement: parsed, normalizedRequirement: normalized, results: { items: selectedItems, page, limit, total, totalPages, candidateTotal: candidateResults.total, rankingCandidateLimit: candidateResults.items.length, hasNext: page < totalPages } };
+    return {
+      status: 'MATCHED' as const,
+      query,
+      normalizedRequirement: normalized,
+      results: {
+        items: selectedItems,
+        page,
+        limit,
+        total,
+        totalPages,
+        candidateTotal: candidateResults.total,
+        rankingCandidateLimit: candidateResults.items.length,
+        hasNext: page < totalPages,
+      },
+    };
   }
 
   private calculateMatchScore(worker: any, normalized: any, geo: WorkerSearchGeoContext) {
@@ -97,9 +118,7 @@ export class WorkerSearchService {
       reasons.push('No specific skill requested');
     } else {
       const matched = skillDetails.filter((skill) => skill.matched);
-      const qualifiedMatched = minimumSkillLevel
-        ? skillDetails.filter((skill) => skill.matched && skill.minimumLevelMet === true)
-        : matched;
+      const qualifiedMatched = minimumSkillLevel ? skillDetails.filter((skill) => skill.matched && skill.minimumLevelMet === true) : matched;
       const coverageScore = (qualifiedMatched.length / normalized.skills.length) * 15;
       const levelWeights: Record<string, number> = { BEGINNER: 0.25, INTERMEDIATE: 0.5, ADVANCED: 0.75, EXPERT: 1 };
       const proficiencyScore = qualifiedMatched.length ? (qualifiedMatched.reduce((sum, skill) => sum + (levelWeights[skill.skillLevel ?? 'BEGINNER'] ?? 0.25), 0) / qualifiedMatched.length) * 3 : 0;
@@ -169,9 +188,7 @@ export class WorkerSearchService {
     let mobility: PreferenceMatchStatus = 'NOT_REQUESTED';
     if (requestedMobility) {
       const workerMobility = String(worker.mobility ?? 'LOCAL').toUpperCase();
-      const mobilityCompatible = requestedMobility === workerMobility || workerMobility === 'ANYWHERE_INDIA'
-        || (requestedMobility === 'WITHIN_RADIUS' && workerMobility === 'WITHIN_STATE')
-        || (requestedMobility === 'SPECIFIC_LOCATIONS' && workerMobility === 'WITHIN_STATE');
+      const mobilityCompatible = requestedMobility === workerMobility || workerMobility === 'ANYWHERE_INDIA' || (requestedMobility === 'WITHIN_RADIUS' && workerMobility === 'WITHIN_STATE') || (requestedMobility === 'SPECIFIC_LOCATIONS' && workerMobility === 'WITHIN_STATE');
       mobility = mobilityCompatible ? 'MATCHED' : 'PARTIAL';
       if (mobility === 'MATCHED') reasons.push(`Mobility preference matched: ${workerMobility}`);
       else reasons.push(`Mobility preference differs: requested ${requestedMobility}, worker ${workerMobility}`);
@@ -190,12 +207,8 @@ export class WorkerSearchService {
     else if (travel === 'NOT_MATCHED') reasons.push('Worker is not marked willing to travel');
 
     let accommodation: PreferenceMatchStatus = 'NOT_SPECIFIED';
-    if (normalized.accommodationAvailable === true) {
-      accommodation = 'OFFERED';
-      reasons.push('Accommodation is available from the employer');
-    } else if (normalized.accommodationAvailable === false) {
-      accommodation = 'NOT_REQUESTED';
-    }
+    if (normalized.accommodationAvailable === true) { accommodation = 'OFFERED'; reasons.push('Accommodation is available from the employer'); }
+    else if (normalized.accommodationAvailable === false) accommodation = 'NOT_REQUESTED';
 
     let score = 0;
     if (relocation === 'MATCHED') score += 1;
