@@ -158,7 +158,7 @@ export class EmployerWorkerDiscoveryService {
         COALESCE((SELECT json_agg(sk_all."name" ORDER BY sk_all."name") FROM "WorkerSkill" ws_all JOIN "Skill" sk_all ON sk_all."id" = ws_all."skillId" WHERE ws_all."workerId" = w."id"), '[]'::json) AS "workerSkills",
         COALESCE((SELECT json_agg(json_build_object('id', sk_detail."id", 'name', sk_detail."name", 'experienceYears', ws_detail."experienceYears", 'skillLevel', ws_detail."skillLevel"::text, 'verified', ws_detail."verified") ORDER BY sk_detail."name") FROM "WorkerSkill" ws_detail JOIN "Skill" sk_detail ON sk_detail."id" = ws_detail."skillId" WHERE ws_detail."workerId" = w."id"), '[]'::json) AS "workerSkillDetails",
         COALESCE((SELECT json_agg(l_all."name" ORDER BY l_all."name") FROM "WorkerLanguage" wl_all JOIN "Language" l_all ON l_all."id" = wl_all."languageId" WHERE wl_all."workerId" = w."id"), '[]'::json) AS "workerLanguages",
-        ${detailSkillExpression} AS "skillMatchCount", ${detailDistanceExpression} AS "distanceKm", w."professionCategory", w."profession", w."experienceYears", addr."city", addr."district", addr."state", w."verificationScore", w."verificationStatus", w."availabilityStatus" AS "availability", wp."mobility", wp."willingToRelocate", wp."willingToTravel",
+        ${detailSkillExpression} AS "skillMatchCount", ${detailDistanceExpression} AS "distanceKm", w."professionCategory", w."profession", w."experienceYears", addr."city", addr."district", addr."state", w."verificationScore", w."verificationStatus", w."availabilityStatus" AS "availability", wp."mobility", wp."willingToRelocate", wp."willingToTravel", wp."requiresAccommodation",
         COALESCE((SELECT json_agg(json_build_object('city', pl."city", 'district', pl."district", 'state', pl."state", 'country', pl."country") ORDER BY pl."city") FROM "worker_preferred_locations" pl WHERE pl."workerId" = w."id"), '[]'::json) AS "preferredLocations"
       FROM "Worker" w JOIN "User" u ON u."id" = w."userId"
       LEFT JOIN LATERAL (SELECT sk."name" FROM "WorkerSkill" ws JOIN "Skill" sk ON sk."id" = ws."skillId" WHERE ws."workerId" = w."id" ORDER BY sk."name" ASC LIMIT 1) skill ON true
@@ -175,7 +175,7 @@ export class EmployerWorkerDiscoveryService {
         primarySkill: worker.primarySkill ?? 'Not specified', skills: Array.isArray(worker.workerSkills) ? worker.workerSkills : [], skillDetails: Array.isArray(worker.workerSkillDetails) ? worker.workerSkillDetails : [],
         languages: Array.isArray(worker.workerLanguages) ? worker.workerLanguages : [], professionCategory: worker.professionCategory, profession: worker.profession, experienceYears: Number(worker.experienceYears ?? 0),
         location: { city: worker.city, district: worker.district, state: worker.state }, distanceKm: worker.distanceKm, verificationStatus: worker.verificationStatus, verificationScore: worker.verificationScore,
-        availability: worker.availability, mobility: worker.mobility, willingToRelocate: worker.willingToRelocate, willingToTravel: worker.willingToTravel,
+        availability: worker.availability, mobility: worker.mobility, willingToRelocate: worker.willingToRelocate, willingToTravel: worker.willingToTravel, requiresAccommodation: Boolean(worker.requiresAccommodation),
         preferredLocations: Array.isArray(worker.preferredLocations) ? worker.preferredLocations : [], skillMatchCount: Number(worker.skillMatchCount ?? 0),
       })),
       page, limit, total, totalPages, hasNext: page < totalPages, candidateTotal: candidateRows.length, rankingCandidateLimit: rankingLimit,
