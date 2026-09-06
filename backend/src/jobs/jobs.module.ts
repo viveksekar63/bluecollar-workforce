@@ -9,5 +9,6 @@ import { JobsService } from './jobs.service';
   imports: [SubscriptionsModule],
   controllers: [JobsController],
   providers: [JobsService, EmployerApplicationService, EmployerPaymentService],
+  exports: [JobsService],
 })
 export class JobsModule {}
