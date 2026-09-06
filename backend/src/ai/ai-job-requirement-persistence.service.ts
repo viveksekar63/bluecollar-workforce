@@ -74,13 +74,13 @@ export class AiJobRequirementPersistenceService {
         INSERT INTO "job_ai_requirements"
           ("jobId", "minimumExperienceYears", "minimumSkillLevel", "availability", "mobility", "willingToRelocate", "willingToTravel", "accommodationAvailable")
         VALUES
-          (${created.id}::uuid, ${normalized.minimumExperienceYears}, ${normalized.minimumSkillLevel}, ${normalized.availability}, ${normalized.mobility}, ${normalized.willingToRelocate}, ${normalized.willingToTravel}, ${normalized.accommodationAvailable})
+          (${created.id}, ${normalized.minimumExperienceYears}, ${normalized.minimumSkillLevel}, ${normalized.availability}, ${normalized.mobility}, ${normalized.willingToRelocate}, ${normalized.willingToTravel}, ${normalized.accommodationAvailable})
       `;
 
       for (const language of normalized.languages) {
         await tx.$executeRaw`
           INSERT INTO "job_ai_requirement_languages" ("jobId", "languageId")
-          VALUES (${created.id}::uuid, ${language.id}::uuid)
+          VALUES (${created.id}, ${language.id})
         `;
       }
 
@@ -104,14 +104,14 @@ export class AiJobRequirementPersistenceService {
       SELECT "minimumExperienceYears", "minimumSkillLevel", "availability", "mobility",
              "willingToRelocate", "willingToTravel", "accommodationAvailable"
       FROM "job_ai_requirements"
-      WHERE "jobId" = ${job.id}::uuid
+      WHERE "jobId" = ${job.id}
     `;
 
     const languages = await this.prisma.$queryRaw<Array<{ id: string; name: string }>>`
       SELECT l."id", l."name"
       FROM "job_ai_requirement_languages" jl
       JOIN "Language" l ON l."id" = jl."languageId"
-      WHERE jl."jobId" = ${job.id}::uuid
+      WHERE jl."jobId" = ${job.id}
       ORDER BY l."name"
     `;
 
