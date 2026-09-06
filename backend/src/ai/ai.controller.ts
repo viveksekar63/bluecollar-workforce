@@ -1,12 +1,14 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Param, Post, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateJobDraftDto } from './dto/create-job-draft.dto';
+import { FindWorkersByJobDto } from './dto/find-workers-by-job.dto';
 import { ParseJobRequirementDto } from './dto/parse-job-requirement.dto';
 import { ParseWorkerRequirementDto } from './dto/parse-worker-requirement.dto';
 import { WorkerSearchDto } from './dto/worker-search.dto';
 import { AiJobRequirementPersistenceService } from './ai-job-requirement-persistence.service';
 import { JobRequirementService } from './job-requirement.service';
+import { JobWorkerSearchService } from './job-worker-search.service';
 import { RequirementParserService } from './requirement-parser.service';
 import { WorkerSearchService } from './worker-search.service';
 
@@ -17,6 +19,7 @@ export class AiController {
     private readonly jobRequirementService: JobRequirementService,
     private readonly workerSearchService: WorkerSearchService,
     private readonly aiJobRequirementPersistenceService: AiJobRequirementPersistenceService,
+    private readonly jobWorkerSearchService: JobWorkerSearchService,
   ) {}
 
   @Post('worker-search/parse')
@@ -81,6 +84,21 @@ export class AiController {
       suggestedJob: result.parsed.suggestedJob,
       job: result.job,
       aiRequirements: result.aiRequirements,
+    };
+  }
+
+  @Post('jobs/:jobId/find-workers')
+  @UseGuards(JwtAuthGuard)
+  async findWorkersForJob(
+    @CurrentUser() user: { userId: string },
+    @Param('jobId') jobId: string,
+    @Body() dto: FindWorkersByJobDto,
+  ) {
+    const result = await this.jobWorkerSearchService.findWorkers(user.userId, jobId, dto);
+
+    return {
+      success: true,
+      ...result,
     };
   }
 }
