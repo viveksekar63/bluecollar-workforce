@@ -72,9 +72,9 @@ export class AiJobRequirementPersistenceService {
 
       await tx.$executeRaw`
         INSERT INTO "job_ai_requirements"
-          ("jobId", "minimumExperienceYears", "minimumSkillLevel", "availability", "mobility", "willingToRelocate", "willingToTravel", "accommodationAvailable")
+          ("jobId", "profession", "professionCategory", "minimumExperienceYears", "minimumSkillLevel", "availability", "mobility", "willingToRelocate", "willingToTravel", "accommodationAvailable")
         VALUES
-          (${created.id}, ${normalized.minimumExperienceYears}, ${normalized.minimumSkillLevel}, ${normalized.availability}, ${normalized.mobility}, ${normalized.willingToRelocate}, ${normalized.willingToTravel}, ${normalized.accommodationAvailable})
+          (${created.id}, ${normalized.profession?.name}, ${normalized.professionCategory?.name}, ${normalized.minimumExperienceYears}, ${normalized.minimumSkillLevel}, ${normalized.availability}, ${normalized.mobility}, ${normalized.willingToRelocate}, ${normalized.willingToTravel}, ${normalized.accommodationAvailable})
       `;
 
       for (const language of normalized.languages) {
@@ -92,39 +92,47 @@ export class AiJobRequirementPersistenceService {
 
     if (!job) throw new NotFoundException('Created job not found');
 
+    return {
+      parsed,
+      job,
+      aiRequirements: await this.getRequirements(job.id),
+    };
+  }
+
+  async getRequirements(jobId: string) {
     const requirements = await this.prisma.$queryRaw<Array<{
+      profession: string | null;
+      professionCategory: string | null;
       minimumExperienceYears: unknown;
       minimumSkillLevel: string | null;
       availability: string | null;
       mobility: string | null;
       willingToRelocate: boolean | null;
       willingToTravel: boolean | null;
-      accommodationAvailable: boolean;
+      accommodationAvailable: boolean | null;
     }>>`
-      SELECT "minimumExperienceYears", "minimumSkillLevel", "availability", "mobility",
+      SELECT "profession", "professionCategory", "minimumExperienceYears", "minimumSkillLevel", "availability", "mobility",
              "willingToRelocate", "willingToTravel", "accommodationAvailable"
       FROM "job_ai_requirements"
-      WHERE "jobId" = ${job.id}
+      WHERE "jobId" = ${jobId}
     `;
 
     const languages = await this.prisma.$queryRaw<Array<{ id: string; name: string }>>`
       SELECT l."id", l."name"
       FROM "job_ai_requirement_languages" jl
       JOIN "Language" l ON l."id" = jl."languageId"
-      WHERE jl."jobId" = ${job.id}
+      WHERE jl."jobId" = ${jobId}
       ORDER BY l."name"
     `;
 
+    if (!requirements[0]) return null;
+
     return {
-      parsed,
-      job,
-      aiRequirements: {
-        ...(requirements[0] ?? {}),
-        minimumExperienceYears: requirements[0]?.minimumExperienceYears == null
-          ? null
-          : Number(requirements[0].minimumExperienceYears),
-        languages,
-      },
+      ...requirements[0],
+      minimumExperienceYears: requirements[0].minimumExperienceYears == null
+        ? null
+        : Number(requirements[0].minimumExperienceYears),
+      languages,
     };
   }
 }
