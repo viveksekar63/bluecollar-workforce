@@ -5,7 +5,6 @@ export interface AccommodationMatchResult {
   score: number;
   reason: string;
 }
-
 /**
  * Accommodation is a preference signal, not a hard worker-search filter.
  * A worker who requires accommodation should rank below an otherwise
@@ -20,7 +19,8 @@ export function calculateAccommodationMatch(
       return {
         status: 'MATCHED',
         score: 2,
-        reason: 'Accommodation is available and matches the worker accommodation requirement',
+        reason:
+          'Accommodation is available and matches the worker accommodation requirement',
       };
     }
 
@@ -31,11 +31,15 @@ export function calculateAccommodationMatch(
     };
   }
 
-  if (employerProvidesAccommodation === false && workerRequiresAccommodation === true) {
+  if (
+    employerProvidesAccommodation === false &&
+    workerRequiresAccommodation === true
+  ) {
     return {
       status: 'NOT_MATCHED',
       score: -2,
-      reason: 'Worker requires accommodation but the employer does not provide it',
+      reason:
+        'Worker requires accommodation but the employer does not provide it',
     };
   }
 
