@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { getRecruitmentRecommendations } from '@/api/employer-recruitment';
@@ -85,7 +85,7 @@ export default function EmployerRecruitmentPipelineScreen() {
         </View>
       </View>
     </ScrollView>
-  </SafeAreaFallback>;
+  </SafeAreaViewFallback>;
 }
 
 function PipelineCard({ candidate, jobId }: { candidate: RecruitmentCandidate; jobId: string }) {
@@ -103,7 +103,7 @@ function PipelineCard({ candidate, jobId }: { candidate: RecruitmentCandidate; j
   </Pressable>;
 }
 
-function SafeAreaViewFallback({ children }: { children: React.ReactNode }) {
+function SafeAreaViewFallback({ children }: { children: ReactNode }) {
   return <View style={styles.safe}>{children}</View>;
 }
 
