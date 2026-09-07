@@ -22,8 +22,6 @@ interface CandidateRow {
   verificationScore: number | null;
   firstName: string;
   lastName: string;
-  phone: string | null;
-  email: string | null;
   positiveEvents: number;
   noResponseEvents: number;
 }
@@ -95,7 +93,7 @@ export class RecruitmentAutopilotService {
         COALESCE(o."status", 'NOT_CONTACTED') AS "status", COALESCE(o."contact_attempts", 0) AS "contactAttempts",
         o."last_contacted_at" AS "lastContactedAt", o."next_follow_up_at" AS "nextFollowUpAt", o."outcome",
         w."workerCode", w."profession", w."experienceYears", w."verificationStatus", w."verificationScore",
-        u."firstName", u."lastName", u."phone", u."email",
+        u."firstName", u."lastName",
         (SELECT COUNT(*)::int FROM "job_worker_outreach_events" e WHERE e."job_id"=a."job_id" AND e."worker_id"=a."worker_id"
           AND e."employer_id"=a."employer_id" AND e."event_type"='STATUS_CHANGE' AND e."outcome" IN ('INTERESTED','INTERVIEW','SELECTED','HIRED')) AS "positiveEvents",
         (SELECT COUNT(*)::int FROM "job_worker_outreach_events" e WHERE e."job_id"=a."job_id" AND e."worker_id"=a."worker_id"
@@ -110,7 +108,7 @@ export class RecruitmentAutopilotService {
   private present(candidate: CandidateRow) {
     return {
       workerId: candidate.workerId, workerCode: candidate.workerCode, name: `${candidate.firstName} ${candidate.lastName}`.trim(),
-      profession: candidate.profession, experienceYears: candidate.experienceYears, phone: candidate.phone, email: candidate.email,
+      profession: candidate.profession, experienceYears: candidate.experienceYears,
       matchScore: candidate.matchScore, matchTier: candidate.matchTier, verificationStatus: candidate.verificationStatus, verificationScore: candidate.verificationScore,
       positiveEvents: candidate.positiveEvents, noResponseEvents: candidate.noResponseEvents,
       outreach: { status: candidate.status, contactAttempts: candidate.contactAttempts, lastContactedAt: candidate.lastContactedAt, nextFollowUpAt: candidate.nextFollowUpAt, outcome: candidate.outcome },
