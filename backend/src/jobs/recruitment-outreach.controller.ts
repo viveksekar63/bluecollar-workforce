@@ -55,17 +55,20 @@ export class RecruitmentOutreachController {
   }
 
   @Patch(':jobId/workers/:workerId/outreach/status')
-  updateStatus(@CurrentUser() user: { userId: string }, @Param('jobId') jobId: string, @Param('workerId') workerId: string, @Body() dto: UpdateStatusDto) {
+  async updateStatus(@CurrentUser() user: { userId: string }, @Param('jobId') jobId: string, @Param('workerId') workerId: string, @Body() dto: UpdateStatusDto) {
+    await this.outreach.initialize(user.userId, jobId, workerId);
     return this.outreach.updateStatus(user.userId, jobId, workerId, dto);
   }
 
   @Post(':jobId/workers/:workerId/outreach/follow-up')
-  scheduleFollowUp(@CurrentUser() user: { userId: string }, @Param('jobId') jobId: string, @Param('workerId') workerId: string, @Body() dto: FollowUpDto) {
+  async scheduleFollowUp(@CurrentUser() user: { userId: string }, @Param('jobId') jobId: string, @Param('workerId') workerId: string, @Body() dto: FollowUpDto) {
+    await this.outreach.initialize(user.userId, jobId, workerId);
     return this.outreach.scheduleFollowUp(user.userId, jobId, workerId, dto.nextFollowUpAt, dto.notes);
   }
 
   @Get(':jobId/workers/:workerId/outreach/timeline')
-  timeline(@CurrentUser() user: { userId: string }, @Param('jobId') jobId: string, @Param('workerId') workerId: string) {
+  async timeline(@CurrentUser() user: { userId: string }, @Param('jobId') jobId: string, @Param('workerId') workerId: string) {
+    await this.outreach.initialize(user.userId, jobId, workerId);
     return this.outreach.timeline(user.userId, jobId, workerId);
   }
 }
