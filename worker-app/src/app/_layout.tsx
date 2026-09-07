@@ -29,6 +29,9 @@ export default function RootLayout() {
         <Stack.Screen name="register-otp" />
         <Stack.Screen name="role-select" />
         <Stack.Screen name="employer-home" />
+        <Stack.Screen name="employer-jobs" />
+        <Stack.Screen name="employer-ai-recruiter" />
+        <Stack.Screen name="employer-recruitment-workspace" />
         <Stack.Screen name="employer-find-manpower" />
         <Stack.Screen name="employer-worker-details" />
         <Stack.Screen name="employer-credits" />
