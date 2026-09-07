@@ -2,7 +2,14 @@ import { Body, Controller, DefaultValuePipe, Get, Param, ParseIntPipe, Post, Que
 import { IsIn, IsISO8601, IsOptional, IsString, MaxLength } from 'class-validator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RecruitmentOutreachService, OutreachChannel, OutreachStatus } from './recruitment-outreach.service';
+import {
+  RecruitmentOutreachService,
+} from './recruitment-outreach.service';
+
+import type {
+  OutreachChannel,
+  OutreachStatus,
+} from './recruitment-outreach.service';
 
 class InitializeOutreachDto {
   @IsOptional() @IsString() @IsIn(['PHONE','WHATSAPP','SMS','EMAIL']) preferredChannel?: OutreachChannel;
