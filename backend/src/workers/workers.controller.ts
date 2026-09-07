@@ -99,15 +99,23 @@ export class WorkersController {
     const worker = await this.workersService.findOne(id);
     const roles: string[] = request.user?.roles ?? [];
     if (roles.includes("EMPLOYER")) {
-      const purchaseRows = await this.prisma.$queryRaw<Array<{ id: string }>>`
-        SELECT "id"
-        FROM "employer_contact_purchases"
-        WHERE "employerId" = (
-          SELECT "id" FROM "employers" WHERE "userId" = ${request.user.userId} LIMIT 1
-        )
-        AND "workerId" = ${id}
-        AND "status" = 'PAID'
-        LIMIT 1`;
+      // Use Prisma to resolve the employer first. The database table is "Employer"
+      // (not "employers"); using the wrong physical table name caused HTTP 500s.
+      const employer = await this.prisma.employer.findUnique({
+        where: { userId: request.user.userId },
+        select: { id: true },
+      });
+
+      const purchaseRows = employer
+        ? await this.prisma.$queryRaw<Array<{ id: string }>>`
+            SELECT "id"
+            FROM "employer_contact_purchases"
+            WHERE "employerId" = ${employer.id}
+              AND "workerId" = ${id}
+              AND "status" = 'PAID'
+            LIMIT 1`
+        : [];
+
       const contactUnlocked = purchaseRows.length > 0;
       const safeUser = worker.user
         ? contactUnlocked
