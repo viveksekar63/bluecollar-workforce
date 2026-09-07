@@ -112,6 +112,7 @@ export class RecruitmentAutopilotService {
       workerId: candidate.workerId, workerCode: candidate.workerCode, name: `${candidate.firstName} ${candidate.lastName}`.trim(),
       profession: candidate.profession, experienceYears: candidate.experienceYears, phone: candidate.phone, email: candidate.email,
       matchScore: candidate.matchScore, matchTier: candidate.matchTier, verificationStatus: candidate.verificationStatus, verificationScore: candidate.verificationScore,
+      positiveEvents: candidate.positiveEvents, noResponseEvents: candidate.noResponseEvents,
       outreach: { status: candidate.status, contactAttempts: candidate.contactAttempts, lastContactedAt: candidate.lastContactedAt, nextFollowUpAt: candidate.nextFollowUpAt, outcome: candidate.outcome },
     };
   }
