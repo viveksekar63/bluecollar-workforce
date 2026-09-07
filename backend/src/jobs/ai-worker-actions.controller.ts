@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  DefaultValuePipe,
   Delete,
   Get,
   Param,
@@ -67,8 +68,8 @@ export class AiWorkerActionsController {
   shortlistedWorkers(
     @CurrentUser() user: { userId: string },
     @Param('jobId') jobId: string,
-    @Query('page', new ParseIntPipe({ optional: true })) page = 1,
-    @Query('limit', new ParseIntPipe({ optional: true })) limit = 20,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
   ) {
     return this.actions.listShortlisted(user.userId, jobId, page, limit);
   }
