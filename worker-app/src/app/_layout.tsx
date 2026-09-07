@@ -17,11 +17,7 @@ export default function RootLayout() {
     <>
       <StatusBar style="dark" />
       <Stack
-        screenOptions={{
-          headerShown: false,
-          animation: 'slide_from_right',
-          contentStyle: { backgroundColor: BrandColors.background },
-        }}
+        screenOptions={{ headerShown: false, animation: 'slide_from_right', contentStyle: { backgroundColor: BrandColors.background } }}
       >
         <Stack.Screen name="index" />
         <Stack.Screen name="login" />
@@ -31,7 +27,9 @@ export default function RootLayout() {
         <Stack.Screen name="employer-home" />
         <Stack.Screen name="employer-jobs" />
         <Stack.Screen name="employer-ai-recruiter" />
+        <Stack.Screen name="employer-ai-contact-recommendations" />
         <Stack.Screen name="employer-recruitment-workspace" />
+        <Stack.Screen name="employer-recruitment-pipeline" />
         <Stack.Screen name="employer-find-manpower" />
         <Stack.Screen name="employer-worker-details" />
         <Stack.Screen name="employer-credits" />
