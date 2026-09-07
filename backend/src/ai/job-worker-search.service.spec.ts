@@ -12,13 +12,19 @@ describe('JobWorkerSearchService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new JobWorkerSearchService(prisma as any, aiRequirements as any, workerSearchService as any);
+    service = new JobWorkerSearchService(
+      prisma as any,
+      aiRequirements as any,
+      workerSearchService as any,
+    );
   });
 
   it('rejects an unverified employer', async () => {
     prisma.employer.findUnique.mockResolvedValue({ id: 'emp-1', status: 'PENDING' });
 
-    await expect(service.findWorkers('user-1', 'job-1', {})).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.findWorkers('user-1', 'job-1', {})).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
     expect(prisma.job.findFirst).not.toHaveBeenCalled();
   });
 
@@ -26,13 +32,17 @@ describe('JobWorkerSearchService', () => {
     prisma.employer.findUnique.mockResolvedValue({ id: 'emp-1', status: 'VERIFIED' });
     prisma.job.findFirst.mockResolvedValue(null);
 
-    await expect(service.findWorkers('user-1', 'job-1', {})).rejects.toBeInstanceOf(NotFoundException);
-    expect(prisma.job.findFirst).toHaveBeenCalledWith(expect.objectContaining({
-      where: { id: 'job-1', employerId: 'emp-1' },
-    }));
+    await expect(service.findWorkers('user-1', 'job-1', {})).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(prisma.job.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'job-1', employerId: 'emp-1' },
+      }),
+    );
   });
 
-  it('loads persisted AI requirements and sends the normalized job requirement to the existing ranked search engine', async () => {
+  it('loads persisted AI requirements, propagates accommodation, and forwards pagination and geo inputs', async () => {
     prisma.employer.findUnique.mockResolvedValue({ id: 'emp-1', status: 'VERIFIED' });
     prisma.job.findFirst.mockResolvedValue({
       id: 'job-1',
@@ -41,7 +51,7 @@ describe('JobWorkerSearchService', () => {
       city: 'Chennai',
       district: 'Chennai',
       state: 'Tamil Nadu',
-      pincode: null,
+      pincode: '600001',
       openings: 5,
       skills: [
         { skill: { id: 'skill-1', name: 'Electrical Wiring' } },
@@ -62,14 +72,45 @@ describe('JobWorkerSearchService', () => {
     });
     workerSearchService.searchNormalizedRequirement.mockResolvedValue({
       status: 'MATCHED',
-      results: { items: [], page: 1, limit: 5, total: 0, totalPages: 0, candidateTotal: 0, rankingCandidateLimit: 0, hasNext: false },
+      results: {
+        items: [
+          {
+            workerId: 'worker-1',
+            matchScore: 94,
+            matchTier: 'BEST_MATCH',
+            matchExplanation: {
+              strengths: ['Profession matches'],
+              missingRequirements: [],
+              concerns: [],
+              recommendation: 'Highly recommended',
+            },
+          },
+        ],
+        page: 2,
+        limit: 10,
+        total: 11,
+        totalPages: 2,
+        candidateTotal: 11,
+        rankingCandidateLimit: 100,
+        hasNext: false,
+      },
     });
 
-    const result = await service.findWorkers('user-1', 'job-1', { page: 1, limit: 5 });
+    const result = await service.findWorkers('user-1', 'job-1', {
+      page: 2,
+      limit: 10,
+      latitude: 13.0827,
+      longitude: 80.2707,
+      radiusKm: 25,
+    });
 
-    const normalized = workerSearchService.searchNormalizedRequirement.mock.calls[0][0];
+    const [normalized, query, geo, pagination] =
+      workerSearchService.searchNormalizedRequirement.mock.calls[0];
+
     expect(normalized.workerCount).toBe(5);
-    expect(normalized.profession.name).toBe('Electrician');
+    expect(normalized.profession).toEqual(
+      expect.objectContaining({ name: 'Electrician' }),
+    );
     expect(normalized.minimumExperienceYears).toBe(5);
     expect(normalized.minimumSkillLevel).toBe('EXPERT');
     expect(normalized.languages).toEqual([{ id: 'lang-1', name: 'Tamil' }]);
@@ -77,8 +118,36 @@ describe('JobWorkerSearchService', () => {
       { id: 'skill-1', name: 'Electrical Wiring' },
       { id: 'skill-2', name: 'Panel Installation' },
     ]);
-    expect(normalized.location).toEqual(expect.objectContaining({ type: 'CITY', name: 'Chennai', stateName: 'Tamil Nadu' }));
-    expect(result.job.id).toBe('job-1');
-    expect(result.aiRequirements.minimumSkillLevel).toBe('EXPERT');
+    expect(normalized.location).toEqual(
+      expect.objectContaining({
+        type: 'CITY',
+        name: 'Chennai',
+        stateName: 'Tamil Nadu',
+        pincode: '600001',
+      }),
+    );
+    expect(normalized.accommodationAvailable).toBe(true);
+    expect(query).toBe('Job job-1: 5 Electricians Required');
+    expect(geo).toEqual({ latitude: 13.0827, longitude: 80.2707, radiusKm: 25 });
+    expect(pagination).toEqual({ page: 2, limit: 10 });
+
+    expect(result.job).toEqual(
+      expect.objectContaining({
+        id: 'job-1',
+        title: '5 Electricians Required',
+        openings: 5,
+      }),
+    );
+    expect(result.aiRequirements.accommodationAvailable).toBe(true);
+    expect(result.results.items[0]).toEqual(
+      expect.objectContaining({
+        workerId: 'worker-1',
+        matchScore: 94,
+        matchTier: 'BEST_MATCH',
+        matchExplanation: expect.any(Object),
+      }),
+    );
+    expect(result.results.page).toBe(2);
+    expect(result.results.limit).toBe(10);
   });
 });
