@@ -22,4 +22,9 @@ export class RecruitmentAutopilotController {
   nextAction(@CurrentUser() user: { userId: string }, @Param('jobId') jobId: string) {
     return this.autopilot.nextAction(user.userId, jobId);
   }
+
+  @Get(':jobId/recruitment-ai/dashboard')
+  dashboard(@CurrentUser() user: { userId: string }, @Param('jobId') jobId: string) {
+    return this.autopilot.dashboard(user.userId, jobId);
+  }
 }
