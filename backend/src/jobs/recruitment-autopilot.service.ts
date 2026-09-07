@@ -116,12 +116,16 @@ export class RecruitmentAutopilotService {
     };
   }
 
+  private rankCandidates(rows: CandidateRow[]) {
+    return rows.map((candidate) => ({ ...this.present(candidate), ...this.scoreCandidate(candidate), ...this.conversionIntelligence(candidate) }))
+      .sort((a, b) => b.priorityScore - a.priorityScore || b.conversionScore - a.conversionScore || Number(b.matchScore ?? 0) - Number(a.matchScore ?? 0));
+  }
+
   async recommendations(userId: string, jobId: string, limit = 20) {
     const { employer, job } = await this.getOwnedJob(userId, jobId);
     const safeLimit = Math.min(50, Math.max(1, Number(limit) || 20));
     const rows = await this.loadCandidates(employer.id, job.id);
-    const recommendations = rows.map((candidate) => ({ ...this.present(candidate), ...this.scoreCandidate(candidate), ...this.conversionIntelligence(candidate) }))
-      .sort((a, b) => b.priorityScore - a.priorityScore || b.conversionScore - a.conversionScore || Number(b.matchScore ?? 0) - Number(a.matchScore ?? 0));
+    const recommendations = this.rankCandidates(rows);
     return {
       success: true, mode: 'AI_RECRUITMENT_AUTOPILOT', job: { id: job.id, title: job.title }, recommendations: recommendations.slice(0, safeLimit),
       summary: {
@@ -141,9 +145,55 @@ export class RecruitmentAutopilotService {
     const { employer, job } = await this.getOwnedJob(userId, jobId);
     const safeLimit = Math.min(50, Math.max(1, Number(limit) || 20));
     const rows = await this.loadCandidates(employer.id, job.id);
-    const recommendations = rows.map((candidate) => ({ ...this.present(candidate), ...this.conversionIntelligence(candidate), ...this.scoreCandidate(candidate) }))
-      .sort((a, b) => b.conversionScore - a.conversionScore || b.priorityScore - a.priorityScore);
+    const recommendations = this.rankCandidates(rows).sort((a, b) => b.conversionScore - a.conversionScore || b.priorityScore - a.priorityScore);
     return { success: true, mode: 'AI_CONVERSION_INTELLIGENCE', job: { id: job.id, title: job.title }, recommendations: recommendations.slice(0, safeLimit), summary: { candidatesEvaluated: rows.length, highConversion: recommendations.filter((r) => r.conversionBand === 'HIGH').length, mediumConversion: recommendations.filter((r) => r.conversionBand === 'MEDIUM').length, lowConversion: recommendations.filter((r) => r.conversionBand === 'LOW').length } };
+  }
+
+  async dashboard(userId: string, jobId: string) {
+    const { employer, job } = await this.getOwnedJob(userId, jobId);
+    const rows = await this.loadCandidates(employer.id, job.id);
+    const ranked = this.rankCandidates(rows);
+    const statusCount = (status: string) => rows.filter((candidate) => candidate.status === status).length;
+    const due = ranked.filter((candidate) => candidate.action === 'FOLLOW_UP_NOW');
+    const contactNow = ranked.filter((candidate) => candidate.action === 'CONTACT_NOW');
+    const highConversion = ranked.filter((candidate) => candidate.conversionBand === 'HIGH' && candidate.action !== 'STOP_CONTACT');
+    const losingInterest = ranked.filter((candidate) => ['NO_RESPONSE', 'UNAVAILABLE'].includes(candidate.outreach.status) || candidate.noResponseEvents >= 2);
+
+    return {
+      success: true,
+      mode: 'AI_RECRUITMENT_DASHBOARD',
+      job: { id: job.id, title: job.title, status: job.status },
+      summary: {
+        totalMatchedWorkers: rows.length,
+        shortlisted: rows.length,
+        notContacted: statusCount('NOT_CONTACTED'),
+        contacted: statusCount('CONTACTED'),
+        noResponse: statusCount('NO_RESPONSE'),
+        interested: statusCount('INTERESTED'),
+        interview: statusCount('INTERVIEW'),
+        selected: statusCount('SELECTED'),
+        hired: statusCount('HIRED'),
+        unavailable: statusCount('UNAVAILABLE'),
+        notInterested: statusCount('NOT_INTERESTED'),
+        contactNow: contactNow.length,
+        followUpsDue: due.length,
+        highConversionCandidates: highConversion.length,
+        candidatesLosingInterest: losingInterest.length,
+      },
+      funnel: [
+        { stage: 'MATCHED', count: rows.length },
+        { stage: 'SHORTLISTED', count: rows.length },
+        { stage: 'CONTACTED', count: rows.filter((c) => ['CONTACTED', 'NO_RESPONSE', 'INTERESTED', 'INTERVIEW', 'SELECTED', 'HIRED', 'NOT_INTERESTED', 'UNAVAILABLE', 'WRONG_NUMBER'].includes(c.status)).length },
+        { stage: 'INTERESTED', count: statusCount('INTERESTED') },
+        { stage: 'INTERVIEW', count: statusCount('INTERVIEW') },
+        { stage: 'SELECTED', count: statusCount('SELECTED') },
+        { stage: 'HIRED', count: statusCount('HIRED') },
+      ],
+      contactNow: contactNow.slice(0, 10),
+      followUpsDue: due.slice(0, 10),
+      highConversionCandidates: highConversion.slice(0, 10),
+      candidatesLosingInterest: losingInterest.slice(0, 10),
+    };
   }
 
   async nextAction(userId: string, jobId: string) {
