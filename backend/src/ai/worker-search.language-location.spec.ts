@@ -78,8 +78,12 @@ describe('WorkerSearchService language and location regressions', () => {
       { required: 'Hindi', matched: false, matchedAs: null },
     ]);
     expect(match.languageScore).toBe(50);
-    expect(match.matchedLanguages).toBe(1);
-    expect(match.unmatchedLanguages).toEqual(['Hindi']);
+    expect(match.matchDetails.languages.filter((language) => language.matched)).toHaveLength(1);
+    expect(
+      match.matchDetails.languages
+        .filter((language) => !language.matched)
+        .map((language) => language.required),
+    ).toEqual(['Hindi']);
     expect(match.matchReasons).toEqual(expect.arrayContaining([
       '1 of 2 required languages matched',
       'Unmatched languages: Hindi',
