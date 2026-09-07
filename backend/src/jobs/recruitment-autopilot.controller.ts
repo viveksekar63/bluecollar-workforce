@@ -9,12 +9,13 @@ export class RecruitmentAutopilotController {
   constructor(private readonly autopilot: RecruitmentAutopilotService) {}
 
   @Get(':jobId/autopilot/recommendations')
-  recommendations(
-    @CurrentUser() user: { userId: string },
-    @Param('jobId') jobId: string,
-    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
-  ) {
+  recommendations(@CurrentUser() user: { userId: string }, @Param('jobId') jobId: string, @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number) {
     return this.autopilot.recommendations(user.userId, jobId, limit);
+  }
+
+  @Get(':jobId/autopilot/conversion-recommendations')
+  conversionRecommendations(@CurrentUser() user: { userId: string }, @Param('jobId') jobId: string, @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number) {
+    return this.autopilot.conversionRecommendations(user.userId, jobId, limit);
   }
 
   @Get(':jobId/autopilot/next-action')
