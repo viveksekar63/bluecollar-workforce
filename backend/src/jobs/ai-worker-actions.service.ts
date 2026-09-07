@@ -6,6 +6,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { JobsService } from './jobs.service';
 
 type MatchTier =
@@ -26,6 +27,7 @@ export class AiWorkerActionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jobsService: JobsService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   private async assertWorker(workerId: string) {
@@ -33,6 +35,7 @@ export class AiWorkerActionsService {
       where: { id: workerId },
       select: {
         id: true,
+        userId: true,
         workerCode: true,
         experienceYears: true,
         profession: true,
@@ -47,8 +50,10 @@ export class AiWorkerActionsService {
   }
 
   private validateSnapshot(snapshot: WorkerActionSnapshot) {
-    if (snapshot.matchScore !== undefined &&
-      (!Number.isInteger(snapshot.matchScore) || snapshot.matchScore < 0 || snapshot.matchScore > 100)) {
+    if (
+      snapshot.matchScore !== undefined &&
+      (!Number.isInteger(snapshot.matchScore) || snapshot.matchScore < 0 || snapshot.matchScore > 100)
+    ) {
       throw new BadRequestException('matchScore must be an integer between 0 and 100');
     }
   }
@@ -99,33 +104,26 @@ export class AiWorkerActionsService {
     const employer = await this.jobsService.getEmployer(userId);
     const job = await this.prisma.job.findFirst({ where: { id: jobId, employerId: employer.id }, select: { id: true } });
     if (!job) throw new NotFoundException('Job not found');
-
     const safePage = Math.max(1, page);
     const safeLimit = Math.min(Math.max(1, limit), 50);
     const offset = (safePage - 1) * safeLimit;
 
     const [items, countRows] = await Promise.all([
       this.prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
-        SELECT
-          a."id" AS "actionId", a."worker_id" AS "workerId", a."match_score" AS "matchScore",
-          a."match_tier" AS "matchTier", a."match_explanation" AS "matchExplanation",
-          a."created_at" AS "shortlistedAt", w."workerCode", w."experienceYears",
-          w."profession", w."professionCategory", w."verificationStatus", w."verificationScore",
+        SELECT a."id" AS "actionId", a."worker_id" AS "workerId", a."match_score" AS "matchScore",
+          a."match_tier" AS "matchTier", a."match_explanation" AS "matchExplanation", a."created_at" AS "shortlistedAt",
+          w."workerCode", w."experienceYears", w."profession", w."professionCategory", w."verificationStatus", w."verificationScore",
           u."firstName", u."lastName", u."profilePhotoUrl"
-        FROM "job_worker_actions" a
-        JOIN "Worker" w ON w."id" = a."worker_id"
-        JOIN "User" u ON u."id" = w."userId"
+        FROM "job_worker_actions" a JOIN "Worker" w ON w."id" = a."worker_id" JOIN "User" u ON u."id" = w."userId"
         WHERE a."employer_id" = ${employer.id} AND a."job_id" = ${jobId} AND a."action_type" = 'SHORTLISTED'
         ORDER BY a."match_score" DESC NULLS LAST, a."created_at" DESC, a."worker_id" ASC
         LIMIT ${safeLimit} OFFSET ${offset}
       `),
       this.prisma.$queryRaw<Array<{ total: bigint }>>(Prisma.sql`
-        SELECT COUNT(*)::bigint AS "total"
-        FROM "job_worker_actions"
+        SELECT COUNT(*)::bigint AS "total" FROM "job_worker_actions"
         WHERE "employer_id" = ${employer.id} AND "job_id" = ${jobId} AND "action_type" = 'SHORTLISTED'
       `),
     ]);
-
     const total = Number(countRows[0]?.total ?? 0);
     return { items, pagination: { page: safePage, limit: safeLimit, total, totalPages: Math.ceil(total / safeLimit) } };
   }
@@ -144,37 +142,59 @@ export class AiWorkerActionsService {
     const employer = await this.jobsService.getEmployer(userId);
     const job = await this.prisma.job.findFirst({ where: { id: jobId, employerId: employer.id }, select: { id: true, title: true, status: true } });
     if (!job) throw new NotFoundException('Job not found');
-    if (String(job.status) !== 'PUBLISHED') {
-      throw new BadRequestException('Worker invitations are only allowed for published jobs');
-    }
+    if (String(job.status) !== 'PUBLISHED') throw new BadRequestException('Worker invitations are only allowed for published jobs');
 
-    await this.assertWorker(workerId);
+    const worker = await this.assertWorker(workerId);
     this.validateSnapshot(snapshot);
     const actionId = randomUUID();
-
     const rows = await this.prisma.$queryRaw<Array<{ id: string; invited_at: Date }>>(Prisma.sql`
       INSERT INTO "job_worker_actions"
-        ("id", "employer_id", "job_id", "worker_id", "action_type", "match_score", "match_tier", "match_explanation", "invited_at")
+        ("id", "employer_id", "job_id", "worker_id", "action_type", "match_score", "match_tier", "match_explanation", "invited_at", "response_status")
       VALUES
-        (${actionId}, ${employer.id}, ${jobId}, ${workerId}, 'INVITED', ${snapshot.matchScore ?? null}, ${snapshot.matchTier ?? null}, ${snapshot.matchExplanation ? JSON.stringify(snapshot.matchExplanation) : null}::jsonb, CURRENT_TIMESTAMP)
+        (${actionId}, ${employer.id}, ${jobId}, ${workerId}, 'INVITED', ${snapshot.matchScore ?? null}, ${snapshot.matchTier ?? null}, ${snapshot.matchExplanation ? JSON.stringify(snapshot.matchExplanation) : null}::jsonb, CURRENT_TIMESTAMP, 'PENDING')
       ON CONFLICT ("job_id", "worker_id", "action_type")
       DO UPDATE SET
         "match_score" = EXCLUDED."match_score", "match_tier" = EXCLUDED."match_tier",
         "match_explanation" = EXCLUDED."match_explanation", "invited_at" = CURRENT_TIMESTAMP,
-        "updated_at" = CURRENT_TIMESTAMP
+        "response_status" = 'PENDING', "responded_at" = NULL, "updated_at" = CURRENT_TIMESTAMP
       RETURNING "id", "invited_at"
     `);
 
-    return {
-      success: true,
-      action: 'INVITED',
-      jobId,
-      workerId,
-      actionId: rows[0].id,
-      invitedAt: rows[0].invited_at,
-      matchScore: snapshot.matchScore ?? null,
-      matchTier: snapshot.matchTier ?? null,
-      matchExplanation: snapshot.matchExplanation ?? null,
-    };
+    await this.notifications.create({
+      userId: worker.userId,
+      title: 'New job invitation',
+      message: `You have been invited for ${job.title} by an employer.`,
+      type: 'JOB',
+      data: { invitationId: rows[0].id, jobId, workerId, matchScore: snapshot.matchScore ?? null, matchTier: snapshot.matchTier ?? null },
+    });
+
+    return { success: true, action: 'INVITED', jobId, workerId, actionId: rows[0].id, invitedAt: rows[0].invited_at, matchScore: snapshot.matchScore ?? null, matchTier: snapshot.matchTier ?? null, matchExplanation: snapshot.matchExplanation ?? null };
+  }
+
+  async listInvitationsForEmployer(userId: string, jobId: string, page = 1, limit = 20) {
+    const employer = await this.jobsService.getEmployer(userId);
+    const job = await this.prisma.job.findFirst({ where: { id: jobId, employerId: employer.id }, select: { id: true } });
+    if (!job) throw new NotFoundException('Job not found');
+    const safePage = Math.max(1, page);
+    const safeLimit = Math.min(50, Math.max(1, limit));
+    const offset = (safePage - 1) * safeLimit;
+    const [items, countRows] = await Promise.all([
+      this.prisma.$queryRaw<Array<Record<string, unknown>>>(Prisma.sql`
+        SELECT a."id" AS "invitationId", a."worker_id" AS "workerId", a."match_score" AS "matchScore",
+          a."match_tier" AS "matchTier", a."match_explanation" AS "matchExplanation", a."invited_at" AS "invitedAt",
+          a."response_status" AS "responseStatus", a."responded_at" AS "respondedAt",
+          w."workerCode", w."profession", w."professionCategory", u."firstName", u."lastName", u."profilePhotoUrl"
+        FROM "job_worker_actions" a JOIN "Worker" w ON w."id" = a."worker_id" JOIN "User" u ON u."id" = w."userId"
+        WHERE a."employer_id" = ${employer.id} AND a."job_id" = ${jobId} AND a."action_type" = 'INVITED'
+        ORDER BY a."invited_at" DESC NULLS LAST, a."created_at" DESC
+        LIMIT ${safeLimit} OFFSET ${offset}
+      `),
+      this.prisma.$queryRaw<Array<{ total: bigint }>>(Prisma.sql`
+        SELECT COUNT(*)::bigint AS "total" FROM "job_worker_actions"
+        WHERE "employer_id" = ${employer.id} AND "job_id" = ${jobId} AND "action_type" = 'INVITED'
+      `),
+    ]);
+    const total = Number(countRows[0]?.total ?? 0);
+    return { items, pagination: { page: safePage, limit: safeLimit, total, totalPages: Math.ceil(total / safeLimit), hasNext: safePage * safeLimit < total, hasPrevious: safePage > 1 } };
   }
 }
