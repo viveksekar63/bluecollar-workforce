@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ArrowLeft, CheckCircle2, UserRound, XCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Sparkles, UserRound, XCircle } from "lucide-react";
 import { EmployerShell } from "@/components/layout/employer-shell";
 
 type Application = { id: string; status?: string; worker?: { user?: { firstName?: string; lastName?: string }; experienceYears?: number | string | null; verificationStatus?: string; skills?: Array<{ skill?: { name?: string } }>; addresses?: Array<{ city?: string; state?: string }> } };
@@ -39,7 +39,7 @@ export default function EmployerJobDetailsPage({ params }: { params: Promise<{ i
   }
 
   return <EmployerShell>
-    <div className="mb-6 flex items-center gap-3"><Link href="/employer/jobs" className="rounded-lg border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50"><ArrowLeft size={17} /></Link><div><h1 className="text-2xl font-bold text-slate-900">Job Applicants</h1><p className="mt-1 text-xs text-slate-500">Review workers and shortlist the right person.</p></div></div>
+    <div className="mb-6 flex items-center justify-between gap-3"><div className="flex items-center gap-3"><Link href="/employer/jobs" className="rounded-lg border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50"><ArrowLeft size={17} /></Link><div><h1 className="text-2xl font-bold text-slate-900">Job Applicants</h1><p className="mt-1 text-xs text-slate-500">Review workers and shortlist the right person.</p></div></div>{job && <Link href={`/employer/jobs/${job.id}/ai-recruiter`} className="inline-flex items-center gap-2 rounded-lg bg-[#0757d8] px-3.5 py-2.5 text-xs font-bold text-white hover:bg-[#064dbf]"><Sparkles size={15} /> AI Recruiter</Link>}</div>
     {loading && <div className="rounded-xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">Loading...</div>}
     {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
     {job && <div className="mb-5 rounded-xl border border-slate-200 bg-white p-5"><div className="flex flex-wrap items-start justify-between gap-4"><div><h2 className="text-lg font-bold text-slate-900">{job.title}</h2><p className="mt-1 text-sm text-slate-500">{[job.city, job.district, job.state].filter(Boolean).join(", ")}</p></div><span className={`rounded-full px-3 py-1 text-xs font-bold ${job.status === "PUBLISHED" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>{job.status}</span></div><p className="mt-4 text-sm leading-6 text-slate-600">{job.description}</p><div className="mt-4 flex flex-wrap gap-2">{(job.skills ?? []).map((item, index) => <span key={index} className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">{item.skill?.name}</span>)}</div></div>}
