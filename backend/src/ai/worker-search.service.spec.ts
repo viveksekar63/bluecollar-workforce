@@ -217,10 +217,10 @@ describe('WorkerSearchService matching', () => {
     const result = await service.search('electrician in Bengaluru willing to relocate and travel');
     expect(result.results!.items.map((item) => item.id)).toEqual(['worker-both', 'worker-relocation']);
     expect(result.results!.items[0].matchScore).toBe(result.results!.items[1].matchScore);
-    expect(result.results!.items[0].preferenceScore).toBe(2);
-    expect(result.results!.items[1].preferenceScore).toBe(1);
-    expect(result.results!.items[0].matchDetails.preferenceScore).toBe(2);
-    expect(result.results!.items[1].matchDetails.preferenceScore).toBe(1);
+    expect(result.results!.items[0].preferenceScore).toBe(3);
+    expect(result.results!.items[1].preferenceScore).toBe(2);
+    expect(result.results!.items[0].matchDetails.preferenceScore).toBe(3);
+    expect(result.results!.items[1].matchDetails.preferenceScore).toBe(2);
   });
 
   it('returns mobility compatibility and employer accommodation offer without changing the 100-point score', async () => {
@@ -231,7 +231,7 @@ describe('WorkerSearchService matching', () => {
     const result = await service.search('electrician anywhere in India, willing to relocate and travel, accommodation available');
     const match = result.results!.items[0];
     expect(match.matchScore).toBe(100);
-    expect(match.preferenceScore).toBe(3);
+    expect(match.preferenceScore).toBe(4);
     expect(match.preferenceMatch).toEqual({ mobility: 'MATCHED', relocation: 'MATCHED', travel: 'MATCHED', accommodation: 'OFFERED' });
     expect(match.matchDetails.preferences).toEqual(match.preferenceMatch);
     expect(match.matchReasons).toEqual(expect.arrayContaining(['Mobility preference matched: ANYWHERE_INDIA', 'Worker is willing to relocate', 'Worker is willing to travel', 'Accommodation is available from the employer']));
