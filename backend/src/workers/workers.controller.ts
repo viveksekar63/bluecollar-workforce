@@ -99,9 +99,23 @@ export class WorkersController {
     const worker = await this.workersService.findOne(id);
     const roles: string[] = request.user?.roles ?? [];
     if (roles.includes("EMPLOYER")) {
-      const safeUser = worker.user ? { ...worker.user, phone: undefined, email: undefined } : worker.user;
+      const purchaseRows = await this.prisma.$queryRaw<Array<{ id: string }>>`
+        SELECT "id"
+        FROM "employer_contact_purchases"
+        WHERE "employerId" = (
+          SELECT "id" FROM "employers" WHERE "userId" = ${request.user.userId} LIMIT 1
+        )
+        AND "workerId" = ${id}
+        AND "status" = 'PAID'
+        LIMIT 1`;
+      const contactUnlocked = purchaseRows.length > 0;
+      const safeUser = worker.user
+        ? contactUnlocked
+          ? { ...worker.user }
+          : { ...worker.user, phone: undefined, email: undefined }
+        : worker.user;
       const workPreferences = await this.workerWorkPreferencesService.getForWorker(id);
-      return { ...worker, user: safeUser, workPreferences };
+      return { ...worker, user: safeUser, contactUnlocked, workPreferences };
     }
     return worker;
   }
