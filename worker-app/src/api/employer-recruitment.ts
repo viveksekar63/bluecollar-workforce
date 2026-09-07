@@ -18,8 +18,6 @@ export type RecruitmentCandidate = {
   name: string;
   profession: string;
   experienceYears: number | null;
-  phone: string | null;
-  email: string | null;
   matchScore: number | null;
   matchTier: string | null;
   verificationStatus: string;
@@ -100,6 +98,17 @@ export type RecruitmentDashboard = {
   candidatesLosingInterest: RecruitmentCandidate[];
 };
 
+export type RecruitmentContactUnlockResult = {
+  success: boolean;
+  alreadyUnlocked?: boolean;
+  purchaseId?: string | null;
+  balance?: number;
+  creditsUsed?: number;
+  workerId: string;
+  contact?: { phone?: string | null; email?: string | null };
+  message?: string;
+};
+
 export async function getEmployerJobs() {
   const response = await api.get<EmployerJob[]>('/jobs/employer/my');
   return response.data;
@@ -122,6 +131,11 @@ export async function shortlistAiWorker(jobId: string, workerId: string, input: 
 
 export async function getRecruitmentRecommendations(jobId: string, limit = 20) {
   const response = await api.get(`/jobs/${jobId}/autopilot/recommendations`, { params: { limit } });
+  return response.data;
+}
+
+export async function unlockRecruitmentWorkerContact(workerId: string) {
+  const response = await api.post<RecruitmentContactUnlockResult>(`/workers/${workerId}/contact`);
   return response.data;
 }
 
