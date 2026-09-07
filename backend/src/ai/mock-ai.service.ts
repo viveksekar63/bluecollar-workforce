@@ -53,7 +53,6 @@ export class MockAiService implements AiProvider {
       [/pipe\s+fitting/i, 'Pipe Fitting'],
       [/carpentry/i, 'Carpentry'],
       [/welding/i, 'Welding'],
-      [/parotta(?:\s+making|\s+cooking)?/i, 'Parotta Cooking'],
     ];
 
     for (const [pattern, skill] of skillPatterns) {
