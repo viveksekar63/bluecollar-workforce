@@ -18,14 +18,18 @@ export class MockAiService implements AiProvider {
             ? 'Carpenter'
             : query.includes('welder')
               ? 'Welder'
-              : null;
+              : /\b(?:parotta\s+master|parotta\s+cook|parotta\s+chef|chef|cook|cooking)\b/i.test(query)
+                ? 'Domestic Cook'
+                : null;
 
-    const professionCategory = profession
-      ? 'Construction'
-      : null;
+    const professionCategory = profession === 'Domestic Cook'
+      ? 'Domestic Services'
+      : profession
+        ? 'Construction'
+        : null;
 
     const workerCountMatch = query.match(
-      /\b(\d+)\s+(?:(?:experienced|skilled|qualified|professional|trained|expert|advanced|intermediate|beginner)\s+)?(?:workers?|people|persons?|electricians?|plumbers?|carpenters?|welders?)\b/i,
+      /\b(\d+)\s+(?:(?:experienced|skilled|qualified|professional|trained|expert|advanced|intermediate|beginner)\s+)?(?:workers?|people|persons?|electricians?|plumbers?|carpenters?|welders?|cooks?|chefs?|parotta\s+masters?|parotta\s+cooks?)\b/i,
     );
 
     const experienceMatch = query.match(
