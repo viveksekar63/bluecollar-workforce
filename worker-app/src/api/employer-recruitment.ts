@@ -41,6 +41,37 @@ export type RecruitmentCandidate = {
   };
 };
 
+export type AiContactRecommendation = {
+  workerId: string;
+  workerCode: string;
+  name: string;
+  profession: string;
+  professionCategory?: string | null;
+  experienceYears: number | null;
+  profileImageUrl?: string | null;
+  verificationStatus: string;
+  verificationScore: number | null;
+  matchScore: number;
+  matchTier: string | null;
+  matchReasons: string[];
+  matchBreakdown: Record<string, number> | null;
+  preferenceScore: number;
+  languageScore: number;
+  isShortlisted: boolean;
+  recommendationRank: number;
+  recommendationAction: 'CONTACT_NOW' | 'HIGH_PRIORITY' | 'REVIEW';
+  contactLocked: true;
+  contactUnlockRequired: true;
+};
+
+export type AiContactRecommendations = {
+  success: boolean;
+  mode: 'AI_CONTACT_RECOMMENDATIONS';
+  job: { id: string; title: string; status: string; city?: string | null; district?: string | null; state?: string | null; openings?: number | null };
+  recommendations: AiContactRecommendation[];
+  summary: { candidatesEvaluated: number; recommended: number; shortlisted: number; contactLocked: number };
+};
+
 export type RecruitmentDashboard = {
   success: boolean;
   mode: string;
@@ -79,6 +110,16 @@ export async function getRecruitmentDashboard(jobId: string) {
   return response.data;
 }
 
+export async function getAiContactRecommendations(jobId: string, limit = 10) {
+  const response = await api.get<AiContactRecommendations>(`/ai/jobs/${jobId}/recommended-workers`, { params: { limit } });
+  return response.data;
+}
+
+export async function shortlistAiWorker(jobId: string, workerId: string, input: { matchScore?: number; matchTier?: string; matchExplanation?: Record<string, unknown> } = {}) {
+  const response = await api.post(`/jobs/${jobId}/workers/${workerId}/shortlist`, input);
+  return response.data;
+}
+
 export async function getRecruitmentRecommendations(jobId: string, limit = 20) {
   const response = await api.get(`/jobs/${jobId}/autopilot/recommendations`, { params: { limit } });
   return response.data;
@@ -89,23 +130,12 @@ export async function initializeOutreach(jobId: string, workerId: string, prefer
   return response.data;
 }
 
-export async function logRecruitmentContact(jobId: string, workerId: string, input: {
-  channel: 'PHONE' | 'WHATSAPP' | 'SMS' | 'EMAIL';
-  status?: string;
-  outcome?: string;
-  notes?: string;
-  nextFollowUpAt?: string | null;
-}) {
+export async function logRecruitmentContact(jobId: string, workerId: string, input: { channel: 'PHONE' | 'WHATSAPP' | 'SMS' | 'EMAIL'; status?: string; outcome?: string; notes?: string; nextFollowUpAt?: string | null }) {
   const response = await api.post(`/jobs/${jobId}/workers/${workerId}/outreach/contact`, input);
   return response.data;
 }
 
-export async function updateRecruitmentStatus(jobId: string, workerId: string, input: {
-  status: string;
-  outcome?: string;
-  notes?: string;
-  nextFollowUpAt?: string | null;
-}) {
+export async function updateRecruitmentStatus(jobId: string, workerId: string, input: { status: string; outcome?: string; notes?: string; nextFollowUpAt?: string | null }) {
   const response = await api.patch(`/jobs/${jobId}/workers/${workerId}/outreach/status`, input);
   return response.data;
 }

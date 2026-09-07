@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateJobDraftDto } from './dto/create-job-draft.dto';
@@ -25,80 +25,39 @@ export class AiController {
   @Post('worker-search/parse')
   async parseWorkerSearch(@Body() dto: ParseWorkerRequirementDto) {
     const requirement = await this.requirementParserService.parse(dto.query);
-
-    return {
-      success: true,
-      query: dto.query,
-      requirement,
-    };
+    return { success: true, query: dto.query, requirement };
   }
 
   @Post('worker-search')
   async workerSearch(@Body() dto: WorkerSearchDto) {
-    const result = await this.workerSearchService.search(dto.query, {
-      latitude: dto.latitude,
-      longitude: dto.longitude,
-      radiusKm: dto.radiusKm,
-    }, {
-      page: dto.page,
-      limit: dto.limit,
-    });
-
-    return {
-      success: true,
-      ...result,
-    };
+    const result = await this.workerSearchService.search(dto.query, { latitude: dto.latitude, longitude: dto.longitude, radiusKm: dto.radiusKm }, { page: dto.page, limit: dto.limit });
+    return { success: true, ...result };
   }
 
   @Post('job-requirement/parse')
   async parseJobRequirement(@Body() dto: ParseJobRequirementDto) {
     const result = await this.jobRequirementService.parse(dto.query);
-
-    return {
-      success: true,
-      ...result,
-    };
+    return { success: true, ...result };
   }
 
   @Post('job-requirement/create-draft')
   @UseGuards(JwtAuthGuard)
-  async createJobDraft(
-    @CurrentUser() user: { userId: string },
-    @Body() dto: ParseJobRequirementDto & CreateJobDraftDto,
-  ) {
+  async createJobDraft(@CurrentUser() user: { userId: string }, @Body() dto: ParseJobRequirementDto & CreateJobDraftDto) {
     const result = await this.aiJobRequirementPersistenceService.createDraft(user.userId, dto);
-
-    if (!result.job) {
-      return {
-        success: false,
-        ...result.parsed,
-      };
-    }
-
-    return {
-      success: true,
-      status: 'DRAFT_CREATED',
-      query: dto.query,
-      requirement: result.parsed.requirement,
-      normalizedRequirement: result.parsed.normalizedRequirement,
-      suggestedJob: result.parsed.suggestedJob,
-      job: result.job,
-      aiRequirements: result.aiRequirements,
-    };
+    if (!result.job) return { success: false, ...result.parsed };
+    return { success: true, status: 'DRAFT_CREATED', query: dto.query, requirement: result.parsed.requirement, normalizedRequirement: result.parsed.normalizedRequirement, suggestedJob: result.parsed.suggestedJob, job: result.job, aiRequirements: result.aiRequirements };
   }
 
   @Post('jobs/:jobId/find-workers')
   @UseGuards(JwtAuthGuard)
-  async findWorkersForJob(
-    @CurrentUser() user: { userId: string },
-    @Param('jobId') jobId: string,
-    @Body() dto: FindWorkersByJobDto,
-  ) {
+  async findWorkersForJob(@CurrentUser() user: { userId: string }, @Param('jobId') jobId: string, @Body() dto: FindWorkersByJobDto) {
     const result = await this.jobWorkerSearchService.findWorkers(user.userId, jobId, dto);
+    return { success: true, ...result };
+  }
 
-    return {
-      success: true,
-      ...result,
-    };
+  @Get('jobs/:jobId/recommended-workers')
+  @UseGuards(JwtAuthGuard)
+  async recommendedWorkers(@CurrentUser() user: { userId: string }, @Param('jobId') jobId: string, @Query('limit') limit?: string) {
+    return this.jobWorkerSearchService.recommendedForContact(user.userId, jobId, Number(limit) || 10);
   }
 }
