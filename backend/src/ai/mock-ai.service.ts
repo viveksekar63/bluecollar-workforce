@@ -21,7 +21,7 @@ export class MockAiService implements AiProvider {
       [/\b(?:ac technician|ac mechanic|air conditioner technician)s?\b/i, 'AC Technician', 'Construction'],
       [/\b(?:civil helper)s?\b/i, 'Civil Helper', 'Construction'],
       [/\b(?:general labourer|general laborer|construction helper|construction worker)s?\b/i, 'General Labourer', 'Construction'],
-      [/\b(?:car driver|car drivers?|personal driver)s?\b/i, 'Car Driver', 'Driving'],
+      [/\b(?:car driver|personal driver)s?\b/i, 'Car Driver', 'Driving'],
       [/\b(?:heavy vehicle driver|lorry driver|truck driver)s?\b/i, 'Heavy Vehicle Driver', 'Driving'],
       [/\b(?:auto driver|auto rickshaw driver)s?\b/i, 'Auto Driver', 'Driving'],
       [/\b(?:delivery driver|delivery rider)s?\b/i, 'Delivery Driver', 'Driving'],
@@ -29,14 +29,10 @@ export class MockAiService implements AiProvider {
       [/\b(?:warehouse helper|warehouse worker)s?\b/i, 'Warehouse Helper', 'Delivery & Logistics'],
       [/\b(?:loader|loading worker)s?\b/i, 'Loader', 'Delivery & Logistics'],
       [/\b(?:house maid|maid|domestic helper)s?\b/i, 'House Maid', 'Domestic Services'],
-      [/\b(?:domestic cook|home cook|cook|cooking worker|parotta master|parotta cook|parotta chef)s?\b/i, 'Domestic Cook', 'Domestic Services'],
-      [/\b(?:babysitter|baby sitter|child care worker)s?\b/i, 'Babysitter', 'Domestic Services'],
-      [/\b(?:caregiver|care giver|patient care worker)s?\b/i, 'Caregiver', 'Domestic Services'],
-      [/\b(?:security guard|watchman|security officer)s?\b/i, 'Security Guard', 'Security Services'],
-      [/\b(?:security supervisor)s?\b/i, 'Security Supervisor', 'Security Services'],
+      [/\b(?:parotta master|parotta cook|parotta chef|domestic cook|home cook|cook|cooking worker)s?\b/i, 'Domestic Cook', 'Domestic Services'],
       [/\b(?:waiter|waitress|hotel server|restaurant server|food server)s?\b/i, 'Waiter', 'Hospitality'],
-      [/\b(?:hotel housekeeping|hotel housekeeper|housekeeper|room attendant)s?\b/i, 'Hotel Housekeeper', 'Hospitality'],
-      [/\b(?:chef|hotel chef|restaurant chef)s?\b/i, 'Chef', 'Hospitality'],
+      [/\b(?:hotel housekeeper|hotel housekeeping|housekeeper|room attendant)s?\b/i, 'Hotel Housekeeper', 'Hospitality'],
+      [/\b(?:hotel chef|restaurant chef|chef)s?\b/i, 'Chef', 'Hospitality'],
       [/\b(?:kitchen helper|kitchen assistant)s?\b/i, 'Kitchen Helper', 'Hospitality'],
       [/\b(?:receptionist|front desk executive)s?\b/i, 'Receptionist', 'Hospitality'],
       [/\b(?:sales executive|sales person|salesperson)s?\b/i, 'Sales Executive', 'Retail & Sales'],
@@ -97,7 +93,7 @@ export class MockAiService implements AiProvider {
 
     const city = this.extractKnownCity(query);
     const accommodationAvailable = /\baccommodation\s+(?:is\s+)?(?:available|provided)\b/i.test(query);
-    const immediate = /\b(?:available\s+immediately|immediately\s+available|immediate)\b/i.test(query);
+    const immediate = /\b(?:available\s+immediately|immediately\s+available|immediate|start\s+today|right\s+away)\b/i.test(query);
 
     const willingToRelocate = /\b(?:willing|ready|can)\s+to\s+relocate\b/i.test(query);
     const willingToTravel = /\b(?:willing|ready|can)\s+to\s+travel\b/i.test(query);
