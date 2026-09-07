@@ -1,5 +1,5 @@
 CREATE TABLE "job_worker_actions" (
-  "id" TEXT NOT NULL DEFAULT gen_random_uuid(),
+  "id" TEXT NOT NULL,
   "employer_id" TEXT NOT NULL,
   "job_id" TEXT NOT NULL,
   "worker_id" TEXT NOT NULL,
